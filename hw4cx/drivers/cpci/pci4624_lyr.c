@@ -368,7 +368,7 @@ pci4624_vmt_t pci4624_vmt =
 
 DEFINE_CXSD_LAYER(pci4624, "pci4624 access",
                   NULL, NULL,
-                  PCI4624_LYR_NAME, PCI4624_LYR_VERSION,
+                  PCI4624_LYR_API_NAME, PCI4624_LYR_API_VERSION,
                   pci4624_init_lyr, pci4624_term_lyr,
                   pci4624_disconnect,
                   &pci4624_vmt);

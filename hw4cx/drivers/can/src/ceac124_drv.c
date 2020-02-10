@@ -804,7 +804,7 @@ DEFINE_CXSD_DRIVER(ceac124, "CEAC124 CAN-DAC/ADC driver",
                    NULL, NULL,
                    sizeof(privrec_t), ceac124_params,
                    2, 2,
-                   CANKOZ_LYR_NAME, CANKOZ_LYR_VERSION,
+                   CANKOZ_LYR_API_NAME, CANKOZ_LYR_API_VERSION,
                    NULL,
                    -1, NULL, NULL,
                    ceac124_init_d, ceac124_term_d, ceac124_rw_p);

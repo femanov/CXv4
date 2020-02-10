@@ -13,7 +13,7 @@ TYPES_LIST=	ist_cdac20 vnn_ceac51 v1k_cdac20 v3h_a40d16 mps20_ceac124 \
 TYPES_FILES=	$(foreach T, $(TYPES_LIST), $T.devtype)
 
 EXPORTSFILES=	$(TYPES_FILES)
-EXPORTSDIR=	configs
+EXPORTSDIR=	configs/types
 
 ######################################################################
 PRJDIR=		..

@@ -147,7 +147,7 @@ DEFINE_CXSD_DRIVER(slio24_reg, "SLIO24-reg (works as a register) driver",
                    NULL, NULL,
                    sizeof(privrec_t), NULL,
                    2, 2,
-                   CANKOZ_LYR_NAME, CANKOZ_LYR_VERSION,
+                   CANKOZ_LYR_API_NAME, CANKOZ_LYR_API_VERSION,
                    NULL,
                    -1, NULL, NULL,
                    slio24_reg_init_d, NULL, slio24_reg_rw_p);

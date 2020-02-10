@@ -1,5 +1,5 @@
 SRCDIR=		../nsrc
-VMEHAL_PFX=	bivme2
+VME_HAL_PFX=	bivme2
 include		$(SRCDIR)/ShadowRules.mk
 
 #--- VmeserverShadowRules.mk -----------------------------------------
@@ -9,7 +9,7 @@ LISTOFDRIVERS=	$(SRCDIR)/LISTOFVMEDRIVERS.mk
 MAKEFILE_PARTS+=$(LISTOFDRIVERS)
 include		$(LISTOFDRIVERS)
 
-LISTOFVMELAYERS=$(VMEHAL_PFX)vme
+LISTOFVMELAYERS=$(VME_HAL_PFX)vme
 VME_LYR_SRCS=	$(addsuffix _lyr.c, $(LISTOFVMELAYERS))
 
 VME_DRV_SRCS=		$(addsuffix _drv.c, $(LISTOFVMEDRIVERS))
@@ -17,7 +17,7 @@ VME_SYMLINKS=		$(VME_DRV_SRCS)
 $(VME_SYMLINKS):	%: $(SRCDIR)/%
 			$(SCRIPTSDIR)/ln-sf_safe.sh $< $@
 
-v4$(VMEHAL_PFX)vmeserver.c:	$(SRCDIR)/vmeserver_common.c
+v4$(VME_HAL_PFX)vmeserver.c:	$(SRCDIR)/vmeserver_common.c
 			$(SCRIPTSDIR)/ln-sf_safe.sh $< $@
 
 vmeserver_drivers.c:	$(LISTOFDRIVERS) Makefile
@@ -44,15 +44,15 @@ vmeserver_drivers.c:	$(LISTOFDRIVERS) Makefile
 		  echo 'int remcxsd_numlyrs = countof(lyrtable);';     \
 		) >$@
 
-v4$(VMEHAL_PFX)vmeserver_COMPONENTS=	v4$(VMEHAL_PFX)vmeserver.o vmeserver_drivers.o \
+v4$(VME_HAL_PFX)vmeserver_COMPONENTS=	v4$(VME_HAL_PFX)vmeserver.o vmeserver_drivers.o \
 				$(VME_LYR_SRCS:.c=.o) \
 				$(VME_DRV_SRCS:.c=.o)
 
-LOCAL_GNTDFILES+=v4$(VMEHAL_PFX)vmeserver.c vmeserver_drivers.c $(VME_DRV_SRCS)
+LOCAL_GNTDFILES+=v4$(VME_HAL_PFX)vmeserver.c vmeserver_drivers.c $(VME_DRV_SRCS)
 #---------------------------------------------------------------------
 
-MONO_C_FILES=	$(VMEHAL_PFX)_test
-EXES=		v4$(VMEHAL_PFX)vmeserver
+MONO_C_FILES=	$(VME_HAL_PFX)_test
+EXES=		v4$(VME_HAL_PFX)vmeserver
 
 EXPORTSFILES=	$(EXES) $(MONO_C_FILES)
 EXPORTSDIR=	lib/server/drivers/bivme2_drvlets
@@ -73,12 +73,12 @@ LOCAL_INCLUDES+=-I$(GIVEN_DIR)
 
 LIBVMEDIRECT=	$(GIVEN_DIR)/libvmedirect.a
 
-v4$(VMEHAL_PFX)vmeserver.%:	SPECIFIC_DEFINES=-DVMESERVER_ISSUE='"CXv4 BIVME2 vmeserver"'
-v4$(VMEHAL_PFX)vmeserver:       $(LIBVMEDIRECT) \
+v4$(VME_HAL_PFX)vmeserver.%:	SPECIFIC_DEFINES=-DVMESERVER_ISSUE='"CXv4 BIVME2 vmeserver"'
+v4$(VME_HAL_PFX)vmeserver:       $(LIBVMEDIRECT) \
 				$(LIBREMSRV) \
 				$(LIBPZFRAME_DRV) \
 				$(LIBUSEFUL) $(LIBCXSCHEDULER) $(LIBMISC)
-v4$(VMEHAL_PFX)vmeserver:	SPECIFIC_LIBS+=$(LIBDL)
+v4$(VME_HAL_PFX)vmeserver:	SPECIFIC_LIBS+=$(LIBDL)
 
 #???
-$(VMEHAL_PFX)_test:	$(LIBVMEDIRECT) $(LIBMISC)
+$(VME_HAL_PFX)_test:	$(LIBVMEDIRECT) $(LIBMISC)

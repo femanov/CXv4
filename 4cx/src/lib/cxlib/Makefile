@@ -5,9 +5,11 @@
 #                                                                    #
 ######################################################################
 
-ARLIBS=		libcx_async.a libcx_sync.a
-libcx_async.a_COMPONENTS=	cxlib_client.o cxlib_utils.o cxlib_async.o
-libcx_sync.a_COMPONENTS=	cxlib_client.o cxlib_utils.o cxlib_sync.o
+ARLIBS=			libcx_async.a libcx_sync.a
+include 		libcx_async.a_COMPONENTS.mk
+include			libcx_sync.a_COMPONENTS.mk
+
+MAKEFILE_PARTS+=	libcx_async.a_COMPONENTS.mk libcx_sync.a_COMPONENTS.mk
 
 EXPORTSFILES=		$(ARLIBS)
 EXPORTSDIR=		lib

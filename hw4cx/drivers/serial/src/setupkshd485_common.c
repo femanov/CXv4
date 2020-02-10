@@ -13,10 +13,10 @@
 #include "misc_macros.h"
 #include "misclib.h"
 
-#ifndef SERIALHAL_FILE_H
-  #error The "SERIALHAL_FILE_H" macro is undefined
+#ifndef SERIAL_HAL_FILE_H
+  #error The "SERIAL_HAL_FILE_H" macro is undefined
 #else
-  #include SERIALHAL_FILE_H
+  #include SERIAL_HAL_FILE_H
 #endif
 
 
@@ -93,7 +93,7 @@ int main(int argc, char *argv[])
     seq[6] = baudrate_n;
     seq[7] = addr;
     
-    fd = serialhal_opendev(line, B600, errreport, argv[0]);
+    fd = serial_hal_opendev(line, B600, errreport, argv[0]);
     if (fd < 0) exit(2);
 
     errno = 0;

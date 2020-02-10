@@ -779,7 +779,7 @@ DEFINE_CXSD_DRIVER(panov_ubs, "Panov's UBS driver",
                    panov_ubs_init_mod, NULL,
                    sizeof(privrec_t), NULL,
                    2, 2,
-                   CANKOZ_LYR_NAME, CANKOZ_LYR_VERSION,
+                   CANKOZ_LYR_API_NAME, CANKOZ_LYR_API_VERSION,
                    NULL,
                    -1, NULL, NULL,
                    panov_ubs_init_d, NULL, panov_ubs_rw_p);

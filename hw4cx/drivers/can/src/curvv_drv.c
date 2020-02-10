@@ -265,7 +265,7 @@ DEFINE_CXSD_DRIVER(curvv, "CURVV driver",
                    NULL, NULL,
                    sizeof(privrec_t), NULL,
                    2, 2,
-                   CANKOZ_LYR_NAME, CANKOZ_LYR_VERSION,
+                   CANKOZ_LYR_API_NAME, CANKOZ_LYR_API_VERSION,
                    NULL,
                    -1, NULL, NULL,
                    curvv_init_d, NULL, curvv_rw_p);

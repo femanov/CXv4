@@ -1,6 +1,6 @@
 # CAN
 SRCDIR=		../src
-CANHAL_PFX=	skt
+CAN_HAL_PFX=	skt
 include		$(SRCDIR)/ShadowRules.mk
 
 #--- CanserverShadowRules.mk -----------------------------------------
@@ -8,7 +8,7 @@ LISTOFDRIVERS=	$(SRCDIR)/LISTOFCANDRIVERS.mk
 MAKEFILE_PARTS+=$(LISTOFDRIVERS)
 include		$(LISTOFDRIVERS)
 #
-LISTOFCANLAYERS=$(CANHAL_PFX)cankoz
+LISTOFCANLAYERS=$(CAN_HAL_PFX)cankoz
 CANKOZ_LYR_SRCS=$(addsuffix _lyr.c, $(LISTOFCANLAYERS))
 #
 CANKOZ_DRV_SRCS=	$(addsuffix _drv.c, $(LISTOFCANDRIVERS))
@@ -16,7 +16,7 @@ CANKOZ_SYMLINKS=	$(CANKOZ_DRV_SRCS)
 $(CANKOZ_SYMLINKS):	%: $(SRCDIR)/%
 			$(SCRIPTSDIR)/ln-sf_safe.sh $< $@
 #
-v4$(CANHAL_PFX)canserver.c:		$(SRCDIR)/canserver_common.c
+v4$(CAN_HAL_PFX)canserver.c:		$(SRCDIR)/canserver_common.c
 			$(SCRIPTSDIR)/ln-sf_safe.sh $< $@
 #
 canserver_drivers.c:	$(LISTOFDRIVERS) Makefile
@@ -45,8 +45,8 @@ canserver_drivers.c:	$(LISTOFDRIVERS) Makefile
 #---------------------------------------------------------------------
 
 #
-EXES=				v4$(CANHAL_PFX)canserver
-v4$(CANHAL_PFX)canserver_COMPONENTS=	v4$(CANHAL_PFX)canserver.o canserver_drivers.o \
+EXES=				v4$(CAN_HAL_PFX)canserver
+v4$(CAN_HAL_PFX)canserver_COMPONENTS=	v4$(CAN_HAL_PFX)canserver.o canserver_drivers.o \
 				$(CANKOZ_LYR_SRCS:.c=.o) \
 				$(CANKOZ_DRV_SRCS:.c=.o)
 
@@ -62,10 +62,10 @@ include		$(PRJDIR)/PrjRules.mk
 GIVEN_DIR=	../socketcan
 LOCAL_INCLUDES+=-I$(GIVEN_DIR)
 
-v4$(CANHAL_PFX)canserver.%:	SPECIFIC_DEFINES=-DCANSERVER_ISSUE='"CXv4 SocketCAN canserver"'
-LOCAL_GNTDFILES+=v4$(CANHAL_PFX)canserver.c canserver_drivers.c $(CANKOZ_DRV_SRCS)
+v4$(CAN_HAL_PFX)canserver.%:	SPECIFIC_DEFINES=-DCANSERVER_ISSUE='"CXv4 SocketCAN canserver"'
+LOCAL_GNTDFILES+=v4$(CAN_HAL_PFX)canserver.c canserver_drivers.c $(CANKOZ_DRV_SRCS)
 
 #
-v4$(CANHAL_PFX)canserver:	$(LIBREMSRV) \
+v4$(CAN_HAL_PFX)canserver:	$(LIBREMSRV) \
 				$(LIBUSEFUL) $(LIBCXSCHEDULER) $(LIBMISC)
-v4$(CANHAL_PFX)canserver:	SPECIFIC_LIBS+=$(LIBDL)
+v4$(CAN_HAL_PFX)canserver:	SPECIFIC_LIBS+=$(LIBDL)

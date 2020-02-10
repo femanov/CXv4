@@ -64,7 +64,7 @@ include		$(PRJDIR)/PrjRules.mk
 ######################################################################
 
 
-LOCAL_GNTDFILES+=serialserver_drivers.c
+LOCAL_GNTDFILES+=serialserver_drivers.c $(SERIAL_SYMLINKS)
 
 #
 cxv4moxaserver:	$(LIBREMSRV) \

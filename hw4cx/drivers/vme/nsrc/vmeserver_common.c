@@ -22,21 +22,26 @@ static remsrv_conscmd_descr_t vmeserver_commands[] =
 static const char * vmeserver_clninfo(int devid)
 {
   vme_vmt_t    *vmt;
+  int           bus_major;
+  int           bus_minor;
   uint32        base_addr;
   uint32        space_size;
+  int           addr_size;
   int           am;
   int           irq_n;
   int           irq_vect;
 
-  char          devinfo_buf[100];
+  char          devinfo_buf[200];
   static char   buf2return [100];
 
     if ((vmt = GetLayerVMT(devid)) != NULL  &&
         vmt->get_dev_info(devid,
-                          &base_addr, &space_size, &am,
+                          &bus_major, &bus_minor,
+                          &base_addr, &space_size,
+                          &addr_size, &am,
                           &irq_n, &irq_vect) >= 0)
-        sprintf(devinfo_buf, "(0x%02x:0x%08x/0x%08x %c:0x%02X)",
-                am, base_addr, space_size,
+        sprintf(devinfo_buf, "(@%d/%d:%d:0x%02x:0x%08x/0x%08x %c:0x%02X)",
+                bus_major, bus_minor, addr_size, am, base_addr, space_size,
                 (irq_n >= 0  &&  irq_n <= 7)? '0'+irq_n : '-', irq_vect);
     else
         sprintf(devinfo_buf, "-");

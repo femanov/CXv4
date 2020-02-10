@@ -14,6 +14,19 @@ extern "C"
 #endif /* __cplusplus */
 
 
+/* Note:
+       When building with Android NDK, it employs its own build system and
+       does NOT use CX's GeneralRules.mk+Config.mk build system.
+       Thus, neither OS_* nor CPU_* are defined as expected by cx_sysdeps.h.
+       However, since Android is a Linux system under the hood
+       (at least as of 2020, Android about 9, platform 24),
+       the following condition "__ANDROID__ implies OS_LINUX" does the trick.
+*/
+#ifdef __ANDROID__
+  #define OS_LINUX
+#endif /* __ANDROID__ */
+
+
 /* Set system-dependent OPTIONs */
 #include "sysdeps/os_linux.h"
 #include "sysdeps/os_cygwin.h"

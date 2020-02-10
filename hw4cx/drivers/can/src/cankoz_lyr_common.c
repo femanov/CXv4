@@ -5,15 +5,15 @@
 #include "cankoz_numbers.h"
 #include "cankoz_strdb.h"
 
-#ifndef CANHAL_FILE_H
-  #error The "CANHAL_FILE_H" macro is undefined
+#ifndef CAN_HAL_FILE_H
+  #error The "CAN_HAL_FILE_H" macro is undefined
 #else
-  #include CANHAL_FILE_H
-#endif /* CANHAL_FILE_H */
+  #include CAN_HAL_FILE_H
+#endif /* CAN_HAL_FILE_H */
 
-#ifndef CANLYR_NAME
-  #error The "CANLYR_NAME" macro is undefined
-#endif /* CANLYR_NAME */
+#ifndef CANKOZ_LYR_NAME
+  #error The "CANKOZ_LYR_NAME" macro is undefined
+#endif /* CANKOZ_LYR_NAME */
 
 
 enum {CANKOZ_MAXPKTBYTES = 8};
@@ -171,20 +171,20 @@ static int SendFrame(lineinfo_t *lp, int kid,
   int   errflg;
   char *errstr;
     
-    r = canhal_send_frame(lp->fd, encode_frameid(kid, prio), dlc, data);
+    r = can_hal_send_frame(lp->fd, encode_frameid(kid, prio), dlc, data);
     log_frame(prio == CANKOZ_PRIO_BROADCAST    ||
               kid < 0  ||  kid >= DEVSPERLINE  ||
               lp->devs[kid].devid <= 0 ? my_lyrid
                                        : lp->devs[kid].devid,
               "SNDFRAME", encode_frameid(kid, prio), dlc, data);
     
-    if (r != CANHAL_OK  &&  r != lp->last_wr_r)
+    if (r != CAN_HAL_OK  &&  r != lp->last_wr_r)
     {
         errflg = 0;
         errstr = "";
-        if      (r == CANHAL_ZERO)   errstr = ": ZERO";
-        else if (r == CANHAL_BUSOFF) errstr = ": BUSOFF";
-        else                         errflg = DRIVERLOG_ERRNO;
+        if      (r == CAN_HAL_ZERO)   errstr = ": ZERO";
+        else if (r == CAN_HAL_BUSOFF) errstr = ": BUSOFF";
+        else                          errflg = DRIVERLOG_ERRNO;
         
         DoDriverLog(my_lyrid, 0 | errflg, "%s(%d:k%d/%d, dlc=%d, cmd=0x%02x)%s",
                     __FUNCTION__, lp2line(lp), kid, prio, dlc,
@@ -207,7 +207,7 @@ static int  cankoz_sender     (void *elem, void *privptr)
   
     r = SendFrame(lines + dp->line, dp->kid, qe->prio, qe->dlc, qe->data);
     
-    return r == CANHAL_OK? 0 : -1;
+    return r == CAN_HAL_OK? 0 : -1;
 }
 
 static int  cankoz_eq_cmp_func(void *elem, void *ptr)
@@ -574,7 +574,7 @@ static void  cankoz_disconnect(int devid)
                 /* ...or was last "client" of this line? */
                 /* Then release the line! */
                 sl_del_fd(lines[l].fdhandle);
-                canhal_close_line(lines[l].fd);
+                can_hal_close_line(lines[l].fd);
                 lines[l].fd = -1;
             }
         NEXT_KID:;
@@ -683,16 +683,16 @@ static int  cankoz_add   (int devid, void *devptr,
         /*!!! Obtain layer-info and psp-parse it */
 
         err = NULL;
-        lp->fd = canhal_open_and_setup_line(line, /*!!!*/CANHAL_B125K, &err);
+        lp->fd = can_hal_open_and_setup_line(line, /*!!!*/CAN_HAL_B125K, &err);
         if (lp->fd < 0)
         {
             DoDriverLog(my_lyrid, 0 | DRIVERLOG_ERRNO,
-                        "%s: canhal_open_and_setup_line(): %s",
+                        "%s: can_hal_open_and_setup_line(): %s",
                         __FUNCTION__, err);
             sq_fini(&(dp->q));
             return -CXRF_DRV_PROBL;
         }
-        lp->last_rd_r  = lp->last_wr_r = CANHAL_OK;
+        lp->last_rd_r  = lp->last_wr_r = CAN_HAL_OK;
         lp->last_ex_id = 0;
         lp->fdhandle   = sl_add_fd(my_lyrid, NULL, lp->fd, SL_RD,
                                    cankoz_fd_p, lp);
@@ -930,21 +930,21 @@ static void cankoz_fd_p     (int devid, void *devptr,
   int           x;
 
     /* Obtain a frame */
-    r = canhal_recv_frame(fd, &can_id, &can_dlc, can_data);
+    r = can_hal_recv_frame(fd, &can_id, &can_dlc, can_data);
     last_rd_r = lp->last_rd_r;
     lp->last_rd_r = r;
     handle = -1;
 
     /* Check result */
-    if (r != CANHAL_OK)
+    if (r != CAN_HAL_OK)
     {
         if (r != last_rd_r)
         {
             errflg = 0;
             errstr = "";
-            if      (r == CANHAL_ZERO)   errstr = ": ZERO";
-            else if (r == CANHAL_BUSOFF) errstr = ": BUSOFF";
-            else                         errflg = DRIVERLOG_ERRNO;
+            if      (r == CAN_HAL_ZERO)   errstr = ": ZERO";
+            else if (r == CAN_HAL_BUSOFF) errstr = ": BUSOFF";
+            else                          errflg = DRIVERLOG_ERRNO;
             
             DoDriverLog(my_lyrid, 0 | errflg, "%s()%s", __FUNCTION__, errstr);
         }
@@ -1225,9 +1225,9 @@ static cankoz_vmt_t cankoz_vmt =
 };
 
 
-DEFINE_CXSD_LAYER(CANLYR_NAME, "CANKOZ implementation via '" __CX_STRINGIZE(CANHAL_DESCR) "' HAL",
+DEFINE_CXSD_LAYER(CANKOZ_LYR_NAME, "CANKOZ implementation via '" __CX_STRINGIZE(CAN_HAL_DESCR) "' HAL",
                   NULL, NULL,
-                  CANKOZ_LYR_NAME, CANKOZ_LYR_VERSION,
+                  CANKOZ_LYR_API_NAME, CANKOZ_LYR_API_VERSION,
                   cankoz_init_lyr, cankoz_term_lyr,
                   cankoz_disconnect,
                   &cankoz_vmt);

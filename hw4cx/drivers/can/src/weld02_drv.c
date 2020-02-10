@@ -317,7 +317,7 @@ DEFINE_CXSD_DRIVER(weld02, "Zharikov-Repkov WELD02 welding controller",
                    NULL, NULL,
                    sizeof(privrec_t), weld02_params,
                    2, 2,
-                   CANKOZ_LYR_NAME, CANKOZ_LYR_VERSION,
+                   CANKOZ_LYR_API_NAME, CANKOZ_LYR_API_VERSION,
                    NULL,
                    -1, NULL, NULL,
                    weld02_init_d, weld02_term_d, weld02_rw_p);

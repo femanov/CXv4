@@ -1,5 +1,5 @@
 /*********************************************************************
-  udpcanhal.h
+  udpcan_hal.h
       This file implements CAN Hardware Abstraction Layer
       via UDP-CAN (CAN over UDP by Panov/Bolkhovityanov)
       and is intended to be included by cankoz_lyr*
@@ -20,12 +20,12 @@
 
 #include "misclib.h"
 
-#include "canhal.h"
+#include "can_hal.h"
 
 #include "udpcan_proto.h"
 
 
-static int  canhal_open_and_setup_line(int line_n, int speed_n, char **errstr)
+static int  can_hal_open_and_setup_line(int line_n, int speed_n, char **errstr)
 {
   int                 fd;
   int                 r;
@@ -74,13 +74,13 @@ static int  canhal_open_and_setup_line(int line_n, int speed_n, char **errstr)
     return -1;
 }
 
-static void canhal_close_line         (int  fd)
+static void can_hal_close_line         (int  fd)
 {
     close(fd);
 }
 
-static int  canhal_send_frame         (int  fd,
-                                       int  id,   int  dlc,   uint8 *data)
+static int  can_hal_send_frame         (int  fd,
+                                        int  id,   int  dlc,   uint8 *data)
 {
   udp_can_frame_b_t  frame;
   int                r;
@@ -99,20 +99,20 @@ static int  canhal_send_frame         (int  fd,
 
     errno = 0;
     r = write(fd, &frame, sizeof(frame));
-    if      (r >  0/*!!!*/) return CANHAL_OK;
-    else if (r == 0) return CANHAL_ZERO;
-    else             return CANHAL_ERR;
+    if      (r >  0/*!!!*/) return CAN_HAL_OK;
+    else if (r == 0) return CAN_HAL_ZERO;
+    else             return CAN_HAL_ERR;
 }
 
-static int  canhal_recv_frame         (int  fd,
-                                       int *id_p, int *dlc_p, uint8 *data)
+static int  can_hal_recv_frame         (int  fd,
+                                        int *id_p, int *dlc_p, uint8 *data)
 {
   udp_can_frame_b_t  frame;
   int                r;
 
     r = read(fd, &frame, sizeof(frame));
-    if      (r <  0)            return CANHAL_ERR;
-    else if (r < sizeof(frame)) return CANHAL_ZERO;
+    if      (r <  0)            return CAN_HAL_ERR;
+    else if (r < sizeof(frame)) return CAN_HAL_ZERO;
 
     *id_p = frame.can_id_b[0]        |
            (frame.can_id_b[1] <<  8) |
@@ -123,9 +123,9 @@ static int  canhal_recv_frame         (int  fd,
     {
         /* Log this somehow? */
         errno = EFBIG;
-        return CANHAL_ERR;
+        return CAN_HAL_ERR;
     }
     if (*dlc_p > 0) memcpy(data, frame.can_data, *dlc_p);
 
-    return CANHAL_OK;
+    return CAN_HAL_OK;
 }

@@ -808,7 +808,7 @@ DEFINE_CXSD_DRIVER(cac208, "CAC208/CEAC208 CAN-DAC/ADC driver",
                    NULL, NULL,
                    sizeof(privrec_t), cac208_params,
                    2, 2,
-                   CANKOZ_LYR_NAME, CANKOZ_LYR_VERSION,
+                   CANKOZ_LYR_API_NAME, CANKOZ_LYR_API_VERSION,
                    NULL,
                    -1, NULL, NULL,
                    cac208_init_d, cac208_term_d, cac208_rw_p);

@@ -1,9 +1,9 @@
-# Note: vnn_ceac51 is the same as v1k_cdac20 and is served by latter's driver
+# Note: vnn_ceac51 is the same as ist_cdac20 and is served by latter's driver
 #       Only several channel names differ (Veremeenko's interlocks and
 #       measurements are mapped to different inputs)
 devtype vnn_ceac51 w50i,r50i {
-	iset		0
-	iset_rate	1
+	iset		0	1000000.0 units:A
+	iset_rate	1	1000000.0 units:A/s
 	switch_on	2
 	switch_off	3
 	rst_ilks	4
@@ -23,7 +23,7 @@ devtype vnn_ceac51 w50i,r50i {
 	adc_0v		56
 	adc_p10v	57
 
-	iset_cur	58
+	iset_cur	58	1000000.0 units:A
 	digcorr_factor	59
 	opr		60
 

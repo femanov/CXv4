@@ -514,7 +514,7 @@ DEFINE_CXSD_DRIVER(dl200me, "DL200ME delay line",
                    NULL, NULL,
                    sizeof(dl200me_privrec_t), dl200me_params,
                    1, 1,
-                   PCI4624_LYR_NAME, PCI4624_LYR_VERSION,
+                   PCI4624_LYR_API_NAME, PCI4624_LYR_API_VERSION,
                    NULL,
                    -1, NULL, NULL,
                    dl200me_init_d, NULL, dl200me_rw_p);

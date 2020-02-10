@@ -209,7 +209,7 @@ static void UnGetL0c(ppf4td_ctx_t *ctx, int ch)
 //////////////////////////////////////////////////////////////////////
 
 
-int ppf4td_open (ppf4td_ctx_t *ctx, const char *def_scheme, const char *reference)
+int ppf4td_open (ppf4td_ctx_t *ctx, const char *def_scheme, const char *reference, const char *path_info)
 {
   char                scheme[20];
   const char         *location;
@@ -239,7 +239,7 @@ int ppf4td_open (ppf4td_ctx_t *ctx, const char *def_scheme, const char *referenc
     ctx->_curline   = 0; // Will be incremented upon 1st getc
     ctx->_is_at_bol = 1;
 
-    r = metric->open(ctx, location);
+    r = metric->open(ctx, location, path_info);
     if (r != 0) return -1;
 
     ctx->vmt = metric;
@@ -487,7 +487,7 @@ int         ppf4td_skip_white(ppf4td_ctx_t *ctx)
     return 0;
 }
 
-int         ppf4td_get_ident (ppf4td_ctx_t *ctx, int flags, char *buf, size_t bufsize)
+int         ppf4td_get_ident (ppf4td_ctx_t *ctx, int flags, char   *buf, size_t bufsize)
 {
   int  ch;
   int  x;
@@ -523,17 +523,95 @@ int         ppf4td_get_ident (ppf4td_ctx_t *ctx, int flags, char *buf, size_t bu
     return 0;
 }
 
-int         ppf4td_get_int   (ppf4td_ctx_t *ctx, int flags, int  *vp,  int defbase, int *base_p)
+int         ppf4td_get_int   (ppf4td_ctx_t *ctx, int flags, int    *vp,  int defbase, int *base_p)
 {
-  int  r;
-  int  ch;
-  int  digit;
+  int   r;
+  int   ch;
+  int   digit;
 
-  int  base;
-  int  pos;
-  int  rqd;
-  int  val;
-  int  neg;
+  int   base;
+  int   pos;
+  int   rqd;
+  int   val;
+  int   neg;
+
+    if (defbase < 0)
+    {
+        errno = EINVAL;
+        return -1;
+    }
+
+    base = defbase > 0? defbase : 10;
+    for (pos = 0, rqd = 1, val = 0, neg = 0;
+         ;
+         pos++)
+    {
+        r = ppf4td_peekc(ctx, &ch);
+        if (r <= 0) goto END_PARSE;
+
+        if      (ch >= '0'  &&  ch <= '9') digit = ch - '0';
+        else if (ch >= 'a'  &&  ch <= 'z') digit = ch - 'a' + 10;
+        else if (ch >= 'A'  &&  ch <= 'Z') digit = ch - 'A' + 10;
+        else                               digit = -1;
+
+        if      (ch == '-'  &&  pos == 0  && (flags & PPF4TD_FLAG_UNSIGNED) == 0)
+        {
+            neg = 1;
+            goto NEXT_CH;
+        }
+        else if (digit >= 0  &&  digit < base)
+        {
+            val = (val * base) + digit;
+            rqd = 0;
+            if (pos == 0  &&  digit == 0  &&  defbase <= 0) base = 8;
+        }
+        else if (pos == 1  &&  val == 0  &&
+                 (
+                  ((ch == 'b'  ||  ch == 'B')  &&  (defbase <= 0  ||  defbase == 2))
+                  ||
+                  ((ch == 'x'  ||  ch == 'X')  &&  (defbase <= 0  ||  defbase == 16))
+                 )
+                )
+        {
+            base = (toupper(ch) == 'B')? 2 : 16;
+            rqd = 1;
+        }
+        else goto END_PARSE;
+
+ NEXT_CH:
+        ppf4td_nextc(ctx, &ch);
+    }
+ END_PARSE:
+    if      (r < 0)
+        return -1;
+    else if (r == 0  &&  rqd)
+    {
+        errno = PPF4TD_EEOF;
+        return -1;
+    }
+    else if (rqd)
+    {
+        errno = ppf4td_is_at_eol(ctx)? PPF4TD_EEOL : PPF4TD_EINT;
+        return -1;
+    }
+
+    if (neg) val = -val;
+    *vp = val;
+    if (base_p != NULL) *base_p = base;
+    return 0;
+}
+
+int         ppf4td_get_quad  (ppf4td_ctx_t *ctx, int flags, int64  *vp,  int defbase, int *base_p)
+{
+  int   r;
+  int   ch;
+  int   digit;
+
+  int   base;
+  int   pos;
+  int   rqd;
+  int64 val;
+  int   neg;
 
     if (defbase < 0)
     {
@@ -627,7 +705,7 @@ static int getxdigit(ppf4td_ctx_t *ctx, int *xdigit_p)
 
     return 0;
 }
-int         ppf4td_get_string(ppf4td_ctx_t *ctx, int flags, char *buf, size_t bufsize)
+int         ppf4td_get_string(ppf4td_ctx_t *ctx, int flags, char   *buf, size_t bufsize)
 {
   int   ch;
   int   x;
@@ -757,7 +835,7 @@ int         ppf4td_get_string(ppf4td_ctx_t *ctx, int flags, char *buf, size_t bu
     return 0;
 }
 
-int         ppf4td_read_line (ppf4td_ctx_t *ctx, int flags, char *buf, size_t bufsize)
+int         ppf4td_read_line (ppf4td_ctx_t *ctx, int flags, char   *buf, size_t bufsize)
 {
   int  ch;
   int  x;

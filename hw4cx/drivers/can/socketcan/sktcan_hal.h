@@ -1,7 +1,7 @@
 /*********************************************************************
-  xrttcanhal.h
+  sktcan_hal.h
       This file implements CAN Hardware Abstraction Layer
-      via RT-SocketCAN (Xenomai) API,
+      via SocketCAN (Linux kernel ~= 2.6.25) API,
       and is intended to be included by cankoz_lyr*
 *********************************************************************/
 
@@ -18,7 +18,7 @@
 #include <sys/socket.h>
 
 
-#include "canhal.h"
+#include "can_hal.h"
 
 #include <net/if.h>
 #include <linux/can.h>
@@ -32,7 +32,7 @@
 #endif
 
 
-static int  canhal_open_and_setup_line(int line_n, int speed_n, char **errstr)
+static int  can_hal_open_and_setup_line(int line_n, int speed_n, char **errstr)
 {
   int                  fd;
   int                  saved_errno;
@@ -50,7 +50,7 @@ static int  canhal_open_and_setup_line(int line_n, int speed_n, char **errstr)
     }
 
     /* Bind it to specified CAN line */
-    check_snprintf(ifr.ifr_name, sizeof(ifr.ifr_name), "rtcan%d", line_n);
+    check_snprintf(ifr.ifr_name, sizeof(ifr.ifr_name), "can%d", line_n);
     if (ioctl(fd, SIOCGIFINDEX, &ifr) < 0)
     {
         *errstr = "ioctl(,SIOCGIFINDEX,)";
@@ -76,13 +76,13 @@ static int  canhal_open_and_setup_line(int line_n, int speed_n, char **errstr)
     return -1;
 }
 
-static void canhal_close_line         (int  fd)
+static void can_hal_close_line         (int  fd)
 {
     close(fd);
 }
 
-static int  canhal_send_frame         (int  fd,
-                                       int  id,   int  dlc,   uint8 *data)
+static int  can_hal_send_frame         (int  fd,
+                                        int  id,   int  dlc,   uint8 *data)
 {
   struct can_frame  frame;
   int               r;
@@ -97,25 +97,25 @@ static int  canhal_send_frame         (int  fd,
     
     errno = 0;
     r = write(fd, &frame, sizeof(frame));
-    if      (r >  0/*!!!*/) return CANHAL_OK;
-    else if (r == 0) return CANHAL_ZERO;
-    else             return CANHAL_ERR;
+    if      (r >  0/*!!!*/) return CAN_HAL_OK;
+    else if (r == 0) return CAN_HAL_ZERO;
+    else             return CAN_HAL_ERR;
 }
 
-static int  canhal_recv_frame         (int  fd,
-                                       int *id_p, int *dlc_p, uint8 *data)
+static int  can_hal_recv_frame         (int  fd,
+                                        int *id_p, int *dlc_p, uint8 *data)
 {
   struct can_frame  frame;
   int               r;
 
     r = read(fd, &frame, sizeof(frame));
     if      (r >  0/*!!!*/) ;
-    else if (r == 0) return CANHAL_ZERO;
-    else             return CANHAL_ERR;
+    else if (r == 0) return CAN_HAL_ZERO;
+    else             return CAN_HAL_ERR;
         
     *id_p  = frame.can_id;
     *dlc_p = frame.can_dlc;
     if (frame.can_dlc > 0) memcpy(data, frame.data, frame.can_dlc);
 
-    return CANHAL_OK;
+    return CAN_HAL_OK;
 }

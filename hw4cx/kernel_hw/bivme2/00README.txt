@@ -4,7 +4,10 @@ This is a version of BIVME2 interrupts driver (vmei) with support for IRQ
 buffering.
 
 Original driver by Vitaly Mamkin circa 2004.
-Buffering support added by Dmitry Bolkhovutyanov in 2019.
+
+28-01-2020	Fix: unmasking interrupts immediately at end of
+		vme_interrupt(); compatible with ROAK only, NOT with RORA
+20-12-2019	Buffering support added by Dmitry Bolkhovityanov
 
 ----------------------------------------------------------------------
 

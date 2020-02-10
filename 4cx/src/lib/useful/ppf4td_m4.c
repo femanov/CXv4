@@ -8,16 +8,18 @@
 #include "ppf4td_m4.h"
 
 
-static int ppf4td_m4_open (ppf4td_ctx_t *ctx, const char *reference)
+static int ppf4td_m4_open (ppf4td_ctx_t *ctx, const char *reference, const char *path_info)
 {
   static const char *model[] = {"/usr/bin/m4", "-s"};
 
-  const char        *cmdline[countof(model) + 2 + 2];
+  const char        *cmdline[countof(model) + 2 + 2 + 2]; // -I+basedir, -I+basedir+basedir/path_info, filename+NULL
   int                i;
 
   const char        *sl_p;
-  size_t             path_len;
-  char               Ipath[PATH_MAX];
+  size_t             path1_len;
+  size_t             path2_len;
+  char               Ipath1[PATH_MAX];
+  char               Ipath2[PATH_MAX];
 
     /* Check file existence/readability */
     if (access(reference, R_OK) != 0) return -1;
@@ -28,12 +30,26 @@ static int ppf4td_m4_open (ppf4td_ctx_t *ctx, const char *reference)
     sl_p = strrchr(reference, '/');
     if (sl_p != NULL)
     {
-        path_len = (sl_p - reference) + 1 /* "+1" for slash itself */;
-        if (path_len < sizeof(Ipath) - 1)
+        path1_len = (sl_p - reference) + 1 /* "+1" for slash itself */;
+        if (path1_len < sizeof(Ipath1) - 1)
         {
-            memcpy(Ipath, reference, path_len); Ipath[path_len] = '\0';
+            memcpy(Ipath1, reference, path1_len); Ipath1[path1_len] = '\0';
             cmdline[i++] = "-I";
-            cmdline[i++] = Ipath;
+            cmdline[i++] = Ipath1;
+
+            if (path_info != NULL  &&  path_info[0] != '0')
+            {
+                path2_len = path1_len + 1/* '/' */ + strlen(path_info);
+                if (path2_len < sizeof(Ipath2) - 1)
+                {
+                    memcpy(Ipath2, Ipath1, path1_len);
+                    Ipath2[path1_len] = '/';
+                    memcpy(Ipath2 + path1_len + 1, path_info, strlen(path_info));
+                    Ipath2[path2_len] = '\0';
+                    cmdline[i++] = "-I";
+                    cmdline[i++] = Ipath2;
+                }
+            }
         }
     }
     /* File name and terminating NULL */

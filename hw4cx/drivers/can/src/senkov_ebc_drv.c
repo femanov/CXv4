@@ -167,7 +167,7 @@ DEFINE_CXSD_DRIVER(senkov_ebc, "Senkov/Pureskin EBC (Electron-Beam Controller)",
                    NULL, NULL,
                    sizeof(privrec_t), senkov_ebc_params,
                    2, 2,
-                   CANKOZ_LYR_NAME, CANKOZ_LYR_VERSION,
+                   CANKOZ_LYR_API_NAME, CANKOZ_LYR_API_VERSION,
                    NULL,
                    -1, NULL, NULL,
                    senkov_ebc_init_d, NULL, senkov_ebc_rw_p);

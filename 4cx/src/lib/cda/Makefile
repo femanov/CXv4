@@ -16,16 +16,14 @@ else
 endif
 
 ARLIBS=		libcda.a libcda_d_insrv.a
-libcda.a_COMPONENTS=	cda_core.o cda_err.o \
-			cda_plugmgr.o \
-			cda_d_cx.o cda_d_dircn.o cda_d_local.o \
-			cda_d_vcas.o \
-			cda_f_fla.o
+include		libcda.a_COMPONENTS.mk
 ifeq "$(NOV2CX)" ""
   libcda.a_COMPONENTS+=	cda_d_v2cx.o v2subsysaccess.o
 endif
 libcda.a_GIVEN_COMPONENTS=	$(foreach F, $(v2all_COMPONENTS), $(V2LIBS_DIR)/$F)
-libcda_d_insrv.a_COMPONENTS=	cda_d_insrv.o
+include		libcda_d_insrv.a_COMPONENTS.mk
+
+MAKEFILE_PARTS+=	libcda.a_COMPONENTS.mk libcda_d_insrv.a_COMPONENTS.mk
 
 EXPORTSFILES=		$(ARLIBS)
 EXPORTSDIR=		lib

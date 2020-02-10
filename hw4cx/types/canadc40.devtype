@@ -14,5 +14,5 @@ devtype canadc40 w40i,r20i,w8i,r16i,w1i,r2i,w13i,r100i,w32i,w32i,r32i,r4i,w100i 
 	outr8b		84
         inpr8b		85
 
-	adc<0-39>      	100
+	adc<0-39>      	100	1000000.0 units:V
 }

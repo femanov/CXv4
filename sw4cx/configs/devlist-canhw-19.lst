@@ -36,7 +36,7 @@ cpoint ic.linCNV.ilk_vacuum cnv_sds.inprb3
 cpoint ic.linCNV.ready      ic.linCNV.is_on
 
 # 0.
-dev slio   slio24_reg/remdrv ~ 0,7 b:v5-sr-rfr
+dev slio   slio24_reg/remdrv ~ 0,7 b:cangw-rfgen # ex-"v5-sr-rfr"
 # Code=(val-eoff)/eslo, eoff=2831316.8384, eslo=0.0122886464
 # Code=(val+D)*R => D=-2831316.8384, R=1/0.0122886464=81.37592762047413
 cpoint ic.linRF.MasterGen.frq slio.word24 81.37592762047413 -2831316.8384

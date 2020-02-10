@@ -14,7 +14,7 @@ static void ProcessFile(const char *argv0, const char *filename)
   int           ch;
   int           prev_ch = '\n';
 
-    r = ppf4td_open(&ctx, "plaintext", filename);
+    r = ppf4td_open(&ctx, "plaintext", filename, NULL);
     if (r != 0)
     {
         fprintf(stderr, "%s: failed to open \"%s\", %s\n",

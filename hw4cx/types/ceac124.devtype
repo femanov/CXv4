@@ -24,23 +24,23 @@ devtype ceac124 w40i,r20i,w8i,r16i,w1i,r2i,w13i,r100i,w32i,w32i,r32i,r4i,w1i31,w
 	outr8b		84
         inpr8b		85
 
-	adc<0-15>      	100
+	adc<0-15>      	100	1000000.0 units:V
 
         adc_t		adc12
         adc_pwr		adc13
 	adc_p10v	adc14
         adc_0v		adc15
 
-	out<0-3>       	200
-        out_rate<0-3>	232
-        out_cur<0-3>	264
+	out<0-3>       	200	1000000.0 units:V
+        out_rate<0-3>	232	1000000.0 units:V/s
+        out_cur<0-3>	264	1000000.0 units:V
 
-	out_imm<0-3>	204
+	out_imm<0-3>	204	1000000.0 units:V
 	out_tac<0-3>	236
 
-	out_tab_times	300
-	out_tab_all	301
-	out_tab<0-3>	302
+	out_tab_times	300	1000000.0 units:s
+	out_tab_all	301	1000000.0 units:V
+	out_tab<0-3>	302	1000000.0 units:V
 
 	out_tab_errdescr	399
 }

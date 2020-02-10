@@ -275,6 +275,7 @@ static int32 ValidateParam(pzframe_drv_t *pdr, int n, int32 v)
     }
     else if (n == ADC250_CHAN_PTSOFS)
     {
+        v &=~ 1;
         if (v < 0)                           v = 0;
         if (v > ADC250_MAX_ALLOWED_NUMPTS-1) v = ADC250_MAX_ALLOWED_NUMPTS-1;
     }
@@ -332,8 +333,8 @@ static int   InitParams(pzframe_drv_t *pdr)
 
     /* Read current values from device */
     me->lvmt->a32rd32(me->handle, ADC4X250_R_TIMER,             &w);
-fprintf(stderr, "%s *** %s ***\n", strcurtime_msc(), __FUNCTION__);
-fprintf(stderr, "TIMER=%08x\n", w);
+fprintf(stderr, "%s *** %s[%d] ***\n", strcurtime_msc(), __FUNCTION__, me->devid);
+fprintf(stderr, "\t\tTIMER=%08x\n", w);
 //    if (w > ADC4X250_TIMER_PRETRIG) w -= ADC4X250_TIMER_PRETRIG;
     if (w <= 1)                        w = 1024;
     if (w > ADC250_MAX_ALLOWED_NUMPTS) w = ADC250_MAX_ALLOWED_NUMPTS;
@@ -345,14 +346,14 @@ fprintf(stderr, "TIMER=%08x\n", w);
                (w >> ADC4X250_CLK_SRC_shift) & ADC4X250_CLK_SRC_bits);
 
     me->lvmt->a32rd32(me->handle, ADC4X250_R_ADC_TRIG_SOURCE,   &w);
-fprintf(stderr, "TRIG_SOURCE=%08x\n", w);
+fprintf(stderr, "\t\tTRIG_SOURCE=%08x\n", w);
     Init1Param(me, ADC250_CHAN_TRIG_TYPE, 
                (w >> ADC4X250_ADC_TRIG_SOURCE_TRIG_ENA_shift)
                    & ADC4X250_ADC_TRIG_SOURCE_TRIG_ENA_bits);
     Init1Param(me, ADC250_CHAN_TRIG_INPUT,
                (w >> ADC4X250_ADC_TRIG_SOURCE_TTL_INPUT_shift)
                    & ADC4X250_ADC_TRIG_SOURCE_TTL_INPUT_bits);
-fprintf(stderr, "[ADC250_CHAN_TRIG_TYPE]=%d [ADC250_CHAN_TRIG_INPUT]=%d\n", me->nxt_args[ADC250_CHAN_TRIG_TYPE], me->nxt_args[ADC250_CHAN_TRIG_INPUT]);
+fprintf(stderr, "\t\t[ADC250_CHAN_TRIG_TYPE]=%d [ADC250_CHAN_TRIG_INPUT]=%d\n", me->nxt_args[ADC250_CHAN_TRIG_TYPE], me->nxt_args[ADC250_CHAN_TRIG_INPUT]);
 
     for (n = 0;  n < ADC250_NUM_LINES;  n++)
     {
@@ -442,7 +443,11 @@ static int  StartMeasurements(pzframe_drv_t *pdr)
     me->force_read = me->start_mask == ADC4X250_CTRL_CALIB;
 
     /* Let's go! */
+#if 0
+    /* A pause between R_CTRL:=BREAK_ACK and R_CTRL:=START
+       was required some time ago because of a bug in ADC250 */
     SleepBySelect(10000);
+#endif
     me->lvmt->a32wr32(me->handle, ADC4X250_R_CTRL, me->start_mask);
 
     return PZFRAME_R_DOING;
@@ -461,7 +466,10 @@ static int  TrggrMeasurements(pzframe_drv_t *pdr)
                       |
                       (me->cur_args[ADC250_CHAN_TRIG_INPUT] << ADC4X250_ADC_TRIG_SOURCE_TTL_INPUT_shift));
 
-    /* 1. Do prog-start */
+    /* 1. Re-start with new settings: */
+    /* 1.1. Stop device */
+    me->lvmt->a32wr32(me->handle, ADC4X250_R_CTRL, ADC4X250_CTRL_ADC_BREAK_ACK);
+    /* 1.2. And do prog-start */
     me->lvmt->a32wr32(me->handle, ADC4X250_R_CTRL, ADC4X250_CTRL_START);
 
     /* 2. Revert to what-programmed start mode */
@@ -502,6 +510,8 @@ static rflags_t ReadMeasurements(pzframe_drv_t *pdr)
   int32             w; // Note SIGNEDNESS
   uint32            status;
 
+  uint32            buf[1024];
+
   int               nl;
   uint32            ro; // Read Offset
   ADC250_DATUM_T   *dp;
@@ -520,14 +530,19 @@ static rflags_t ReadMeasurements(pzframe_drv_t *pdr)
     numduplets = (me->cur_args[ADC250_CHAN_NUMPTS] + 1) / 2;
     for (nl = 0;  nl < ADC250_NUM_LINES;  nl++)
     {
+#if 0
+        
+#else
         dp = me->retdata + nl * me->cur_args[ADC250_CHAN_NUMPTS];
-        ro = ADC4X250_DATA_ADDR_CHx_base + nl * ADC4X250_DATA_ADDR_CHx_incr;
-        for (n = numduplets;  n > 0;  n--)
+        ro = ADC4X250_DATA_ADDR_CHx_base + nl * ADC4X250_DATA_ADDR_CHx_incr +
+             (me->cur_args[ADC250_CHAN_PTSOFS] / 2) * 4;
+        for (n = numduplets;  n > 0;  n--, ro += 4)
         {
             me->lvmt->a32rd32(me->handle, ro, &w);
             *dp++ =  w        & 0xFFFF;
             *dp++ = (w >> 16) & 0xFFFF;
         }
+#endif
     }
     for (n = ADC250_CHAN_STATS_first;  n <= ADC250_CHAN_STATS_last;  n++)
         me->cur_args[n] = me->nxt_args[n] = 0;
@@ -765,6 +780,7 @@ enum
 enum
 {
     FASTADC_SPACE_SIZE       = 0xB80000,
+    FASTADC_ADDRESS_SIZE     = 32,
     FASTADC_ADDRESS_MODIFIER = ADC4X250_ADDRESS_MODIFIER,
 };
 
@@ -794,11 +810,11 @@ static void FASTADC_IRQ_P (int devid, void *devptr,
   FASTADC_PRIVREC_T   *me = (FASTADC_PRIVREC_T *)devptr;
   uint32               w;
 
-fprintf(stderr, "%s IRQ[%d]: n=%d vector=%d\n", strcurtime_msc(), devid, irq_n, irq_vect);
+////fprintf(stderr, "%s IRQ[%d]: n=%d vector=%d\n", strcurtime_msc(), devid, irq_n, irq_vect);
     if (irq_vect != me->irq_vect) return;
-fprintf(stderr, "Yes!\n");
+////fprintf(stderr, "Yes!\n");
 me->lvmt->a32rd32(me->handle, ADC4X250_R_INT_STATUS, &w);
-fprintf(stderr, "zINT_STATUS=%08x\n", w);
+////fprintf(stderr, "zINT_STATUS=%08x\n", w);
 me->lvmt->a32wr32(me->handle, ADC4X250_R_CTRL,       ADC4X250_CTRL_ADC_BREAK_ACK); // Stop (or drop ADC_CMPLT)
 
     /*!!! Here MUST call smth to read ADC4X250_R_INT_STATUS (thus dropping IRQ) */
@@ -812,17 +828,23 @@ static int  FASTADC_INIT_D(int devid, void *devptr,
 {
   FASTADC_PRIVREC_T   *me = (FASTADC_PRIVREC_T *)devptr;
   int                  n;
+  int                  bus_major;
+  int                  bus_minor;
   int                  jumpers;
 
-    jumpers      = businfo[0]; /*!!!*/
-    me->irq_n    = businfo[1] &  0x7;
-    me->irq_vect = businfo[2] & 0xFF;
-fprintf(stderr, "%s businfo[0]=%08x jumpers=0x%x irq=%d vector=%d\n", strcurtime_msc(), businfo[0], jumpers, me->irq_n, me->irq_vect);
+    bus_major    = businfo[0];
+    bus_minor    = businfo[1];
+    jumpers      = businfo[2]; /*!!!*/
+    me->irq_n    = businfo[3] &  0x7;
+    me->irq_vect = businfo[4] & 0xFF;
+fprintf(stderr, "%s businfo[2]=%08x jumpers=0x%x irq=%d vector=%d\n", strcurtime_msc(), businfo[2], jumpers, me->irq_n, me->irq_vect);
 
     me->lvmt   = GetLayerVMT(devid);
     me->devid  = devid;
     me->handle = me->lvmt->add(devid, devptr,
-                               jumpers << 24, FASTADC_SPACE_SIZE, FASTADC_ADDRESS_MODIFIER,
+                               bus_major, bus_minor,
+                               jumpers << 24, FASTADC_SPACE_SIZE,
+                               32, FASTADC_ADDRESS_MODIFIER,
                                me->irq_n, me->irq_vect, FASTADC_IRQ_P);
     if (me->handle < 0) return me->handle;
 
@@ -859,8 +881,8 @@ static void FASTADC_TERM_D(int devid, void *devptr)
 DEFINE_CXSD_DRIVER(FASTADC_NAME, __CX_STRINGIZE(FASTADC_NAME) " fast-ADC",
                    NULL, NULL,
                    sizeof(FASTADC_PRIVREC_T), FASTADC_PARAMS,
-                   3, 3,
-                   VME_LYR_NAME, VME_LYR_VERSION,
+                   5, 5,
+                   VME_LYR_API_NAME, VME_LYR_API_VERSION,
                    NULL,
                    -1, NULL, NULL,
                    FASTADC_INIT_D, FASTADC_TERM_D, FASTADC_RW_P);

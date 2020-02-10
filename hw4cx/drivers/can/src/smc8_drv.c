@@ -441,7 +441,7 @@ DEFINE_CXSD_DRIVER(smc8, "Yaminov KShD8",
                    NULL, NULL,
                    sizeof(privrec_t), NULL,
                    2, 2,
-                   CANKOZ_LYR_NAME, CANKOZ_LYR_VERSION,
+                   CANKOZ_LYR_API_NAME, CANKOZ_LYR_API_VERSION,
                    NULL,
                    -1, NULL, NULL,
                    smc8_init_d, NULL, smc8_rw_p);

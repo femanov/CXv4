@@ -566,7 +566,7 @@ DEFINE_CXSD_DRIVER(vsdc2, "VSDC2 driver",
                    NULL, NULL,
                    sizeof(privrec_t), vsdc2_params,
                    2, 2,
-                   CANKOZ_LYR_NAME, CANKOZ_LYR_VERSION,
+                   CANKOZ_LYR_API_NAME, CANKOZ_LYR_API_VERSION,
                    NULL,
                    -1, NULL, NULL,
                    vsdc2_init_d, vsdc2_term_d, vsdc2_rw_p);

@@ -423,7 +423,7 @@ static void LoadPlot(const char *argv0, const char *filename)
   };
 
     if (strcmp(filename, "-") == 0) filename = "/dev/stdin";
-    r = ppf4td_open(&ctx, "plaintext", filename);
+    r = ppf4td_open(&ctx, "plaintext", filename, NULL);
     if (r != 0)
     {
         fprintf(stderr, "%s %s: failed to open \"%s\": %s\n",

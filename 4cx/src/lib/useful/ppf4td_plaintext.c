@@ -4,7 +4,7 @@
 #include "ppf4td_plaintext.h"
 
 
-static int ppf4td_plaintext_open (ppf4td_ctx_t *ctx, const char *reference)
+static int ppf4td_plaintext_open (ppf4td_ctx_t *ctx, const char *reference, const char *path_info)
 {
     return (ctx->imp_privptr = fopen(reference, "r")) == NULL? -1 : 0;
 }

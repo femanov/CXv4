@@ -1,9 +1,9 @@
 SRCDIR=		../src
-CANHAL_PFX=	mar
+CAN_HAL_PFX=	mar
 include		$(SRCDIR)/ShadowRules.mk
 #
 
-MONO_C_FILES=	$(CANHAL_PFX)cankoz_lyr.so $(CANHAL_PFX)canmon
+MONO_C_FILES=	$(CAN_HAL_PFX)cankoz_lyr.so $(CAN_HAL_PFX)canmon
 
 ######################################################################
 PRJDIR=		../../..

@@ -465,7 +465,7 @@ void ReadConfig      (const char *argv0,
   char          keyword[50];
   keyworddef_t *kdp;
 
-    r = ppf4td_open(&ctx, def_scheme, reference);
+    r = ppf4td_open(&ctx, def_scheme, reference, NULL);
     if (r != 0)
     {
         fprintf(stderr, "%s %s: failed to open \"%s\": %s\n",

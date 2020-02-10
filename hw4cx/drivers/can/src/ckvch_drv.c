@@ -294,7 +294,7 @@ DEFINE_CXSD_DRIVER(ckvch, "CKVCH driver",
                    NULL, NULL,
                    sizeof(privrec_t), ckvch_params,
                    2, 2,
-                   CANKOZ_LYR_NAME, CANKOZ_LYR_VERSION,
+                   CANKOZ_LYR_API_NAME, CANKOZ_LYR_API_VERSION,
                    NULL,
                    -1, NULL, NULL,
                    ckvch_init_d, NULL, ckvch_rw_p);

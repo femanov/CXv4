@@ -115,6 +115,12 @@ vme_interrupt(int irq, void *dev_id, struct pt_regs *regs)
     }
 
     spin_unlock_irqrestore(&vmelock, flags);
+
+    /* Note: the following unmasking is NOT compatible
+       with RORA devices (RORA - interrupt Reset On Register Access),
+       only ROAK ones (Reset On AcK) are OK. */
+    if (active_mask)
+        *reg1 |=  active_mask;
 }
 
 static ssize_t vme_read(struct file *file, char *buf,

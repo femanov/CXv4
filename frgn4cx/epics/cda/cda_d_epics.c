@@ -27,7 +27,7 @@ static sl_tid_t  ca_hbt_tid = -1;
 static void CaHeartbeatProc(int uniq, void *unsdptr,
                             sl_tid_t tid, void *privptr)
 {
-    ca_hbt_tid = sl_enq_tout_after(0/*!!!uniq*/, NULL,
+    ca_hbt_tid = sl_enq_tout_after(uniq, NULL,
                                    CA_HEARTBEAT_USECS, CaHeartbeatProc, NULL);
     ca_poll();
 }

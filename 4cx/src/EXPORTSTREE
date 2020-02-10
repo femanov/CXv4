@@ -17,6 +17,7 @@ lib/cda
 lib/cda/plugins
 bin
 configs
+configs/types
 sbin
 settings
 settings/common

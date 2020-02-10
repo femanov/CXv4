@@ -2,7 +2,8 @@ echo "loading firmware"
 pload /etc/bivme2/vmechip.rbf
 
 echo "loading VME interrupts driver"
-insmod /lib/modules/2.4.22/vmei.o
+#insmod /lib/modules/2.4.22/vmei.o
+insmod /etc/buffered_vmei/vmei.o
 
 echo "loading CAN driver"
 insmod /lib/modules/2.4.22/Can.o

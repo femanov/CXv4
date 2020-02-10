@@ -1,3 +1,3 @@
 devtype c0642 w16i {
-	out<0-15>	0
+	out<0-15>	0	1000000.0 units:V
 }

@@ -6,15 +6,15 @@
 #include "vme_lyr.h"
 
 
-#ifndef VMEHAL_FILE_H
-  #error The "VMEHAL_FILE_H" macro is undefined
+#ifndef VME_HAL_FILE_H
+  #error The "VME_HAL_FILE_H" macro is undefined
 #else
-  #include VMEHAL_FILE_H
-#endif /* VMEHAL_FILE_H */
+  #include VME_HAL_FILE_H
+#endif /* VME_HAL_FILE_H */
 
-#ifndef VMELYR_NAME
-  #error The "VMELYR_NAME" macro is undefined
-#endif /* VMELYR_NAME */
+#ifndef VME_LYR_NAME
+  #error The "VME_LYR_NAME" macro is undefined
+#endif /* VME_LYR_NAME */
 
 
 enum
@@ -32,13 +32,36 @@ enum
 
 typedef struct
 {
+    int is_open;
+    int vect2handle[VECTSPERIRQ];
+} irqinfo_t;
+
+typedef struct
+{
+    int        in_use;
+
+    int        bus_major;
+    int        bus_minor;
+
+    int        bus_handle;  // Value from vme_hal_open_bus()
+
+    irqinfo_t  irqs[NUMIRQS];
+} vmebusinfo_t;
+
+typedef struct
+{
     int               is_used;
+
+    int               bus_idx;
 
     int               devid;
     void             *devptr;
 
+    int               bus_major;
+    int               bus_minor;
     uint32            base_addr;
     uint32            space_size; // As of 15.09.2011 -- unused; for future checks in layer
+    int               addr_size;
     int               am;
 
     int               irq_n;
@@ -46,43 +69,37 @@ typedef struct
     vme_irq_proc      irq_proc;
 } vmedevinfo_t;
 
-typedef struct
-{
-    int state;
-    int vect2handle[VECTSPERIRQ];
-} irqinfo_t;
-
 
 static int    my_lyrid;
 
+/* Note:
+       As opposed to a3818_hal.h, here the [0] element IS usable,
+       because the whole busi[] is used inside layer only and
+       "bus_idx" indexes aren't exposed outside.
+       Thus, it is [VME_HAL_BUS_MAXCOUNT], not [1+VME_HAL_BUS_MAXCOUNT]. */
+vmebusinfo_t  busi[VME_HAL_BUS_MAXCOUNT];
 vmedevinfo_t  devs[MAXDEVS];
-irqinfo_t     irqs[NUMIRQS];
 
+#if VME_BUS_COMPONENTS_SENSIBLE == 0
+static int the_bus_handle = 0;
+#endif
 
 /*##################################################################*/
 /*##################################################################*/
 
 static int   vme_init_lyr  (int lyrid)
 {
-  int  irq_n;
-  int  irq_vect;
   int  r;
 
     DoDriverLog(my_lyrid, 0, "%s(%d)!", __FUNCTION__, lyrid);
     my_lyrid = lyrid;
+    bzero(busi, sizeof(busi));
     bzero(devs, sizeof(devs));
-    bzero(irqs, sizeof(irqs));
-    for (irq_n = 0;  irq_n < countof(irqs);  irq_n++)
-    {
-        irqs[irq_n].state = -1;
-        for (irq_vect = 0;  irq_vect < countof(irqs[irq_n].vect2handle);  irq_vect++)
-            irqs[irq_n].vect2handle[irq_vect] = VME_HANDLE_ABSENT;
-    }
 
-    r = vmehal_init();
+    r = vme_hal_init(lyrid);
     if (r < 0)
     {
-        DoDriverLog(my_lyrid, 0, "%s(): vmehal_init()=%d", __FUNCTION__, r);
+        DoDriverLog(my_lyrid, 0, "%s(): vme_hal_init()=%d", __FUNCTION__, r);
         return -CXRF_DRV_PROBL;
     }
 
@@ -91,19 +108,29 @@ static int   vme_init_lyr  (int lyrid)
 
 static void  vme_term_lyr  (void)
 {
+  int  bus_idx;
   int  irq_n;
 
-    for (irq_n = 0;  irq_n < countof(irqs);  irq_n++)
-    {
-        if (irqs[irq_n].state >= 0) vmehal_close_irq(irq_n);
-        irqs[irq_n].state = -1;
-    }
+    for (bus_idx = 0;  bus_idx < countof(busi);  bus_idx++)
+        if (busi[bus_idx].in_use)
+        {
+            for (irq_n = 0;  irq_n < countof(busi[bus_idx].irqs);  irq_n++)
+            {
+                if (busi[bus_idx].irqs[irq_n].is_open)
+                    vme_hal_close_irq(busi[bus_idx].bus_handle, irq_n);
+                busi[bus_idx].irqs[irq_n].is_open = 0;
+            }
+            vme_hal_close_bus(busi[bus_idx].bus_handle);
+        }
+
+    vme_hal_term();
 }
 
 static void  vme_disconnect(int devid)
 {
   int           handle;
   int           other_handle;
+  int           bus_idx;
   int           irq_n;
   int           irq_vect;
   vmedevinfo_t *dp;
@@ -116,6 +143,7 @@ fprintf(stderr, "%s[%d]\n", __FUNCTION__, devid);
             was_found = 1;
             dp = devs + handle;
 
+            bus_idx  = dp->bus_idx;
             irq_n    = dp->irq_n;
             irq_vect = dp->irq_vect;
             bzero(dp, sizeof(&dp));
@@ -123,20 +151,31 @@ fprintf(stderr, "%s[%d]\n", __FUNCTION__, devid);
             // If IRQ was used, then release associated resources
             if (irq_n >= 0)
             {
-                // a. Mark this vector as free
-                irqs[irq_n].vect2handle[irq_vect] = VME_HANDLE_ABSENT;
+                /* a. Mark this vector as free */
+                busi[bus_idx].irqs[irq_n].vect2handle[irq_vect] = VME_HANDLE_ABSENT;
                 /* b. Check if some other devices still use this IRQ */
                 for (other_handle = VME_HANDLE_FIRST;  other_handle < countof(devs);  other_handle++)
-                    if (devs[other_handle].is_used  &&
-                        devs[other_handle].irq_n == irq_n)
-                        goto NEXT_DEV;
+                    if (devs[other_handle].is_used             &&
+                        devs[other_handle].bus_idx == bus_idx  &&
+                        devs[other_handle].irq_n   == irq_n)
+                        goto BREAK_IRQ_CHECK;
                 /* ...or was last "client" of this IRQ? */
                 /* Then release the IRQ! */
-                vmehal_close_irq(irq_n);
-                irqs[irq_n].state = -1;
+                vme_hal_close_irq(busi[bus_idx].bus_handle, irq_n);
+                busi[bus_idx].irqs[irq_n].is_open = 0;
+            BREAK_IRQ_CHECK:;
             }
 
-        NEXT_DEV:; //!!! "BREAK_IRQ_CHECK"?
+            /* Check if it was the last device on a bus */
+            for (other_handle = VME_HANDLE_FIRST;  other_handle < countof(devs);  other_handle++)
+                if (devs[other_handle].is_used             &&
+                    devs[other_handle].bus_idx == bus_idx)
+                    goto BREAK_BUS_CHECK;
+            /* Then close/release this bus */
+fprintf(stderr, "\twas the last device on bus idx=%d/handle=%d\n", bus_idx, busi[bus_idx].bus_handle);
+            vme_hal_close_bus(busi[bus_idx].bus_handle);
+            busi[bus_idx].in_use = 0;
+        BREAK_BUS_CHECK:;
         }
 
     if (!was_found)
@@ -145,13 +184,15 @@ fprintf(stderr, "%s[%d]\n", __FUNCTION__, devid);
 }
 
 
-static void vme_lyr_irq_cb(int irq_n, int irq_vect)
+static void vme_lyr_irq_cb(int bus_handle, void *privptr,
+                           int irq_n, int irq_vect)
 {
+  int           bus_idx = ptr2lint(privptr);
   vmedevinfo_t *dp;
   int           handle;
 
-    handle = irqs[irq_n].vect2handle[irq_vect];
-fprintf(stderr, "\t%s %d,%d ->%d\n", __FUNCTION__, irq_n, irq_vect, handle);
+    handle = busi[bus_idx].irqs[irq_n].vect2handle[irq_vect];
+////fprintf(stderr, "\t%s %d,%d ->%d\n", __FUNCTION__, irq_n, irq_vect, handle);
     if (handle != VME_HANDLE_ABSENT)
     {
         dp = devs + handle;
@@ -160,16 +201,31 @@ fprintf(stderr, "\t%s %d,%d ->%d\n", __FUNCTION__, irq_n, irq_vect, handle);
     }
 }
 static int vme_add(int devid, void *devptr,
-                   uint32 base_addr, uint32 space_size, int am,
+                   int    bus_major, int    bus_minor,
+                   uint32 base_addr, uint32 space_size,
+                   int    addr_size, int    am,
                    int irq_n, int irq_vect, vme_irq_proc irq_proc)
 {
+  int           idx;
+  int           first_free_idx;
+  int           bus_idx;
+
   vmedevinfo_t *dp;
   int           handle;
   int           other_devid;
+  int           irq_open_r;
 
     if (devid == DEVID_NOT_IN_DRIVER)
     {
         DoDriverLog(my_lyrid, 0, "%s: devid==DEVID_NOT_IN_DRIVER", __FUNCTION__);
+        return -CXRF_DRV_PROBL;
+    }
+
+    if (addr_size != 16  &&
+        addr_size != 24  &&
+        addr_size != 32) // For VME64: also 40 and 64
+    {
+        DoDriverLog(devid, 0, "%s: bad addr_size=%d (should be one of 16,24,32)", __FUNCTION__, addr_size);
         return -CXRF_DRV_PROBL;
     }
 
@@ -179,17 +235,59 @@ static int vme_add(int devid, void *devptr,
         return -CXRF_CFG_PROBL;
     }
 
+    /* Try to find a bus cell:
+       - either an already used with appropriate {major,minor}
+       - or a free one */
+    for (idx = 0, first_free_idx = -1, bus_idx = -1;
+         idx < countof(busi)     &&    bus_idx < 0;
+         idx++)
+    {
+        if (busi[idx].in_use)
+        {
+            if (busi[idx].bus_major == bus_major  &&
+                busi[idx].bus_minor == bus_minor)
+                bus_idx = idx;
+        }
+        else
+            if (first_free_idx < 0) first_free_idx = idx;
+    }
+
+    /* Wasn't found? */
+    if (bus_idx < 0)
+    {
+        /* Okay, was a FREE cell found? */
+        if (first_free_idx < 0)
+        {
+            DoDriverLog(devid, 0, "%s: bus table overflow, no room for bus(%d,%d)",
+                        __FUNCTION__, bus_major, bus_minor);
+            return -CXRF_DRV_PROBL;
+        }
+
+        /* Yes! */
+        bus_idx = first_free_idx;
+        busi[bus_idx].in_use = 1;
+        busi[bus_idx].bus_handle = vme_hal_open_bus(bus_major, bus_minor);
+        if (busi[bus_idx].bus_handle < 0)
+        {
+            DoDriverLog(devid, 0, "%s: vme_hal_open_bus(%d,%d) failed: %s",
+                        __FUNCTION__, bus_major, bus_minor,
+                        errno != 0? strerror(errno) : vme_hal_strerror(busi[bus_idx].bus_handle));
+            busi[bus_idx].in_use = 0;
+            return -CXRF_DRV_PROBL;
+        }
+    }
+
     /* Check if requested {irq_n,irq_vect} tuple isn't already used */
     irq_vect &= 0xFF;
     if (irq_n > 0  &&
-        irqs[irq_n].vect2handle[irq_vect] != VME_HANDLE_ABSENT)
+        busi[bus_idx].irqs[irq_n].vect2handle[irq_vect] != VME_HANDLE_ABSENT)
     {
-        other_devid = (irqs[irq_n].vect2handle[irq_vect] > 0  &&
-                       irqs[irq_n].vect2handle[irq_vect] < countof(devs))?
-            devs[irqs[irq_n].vect2handle[irq_vect]].devid : DEVID_NOT_IN_DRIVER;
+        other_devid = (busi[bus_idx].irqs[irq_n].vect2handle[irq_vect] > 0  &&
+                       busi[bus_idx].irqs[irq_n].vect2handle[irq_vect] < countof(devs))?
+            devs[busi[bus_idx].irqs[irq_n].vect2handle[irq_vect]].devid : DEVID_NOT_IN_DRIVER;
         DoDriverLog(devid, 0, "%s: (irq_n=%d,irq_vect=%d) is already in use (handle=%d, devid=%d)",
                     __FUNCTION__, irq_n, irq_vect,
-                    irqs[irq_n].vect2handle[irq_vect],
+                    busi[bus_idx].irqs[irq_n].vect2handle[irq_vect],
                     other_devid);
         if (other_devid != DEVID_NOT_IN_DRIVER)
             ReturnDataSet(other_devid, RETURNDATA_COUNT_PONG,
@@ -210,10 +308,14 @@ static int vme_add(int devid, void *devptr,
     dp->is_used = 1;
 
     /* Remember info */
+    dp->bus_idx    = bus_idx;
     dp->devid      = devid;
     dp->devptr     = devptr;
+    dp->bus_major  = bus_major;
+    dp->bus_minor  = bus_minor;
     dp->base_addr  = base_addr;
     dp->space_size = space_size;
+    dp->addr_size  = addr_size;
     dp->am         = am;
     dp->irq_n      = irq_n;
     dp->irq_vect   = irq_vect;
@@ -221,26 +323,31 @@ static int vme_add(int devid, void *devptr,
 
     if (irq_n > 0)
     {
-        if (irqs[irq_n].state < 0)
+        if (!(busi[bus_idx].irqs[irq_n].is_open))
         {
-            irqs[irq_n].state = vmehal_open_irq(irq_n, vme_lyr_irq_cb, my_lyrid);
-            if (irqs[irq_n].state < 0)
+            irq_open_r = vme_hal_open_irq(busi[bus_idx].bus_handle, lint2ptr(bus_idx),
+                                          irq_n, vme_lyr_irq_cb, my_lyrid);
+            if (irq_open_r < 0)
             {
+                DoDriverLog(devid, 0, "vme_hal_open_irq(IRQ%d): %s",
+                            irq_n,
+                            errno != 0? strerror(errno) : vme_hal_strerror(irq_open_r));
                 bzero(dp, sizeof(*dp));
                 return -CXRF_DRV_PROBL;
             }
+            busi[bus_idx].irqs[irq_n].is_open = 1;
         }
-        irqs[irq_n].vect2handle[irq_vect] = handle;
+        busi[bus_idx].irqs[irq_n].vect2handle[irq_vect] = handle;
     }
-
-    //!!!!!!!!!!! Get an irq!
 
     return handle;
 }
 
 static int vme_get_dev_info(int devid,
-                            uint32 *base_addr_p, uint32 *space_size_p, int *am_p,
-                            int *irq_n_p, int *irq_vect_p)
+                            int    *bus_major_p, int    *bus_minor_p,
+                            uint32 *base_addr_p, uint32 *space_size_p,
+                            int    *addr_size_p, int    *am_p,
+                            int    *irq_n_p,     int    *irq_vect_p)
 {
   int           handle;
   vmedevinfo_t *dp;
@@ -249,8 +356,11 @@ static int vme_get_dev_info(int devid,
         if (devs[handle].is_used  &&  devs[handle].devid == devid)
         {
             dp = devs + handle;
+            if (bus_major_p  != NULL) *bus_major_p  = dp->bus_major;
+            if (bus_minor_p  != NULL) *bus_minor_p  = dp->bus_minor;
             if (base_addr_p  != NULL) *base_addr_p  = dp->base_addr;
             if (space_size_p != NULL) *space_size_p = dp->space_size;
+            if (addr_size_p  != NULL) *addr_size_p  = dp->addr_size;
             if (am_p         != NULL) *am_p         = dp->am;
             if (irq_n_p      != NULL) *irq_n_p      = dp->irq_n;
             if (irq_vect_p   != NULL) *irq_vect_p   = dp->irq_vect;
@@ -262,29 +372,64 @@ static int vme_get_dev_info(int devid,
     return -1;
 }
 
-#define VMELYR_DEFINE_IO(AS, TS)                                      \
-static int vme_a##AS##wr##TS(int handle, uint32 ofs, uint##TS  value) \
-{                                                                     \
-    return vmehal_a##AS##wr##TS(devs[handle].am,                      \
-                                devs[handle].base_addr + ofs, value); \
-}                                                                     \
-static int vme_a##AS##rd##TS(int handle, uint32 ofs, uint##TS *val_p) \
-{                                                                     \
-    return vmehal_a##AS##rd##TS(devs[handle].am,                      \
-                                devs[handle].base_addr + ofs, val_p); \
+
+#if VME_BUS_COMPONENTS_SENSIBLE
+  #define VME_LYR_CHECK_HANDLE()                                          \
+      do {                                                                \
+          if (handle < VME_HANDLE_FIRST  ||  handle >= countof(devs)  ||  \
+              devs[handle].is_used == 0)                                  \
+          {                                                               \
+              errno = EBADF;                                              \
+              return -1;                                                  \
+          }                                                               \
+      } while (0)
+  #define VME_LYR_BUS_HANDLE_VALUE  busi[devs[handle].bus_idx].bus_handle
+#else
+  #define VME_LYR_CHECK_HANDLE()    do { } while (0) /* A no-op */
+  #define VME_LYR_BUS_HANDLE_VALUE  the_bus_handle
+#endif
+
+#define VME_LYR_DEFINE_IO(AS, TS)                                          \
+static int vme_a##AS##wr##TS   (int handle, uint32 ofs, uint##TS  value)   \
+{                                                                          \
+    VME_LYR_CHECK_HANDLE();                                                \
+    return vme_hal_a##AS##wr##TS   (VME_LYR_BUS_HANDLE_VALUE,              \
+                                    devs[handle].am,                       \
+                                    devs[handle].base_addr + ofs, value);  \
+}                                                                          \
+static int vme_a##AS##rd##TS   (int handle, uint32 ofs, uint##TS *val_p)   \
+{                                                                          \
+    VME_LYR_CHECK_HANDLE();                                                \
+    return vme_hal_a##AS##rd##TS   (VME_LYR_BUS_HANDLE_VALUE,              \
+                                    devs[handle].am,                       \
+                                    devs[handle].base_addr + ofs, val_p);  \
+}                                                                          \
+static int vme_a##AS##wr##TS##v(int handle, uint32 ofs, uint##TS *data, int count) \
+{                                                                          \
+    VME_LYR_CHECK_HANDLE();                                                \
+    return vme_hal_a##AS##wr##TS##v(VME_LYR_BUS_HANDLE_VALUE,              \
+                                    devs[handle].am,                       \
+                                    devs[handle].base_addr + ofs, data, count); \
+}                                                                          \
+static int vme_a##AS##rd##TS##v(int handle, uint32 ofs, uint##TS *data, int count) \
+{                                                                          \
+    VME_LYR_CHECK_HANDLE();                                                \
+    return vme_hal_a##AS##rd##TS##v(VME_LYR_BUS_HANDLE_VALUE,              \
+                                    devs[handle].am,                       \
+                                    devs[handle].base_addr + ofs, data, count); \
 }
 
-VMELYR_DEFINE_IO(16, 8)
-VMELYR_DEFINE_IO(16, 16)
-VMELYR_DEFINE_IO(16, 32)
+VME_LYR_DEFINE_IO(16, 8)
+VME_LYR_DEFINE_IO(16, 16)
+VME_LYR_DEFINE_IO(16, 32)
 
-VMELYR_DEFINE_IO(24, 8)
-VMELYR_DEFINE_IO(24, 16)
-VMELYR_DEFINE_IO(24, 32)
+VME_LYR_DEFINE_IO(24, 8)
+VME_LYR_DEFINE_IO(24, 16)
+VME_LYR_DEFINE_IO(24, 32)
 
-VMELYR_DEFINE_IO(32, 8)
-VMELYR_DEFINE_IO(32, 16)
-VMELYR_DEFINE_IO(32, 32)
+VME_LYR_DEFINE_IO(32, 8)
+VME_LYR_DEFINE_IO(32, 16)
+VME_LYR_DEFINE_IO(32, 32)
 
 
 static vme_vmt_t vme_vmt =
@@ -292,6 +437,12 @@ static vme_vmt_t vme_vmt =
     vme_add,
 
     vme_get_dev_info,
+
+    NULL,
+
+    /* I/O */
+
+    // a. Scalar
 
     // A16
     vme_a16wr8,
@@ -316,11 +467,37 @@ static vme_vmt_t vme_vmt =
     vme_a32rd16,
     vme_a32wr32,
     vme_a32rd32,
+
+    // b. Vector
+
+    // A16
+    vme_a16wr8v,
+    vme_a16rd8v,
+    vme_a16wr16v,
+    vme_a16rd16v,
+    vme_a16wr32v,
+    vme_a16rd32v,
+
+    // A24
+    vme_a24wr8v,
+    vme_a24rd8v,
+    vme_a24wr16v,
+    vme_a24rd16v,
+    vme_a24wr32v,
+    vme_a24rd32v,
+
+    // A32
+    vme_a32wr8v,
+    vme_a32rd8v,
+    vme_a32wr16v,
+    vme_a32rd16v,
+    vme_a32wr32v,
+    vme_a32rd32v,
 };
 
-DEFINE_CXSD_LAYER(VMELYR_NAME, "VME-layer implementation via '" __CX_STRINGIZE(VMEHAL_DESCR) "' HAL",
+DEFINE_CXSD_LAYER(VME_LYR_NAME, "VME-layer implementation via '" __CX_STRINGIZE(VME_HAL_DESCR) "' HAL",
                   NULL, NULL,
-                  VME_LYR_NAME, VME_LYR_VERSION,
+                  VME_LYR_API_NAME, VME_LYR_API_VERSION,
                   vme_init_lyr, vme_term_lyr,
                   vme_disconnect,
                   &vme_vmt);

@@ -563,7 +563,7 @@ DEFINE_CXSD_DRIVER(kshd485, "KShD485 driver",
                    NULL, NULL,
                    sizeof(privrec_t), NULL,
                    2, 2,
-                   PIV485_LYR_NAME, PIV485_LYR_VERSION,
+                   PIV485_LYR_API_NAME, PIV485_LYR_API_VERSION,
                    NULL,
                    -1, NULL, NULL,
                    kshd485_init_d, NULL, kshd485_rw_p);

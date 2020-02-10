@@ -35,7 +35,7 @@ TYPES_LIST=	cac208 ceac124 cdac20 candac16 canadc40 \
 TYPES_FILES=	$(foreach T, $(TYPES_LIST), $T.devtype)
 
 EXPORTSFILES=	$(TYPES_FILES)
-EXPORTSDIR=	configs
+EXPORTSDIR=	configs/types
 
 ######################################################################
 PRJDIR=		..

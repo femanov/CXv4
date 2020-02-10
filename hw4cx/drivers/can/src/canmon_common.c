@@ -11,10 +11,10 @@
 #include "cankoz_numbers.h"
 #include "cankoz_strdb.h"
 
-#ifndef CANHAL_FILE_H
-  #error The "CANHAL_FILE_H" macro is undefined
+#ifndef CAN_HAL_FILE_H
+  #error The "CAN_HAL_FILE_H" macro is undefined
 #else
-  #include CANHAL_FILE_H
+  #include CAN_HAL_FILE_H
 #endif
 
 
@@ -49,7 +49,7 @@ static int  CanutilOpenDev  (const char *argv0,
         exit(1);
     }
 
-    fd = canhal_open_and_setup_line(minor, speed_n, &err);
+    fd = can_hal_open_and_setup_line(minor, speed_n, &err);
     if (fd < 0)
     {
         fprintf(stderr, "%s: unable to open line %d: %s: %s\n",
@@ -62,7 +62,7 @@ static int  CanutilOpenDev  (const char *argv0,
 
 static void CanutilCloseDev (int fd)
 {
-    canhal_close_line(fd);
+    can_hal_close_line(fd);
 }
 
 static void CanutilReadFrame(int fd, int *id_p, int *dlc_p, uint8 *data)
@@ -79,12 +79,12 @@ static void CanutilReadFrame(int fd, int *id_p, int *dlc_p, uint8 *data)
         r = select(fd + 1, &fds, NULL, NULL, NULL);
         if (r == 1)
         {
-            r = canhal_recv_frame(fd, id_p, dlc_p, data);
-            if (r != CANHAL_OK)
+            r = can_hal_recv_frame(fd, id_p, dlc_p, data);
+            if (r != CAN_HAL_OK)
             {
-                if      (r == CANHAL_ZERO)   err = "ZERO";
-                else if (r == CANHAL_BUSOFF) err = "BUSOFF";
-                else                         err = strerror(errno);
+                if      (r == CAN_HAL_ZERO)   err = "ZERO";
+                else if (r == CAN_HAL_BUSOFF) err = "BUSOFF";
+                else                          err = strerror(errno);
                 fprintf(stderr, "%s: recv_frame: %s\n",
                         "argv0", err);
                 exit (2);
@@ -99,12 +99,12 @@ static void CanutilSendFrame(int fd, int id,    int  dlc,   uint8 *data)
   int     r;
   char   *err;
     
-    r = canhal_send_frame(fd, id, dlc, data);
-    if (r != CANHAL_OK)
+    r = can_hal_send_frame(fd, id, dlc, data);
+    if (r != CAN_HAL_OK)
     {
-        if      (r == CANHAL_ZERO)   err = "ZERO";
-        else if (r == CANHAL_BUSOFF) err = "BUSOFF";
-        else                         err = strerror(errno);
+        if      (r == CAN_HAL_ZERO)   err = "ZERO";
+        else if (r == CAN_HAL_BUSOFF) err = "BUSOFF";
+        else                          err = strerror(errno);
         fprintf(stderr, "%s: send_frame(id=%d=0x%x, dlc=%d, [0]=0x%02x): %s\n",
                 "argv0", id, id, dlc, 
                 dlc > 0? data[0] : 0xFFFFFFFF,

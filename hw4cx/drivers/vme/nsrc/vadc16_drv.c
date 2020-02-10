@@ -165,17 +165,23 @@ static int init_d(int devid, void *devptr,
 {
   privrec_t  *me = (privrec_t*)devptr;
 
+  int         bus_major;
+  int         bus_minor;
   int         jumpers;
 
-    if (businfocount < 1) return -CXRF_CFG_PROBL;
-    jumpers      = businfo[0];
-    me->irq_n    = businfocount > 1? businfo[1] &  0x7 : 0;
-    me->irq_vect = businfocount > 2? businfo[2] & 0xFF : 0;
-fprintf(stderr, "businfo[0]=%08x jumpers=0x%x irq=%d\n", businfo[0], jumpers, me->irq_n);
+    if (businfocount < 3) return -CXRF_CFG_PROBL;
+    bus_major    = businfo[0];
+    bus_minor    = businfo[1];
+    jumpers      = businfo[2];
+    me->irq_n    = businfocount > 3? businfo[3] &  0x7 : 0;
+    me->irq_vect = businfocount > 4? businfo[4] & 0xFF : 0;
+fprintf(stderr, "businfo[2]=%08x jumpers=0x%x irq=%d\n", businfo[2], jumpers, me->irq_n);
 
     me->lvmt   = GetLayerVMT(devid);
     me->handle = me->lvmt->add(devid, devptr,
-                               jumpers << 4, 4, ADDRESS_MODIFIER,
+                               bus_major, bus_minor,
+                               jumpers << 4, 4,
+                               16, ADDRESS_MODIFIER,
                                me->irq_n, me->irq_vect, irq_p);
     if (me->handle < 0) return me->handle;
 
@@ -321,8 +327,8 @@ static void rdwr_p(int devid, void *devptr,
 DEFINE_CXSD_DRIVER(vadc16, "VADC16 VME ADC driver",
                    NULL, NULL,
                    sizeof(privrec_t), vadc16_params,
-                   1, 3,
-                   VME_LYR_NAME, VME_LYR_VERSION,
+                   3, 5,
+                   VME_LYR_API_NAME, VME_LYR_API_VERSION,
                    NULL,
                    -1, NULL, NULL,
                    init_d, term_d, rdwr_p);

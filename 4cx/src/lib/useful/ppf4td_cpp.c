@@ -5,7 +5,7 @@
 #include "ppf4td_cpp.h"
 
 
-static int ppf4td_cpp_open (ppf4td_ctx_t *ctx, const char *reference)
+static int ppf4td_cpp_open (ppf4td_ctx_t *ctx, const char *reference, const char *path_info)
 {
   static const char *model[] = {"/usr/bin/cpp"};
 

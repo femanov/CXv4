@@ -11,13 +11,13 @@
 #include "drv_i/cankoz_common_drv_i.h"
 
 
-#define CANKOZ_LYR_NAME "cankoz"
+#define CANKOZ_LYR_API_NAME "cankoz"
 enum
 {
-    CANKOZ_LYR_VERSION_MAJOR = 3,
-    CANKOZ_LYR_VERSION_MINOR = 0,
-    CANKOZ_LYR_VERSION = CX_ENCODE_VERSION(CANKOZ_LYR_VERSION_MAJOR,
-                                           CANKOZ_LYR_VERSION_MINOR)
+    CANKOZ_LYR_API_VERSION_MAJOR = 3,
+    CANKOZ_LYR_API_VERSION_MINOR = 0,
+    CANKOZ_LYR_API_VERSION = CX_ENCODE_VERSION(CANKOZ_LYR_API_VERSION_MAJOR,
+                                               CANKOZ_LYR_API_VERSION_MINOR)
 };
 
 

@@ -5,7 +5,7 @@
 #include "ppf4td_mem.h"
 
 
-static int ppf4td_mem_open (ppf4td_ctx_t *ctx, const char *reference)
+static int ppf4td_mem_open (ppf4td_ctx_t *ctx, const char *reference, const char *path_info)
 {
     ctx->imp_privptr = reference;
 

@@ -292,7 +292,7 @@ DEFINE_CXSD_DRIVER(senkov_vip, "Senkov VIP (high-voltage power supply)",
                    NULL, NULL,
                    sizeof(privrec_t), senkov_vip_params,
                    2, 2,
-                   CANKOZ_LYR_NAME, CANKOZ_LYR_VERSION,
+                   CANKOZ_LYR_API_NAME, CANKOZ_LYR_API_VERSION,
                    NULL,
                    -1, NULL, NULL,
                    senkov_vip_init_d, NULL, senkov_vip_rw_p);

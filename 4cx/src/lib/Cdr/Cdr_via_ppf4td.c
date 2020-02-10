@@ -1337,10 +1337,10 @@ DataSubsys  CdrLoadSubsystemViaPpf4td(const char *scheme,
     }
     bzero(rec.sys, sizeof(*rec.sys));
 
-    r = ppf4td_open(&ctx, scheme, reference);
+    r = ppf4td_open(&ctx, scheme, reference, "include");
     if (r != 0)
     {
-        CdrSetErr("malloc(DataSubsys) failed");
+        CdrSetErr("ppf4td_open() failed");
         goto CLEANUP;
     }
     rec.ctx = &ctx;

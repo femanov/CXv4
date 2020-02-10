@@ -913,7 +913,7 @@ DEFINE_CXSD_DRIVER(cdac20, "CDAC20/CEAC51/CEAC51A CAN-DAC/ADC driver",
                    NULL, NULL,
                    sizeof(privrec_t), cdac20_params,
                    2, 2,
-                   CANKOZ_LYR_NAME, CANKOZ_LYR_VERSION,
+                   CANKOZ_LYR_API_NAME, CANKOZ_LYR_API_VERSION,
                    NULL,
                    -1, NULL, NULL,
                    cdac20_init_d, cdac20_term_d, cdac20_rw_p);

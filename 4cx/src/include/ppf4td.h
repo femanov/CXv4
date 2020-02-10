@@ -10,6 +10,7 @@ extern "C"
 
 #include <unistd.h>
 
+#include "misc_types.h"
 #include "misc_macros.h"
 #include "cx_version.h"
 #include "cx_module.h"
@@ -19,7 +20,7 @@ extern "C"
 
 struct _ppf4td_ctx_t_struct;
 
-typedef int (*ppf4td_open_t) (struct _ppf4td_ctx_t_struct *ctx, const char *reference);
+typedef int (*ppf4td_open_t) (struct _ppf4td_ctx_t_struct *ctx, const char *reference, const char *path_info);
 typedef int (*ppf4td_peekc_t)(struct _ppf4td_ctx_t_struct *ctx, int *ch_p);
 typedef int (*ppf4td_nextc_t)(struct _ppf4td_ctx_t_struct *ctx, int *ch_p);
 typedef int (*ppf4td_close_t)(struct _ppf4td_ctx_t_struct *ctx);
@@ -107,7 +108,7 @@ typedef struct _ppf4td_ctx_t_struct
     int             _l0buf_used;
 } ppf4td_ctx_t;
 
-int ppf4td_open (ppf4td_ctx_t *ctx, const char *def_scheme, const char *reference);
+int ppf4td_open (ppf4td_ctx_t *ctx, const char *def_scheme, const char *reference, const char *path_info);
 int ppf4td_close(ppf4td_ctx_t *ctx);
 
 int         ppf4td_peekc     (ppf4td_ctx_t *ctx, int *ch_p);
@@ -116,11 +117,12 @@ int         ppf4td_ungetchars(ppf4td_ctx_t *ctx, const char *buf, int len);
 int         ppf4td_is_at_eol (ppf4td_ctx_t *ctx);
 
 int         ppf4td_skip_white(ppf4td_ctx_t *ctx);
-int         ppf4td_get_ident (ppf4td_ctx_t *ctx, int flags, char *buf, size_t bufsize);
-int         ppf4td_get_int   (ppf4td_ctx_t *ctx, int flags, int  *vp,  int defbase, int *base_p);
+int         ppf4td_get_ident (ppf4td_ctx_t *ctx, int flags, char   *buf, size_t bufsize);
+int         ppf4td_get_int   (ppf4td_ctx_t *ctx, int flags, int    *vp,  int defbase, int *base_p);
+int         ppf4td_get_quad  (ppf4td_ctx_t *ctx, int flags, int64  *vp,  int defbase, int *base_p);
 int         ppf4td_get_double(ppf4td_ctx_t *ctx, int flags, double *vp);
-int         ppf4td_get_string(ppf4td_ctx_t *ctx, int flags, char *buf, size_t bufsize);
-int         ppf4td_read_line (ppf4td_ctx_t *ctx, int flags, char *buf, size_t bufsize);
+int         ppf4td_get_string(ppf4td_ctx_t *ctx, int flags, char   *buf, size_t bufsize);
+int         ppf4td_read_line (ppf4td_ctx_t *ctx, int flags, char   *buf, size_t bufsize);
 
 const char *ppf4td_cur_ref   (ppf4td_ctx_t *ctx);
 int         ppf4td_cur_line  (ppf4td_ctx_t *ctx);

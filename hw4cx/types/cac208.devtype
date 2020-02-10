@@ -24,23 +24,23 @@ devtype cac208 w40i,r20i,w8i,r16i,w1i,r2i,w13i,r100i,w32i,w32i,r32i,r4i,w1i31,w1
 	outr8b		84
         inpr8b		85
 
-	adc<0-23>      	100
+	adc<0-23>      	100	1000000.0 units:V
 
 	adc_p10v	adc20
         adc_0v		adc21
         adc_t		adc22
         adc_pwr		adc23
 
-	out<0-7>       	200
-        out_rate<0-7>	232
-        out_cur<0-7>	264
+	out<0-7>       	200	1000000.0 units:V
+        out_rate<0-7>	232	1000000.0 units:V/s
+        out_cur<0-7>	264	1000000.0 units:V
 
-	out_imm<0-7>	208
+	out_imm<0-7>	208	1000000.0 units:V
 	out_tac<0-7>	240
 
-	out_tab_times	300
-	out_tab_all	301
-	out_tab<0-7>	302
+	out_tab_times	300	1000000.0 units:s
+	out_tab_all	301	1000000.0 units:V
+	out_tab<0-7>	302	1000000.0 units:V
 
 	out_tab_errdescr	399
 }

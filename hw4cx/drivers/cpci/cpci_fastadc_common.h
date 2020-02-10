@@ -103,7 +103,7 @@ DEFINE_CXSD_DRIVER(FASTADC_NAME, __CX_STRINGIZE(FASTADC_NAME) " fast-ADC",
                    NULL, NULL,
                    sizeof(FASTADC_PRIVREC_T), FASTADC_PARAMS,
                    1, 1,
-                   PCI4624_LYR_NAME, PCI4624_LYR_VERSION,
+                   PCI4624_LYR_API_NAME, PCI4624_LYR_API_VERSION,
                    NULL,
                    -1, NULL, NULL,
                    FASTADC_INIT_D, FASTADC_TERM_D, FASTADC_RW_P);

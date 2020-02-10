@@ -1,5 +1,5 @@
-#ifndef SERIALHAL_PFX
-  #error The "SERIALHAL_PFX" macro is undefined
+#ifndef SERIAL_HAL_PFX
+  #error The "SERIAL_HAL_PFX" macro is undefined
 #endif
 
 #ifdef MOXA_KSHD485
@@ -7,19 +7,19 @@
   #include <moxadevice.h>
 #endif
 
-#include "serialhal.h"
+#include "serial_hal.h"
 
 
-static int serialhal_opendev (int line, int baudrate,
-                              serialhal_errreport_t errreport,
-                              void * opaqueptr)
+static int serial_hal_opendev (int line, int baudrate,
+                               serial_hal_errreport_t errreport,
+                               void * opaqueptr)
 {
   int             fd;
   char            devpath[PATH_MAX];
   int             r;
   struct termios  newtio;
 
-    sprintf(devpath, "/dev/tty%s%d", SERIALHAL_PFX, line);
+    sprintf(devpath, "/dev/tty%s%d", SERIAL_HAL_PFX, line);
 
     /* Open a descriptor to COM port... */
     fd = open(devpath, O_RDWR | O_NOCTTY);

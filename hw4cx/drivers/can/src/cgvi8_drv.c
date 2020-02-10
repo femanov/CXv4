@@ -442,7 +442,7 @@ DEFINE_CXSD_DRIVER(cgvi8, "CGVI8 and GVI8M driver",
                    NULL, NULL,
                    sizeof(privrec_t), NULL,
                    2, 2,
-                   CANKOZ_LYR_NAME, CANKOZ_LYR_VERSION,
+                   CANKOZ_LYR_API_NAME, CANKOZ_LYR_API_VERSION,
                    NULL,
                    -1, NULL, NULL,
                    cgvi8_init_d, NULL, cgvi8_rw_p);

@@ -1,5 +1,5 @@
 /*********************************************************************
-  c4lcanhal.h
+  c4lcan_hal.h
       This file implements CAN Hardware Abstraction Layer
       via can4linux (c4l) /dev/canX API,
       and is intended to be included by cankoz_lyr*
@@ -17,12 +17,12 @@
 #include <sys/ioctl.h>
 
 
-#include "canhal.h"
+#include "can_hal.h"
 
 #include "can4linux.h"
 
 
-static int  canhal_open_and_setup_line(int line_n, int speed_n, char **errstr)
+static int  can_hal_open_and_setup_line(int line_n, int speed_n, char **errstr)
 {
   int              fd;
   char             devpath[100];
@@ -73,13 +73,13 @@ static int  canhal_open_and_setup_line(int line_n, int speed_n, char **errstr)
     return -1;
 }
 
-static void canhal_close_line         (int  fd)
+static void can_hal_close_line         (int  fd)
 {
     close(fd);
 }
 
-static int  canhal_send_frame         (int  fd,
-                                       int  id,   int  dlc,   uint8 *data)
+static int  can_hal_send_frame         (int  fd,
+                                        int  id,   int  dlc,   uint8 *data)
 {
   canmsg_t  frame;
   int       r;
@@ -94,25 +94,25 @@ static int  canhal_send_frame         (int  fd,
     
     errno = 0;
     r = write(fd, &frame, 1);
-    if      (r == 1) return CANHAL_OK;
-    else if (r == 0) return CANHAL_ZERO;
-    else             return CANHAL_ERR;
+    if      (r == 1) return CAN_HAL_OK;
+    else if (r == 0) return CAN_HAL_ZERO;
+    else             return CAN_HAL_ERR;
 }
 
-static int  canhal_recv_frame         (int  fd,
-                                       int *id_p, int *dlc_p, uint8 *data)
+static int  can_hal_recv_frame         (int  fd,
+                                        int *id_p, int *dlc_p, uint8 *data)
 {
   canmsg_t  frame;
   int       r;
 
     r = read(fd, &frame, 1);
     if      (r == 1) ;
-    else if (r == 0) return CANHAL_ZERO;
-    else             return CANHAL_ERR;
+    else if (r == 0) return CAN_HAL_ZERO;
+    else             return CAN_HAL_ERR;
         
     *id_p  = frame.id;
     *dlc_p = frame.length;
     if (frame.length > 0) memcpy(data, frame.data, frame.length);
 
-    return CANHAL_OK;
+    return CAN_HAL_OK;
 }

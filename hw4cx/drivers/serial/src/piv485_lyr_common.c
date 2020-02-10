@@ -11,10 +11,10 @@
 #include "cxsd_driver.h"
 #include "piv485_lyr.h"
 
-#ifndef SERIALHAL_FILE_H
-  #error The "SERIALHAL_FILE_H" macro is undefined
+#ifndef SERIAL_HAL_FILE_H
+  #error The "SERIAL_HAL_FILE_H" macro is undefined
 #else
-  #include SERIALHAL_FILE_H
+  #include SERIAL_HAL_FILE_H
 #endif
 
 #ifndef SERIALLYR_NAME
@@ -506,12 +506,12 @@ static int  piv485_add(int devid, void *devptr,
     {
         /*!!! Obtain layer-info and psp-parse it */
 
-        lp->fd = serialhal_opendev(line, B9600,
-                                   errreport, lint2ptr(devid));
+        lp->fd = serial_hal_opendev(line, B9600,
+                                    errreport, lint2ptr(devid));
         if (lp->fd < 0)
         {
             DoDriverLog(devid, DRIVERLOG_ERR | DRIVERLOG_ERRNO,
-                        "%s: serialhal_opendev(%d)", __FUNCTION__, line);
+                        "%s: serial_hal_opendev(%d)", __FUNCTION__, line);
             sq_fini(&(dp->q));
             return -CXRF_DRV_PROBL;
         }
@@ -864,9 +864,9 @@ static piv485_vmt_t piv485_vmt =
 };
 
 
-DEFINE_CXSD_LAYER(SERIALLYR_NAME, "PIV485 implementation via '" __CX_STRINGIZE(SERIALHAL_DESCR) "' HAL",
+DEFINE_CXSD_LAYER(SERIALLYR_NAME, "PIV485 implementation via '" __CX_STRINGIZE(SERIAL_HAL_DESCR) "' HAL",
                   NULL, NULL,
-                  PIV485_LYR_NAME, PIV485_LYR_VERSION,
+                  PIV485_LYR_API_NAME, PIV485_LYR_API_VERSION,
                   piv485_init_lyr, piv485_term_lyr,
                   piv485_disconnect,
                   &piv485_vmt);

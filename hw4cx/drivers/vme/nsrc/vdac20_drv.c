@@ -136,14 +136,20 @@ static int init_d(int devid, void *devptr,
 {
   privrec_t  *me = (privrec_t*)devptr;
 
+  int         bus_major;
+  int         bus_minor;
   int         jumpers;
 
-    if (businfocount < 1) return -CXRF_CFG_PROBL;
-    jumpers    = businfo[0] & 0xFFF;
+    if (businfocount < 3) return -CXRF_CFG_PROBL;
+    bus_major  = businfo[0];
+    bus_minor  = businfo[1];
+    jumpers    = businfo[2] & 0xFFF;
 
     me->lvmt   = GetLayerVMT(devid);
     me->handle = me->lvmt->add(devid, devptr,
-                               jumpers << 4, 2, ADDRESS_MODIFIER,
+                               bus_major, bus_minor,
+                               jumpers << 4, 2,
+                               16, ADDRESS_MODIFIER,
                                0, 0, NULL);
     if (me->handle < 0) return me->handle;
 
@@ -262,8 +268,8 @@ static void rdwr_p(int devid, void *devptr,
 DEFINE_CXSD_DRIVER(vdac20, "VDAC20 VME DAC driver",
                    NULL, NULL,
                    sizeof(privrec_t), NULL,
-                   1, 1,
-                   VME_LYR_NAME, VME_LYR_VERSION,
+                   3, 3,
+                   VME_LYR_API_NAME, VME_LYR_API_VERSION,
                    NULL,
                    -1, NULL, NULL,
                    init_d, NULL, rdwr_p);

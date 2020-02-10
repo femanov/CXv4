@@ -8,7 +8,7 @@ static CxsdDb file_ldr(const char *argv0,
 {
   ppf4td_ctx_t  ctx;
 
-    if (ppf4td_open(&ctx, "m4", reference) != 0)
+    if (ppf4td_open(&ctx, "m4", reference, "types") != 0)
     {
         fprintf(stderr, "%s %s(): failed to open \"%s\": %s\n",
                strcurtime(), __FUNCTION__, reference, ppf4td_strerror(errno));

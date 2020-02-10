@@ -1,0 +1,1 @@
+../nsrc/vme_test_common.c

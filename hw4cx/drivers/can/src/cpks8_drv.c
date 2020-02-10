@@ -156,7 +156,7 @@ DEFINE_CXSD_DRIVER(cpks8, "CPKS8 driver",
                    NULL, NULL,
                    sizeof(privrec_t), NULL,
                    2, 2,
-                   CANKOZ_LYR_NAME, CANKOZ_LYR_VERSION,
+                   CANKOZ_LYR_API_NAME, CANKOZ_LYR_API_VERSION,
                    NULL,
                    -1, NULL, NULL,
                    cpks8_init_d, NULL, cpks8_rw_p);
