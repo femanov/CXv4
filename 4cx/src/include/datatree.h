@@ -89,6 +89,7 @@ char *strknobstate_long (knobstate_t state);
 
 void *find_knobs_nearest_upmethod(DataKnob k, int vmtoffset);
 
+enum {DATATREE_FROMLOCAL_FLAG_NOVALUECHANGE = 1 << 16};
 int  set_knob_controlvalue(DataKnob k, double      v, int fromlocal);
 int  set_knob_textvalue   (DataKnob k, const char *s, int fromlocal);
 int  set_knob_vectvalue   (DataKnob k, const double *data, int nelems,

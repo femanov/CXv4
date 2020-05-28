@@ -80,7 +80,7 @@ static pzframe_chan_dscr_t f4226_chan_dscrs[] =
     // TOTAL{MIN,MAX} and NUM_LINES are omitted
 
 //    [] = {""},
-    [F4226_NUMCHANS] = {"_devstate"},
+    [F4226_NUMCHANS] = {"_devstate", 0, PZFRAME_CHAN__DEVSTATE_MASK},
 };
 
 static fastadc_line_dscr_t f4226_line_dscrs[] =

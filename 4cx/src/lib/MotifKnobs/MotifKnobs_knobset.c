@@ -2,6 +2,7 @@
 #include "KnobsP.h"
 
 #include "MotifKnobs_text_knob.h"
+#include "MotifKnobs_inttext_knob.h"
 #include "MotifKnobs_selector_knob.h"
 #include "MotifKnobs_choicebs_knob.h"
 #include "MotifKnobs_alarmonoffled_knob.h"
@@ -28,6 +29,7 @@ static knobs_knobset_t Motif_knobset =
     (dataknob_unif_vmt_t *[]){
         (dataknob_unif_vmt_t *)&motifknobs_def_knob_vmt,
         (dataknob_unif_vmt_t *)&motifknobs_text_knob_vmt,
+        (dataknob_unif_vmt_t *)&motifknobs_inttext_knob_vmt,
         (dataknob_unif_vmt_t *)&motifknobs_selector_vmt,
         (dataknob_unif_vmt_t *)&motifknobs_choicebs_vmt,
         (dataknob_unif_vmt_t *)&motifknobs_alarm_vmt,

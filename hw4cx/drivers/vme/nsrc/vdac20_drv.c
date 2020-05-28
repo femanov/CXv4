@@ -150,7 +150,8 @@ static int init_d(int devid, void *devptr,
                                bus_major, bus_minor,
                                jumpers << 4, 2,
                                16, ADDRESS_MODIFIER,
-                               0, 0, NULL);
+                               0, 0, NULL,
+                               NULL, VME_LYR_OPTION_NONE);
     if (me->handle < 0) return me->handle;
 
     SetChanRDs  (devid, VDAC20_CHAN_ADC_n_base, VDAC20_CHAN_ADC_n_count, 1000000.0, 0.0);

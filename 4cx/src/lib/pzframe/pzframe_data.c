@@ -93,6 +93,8 @@ static void PzframeDataEvproc(int            uniq,
   pzframe_data_t      *pfr = privptr2;
   pzframe_type_dscr_t *ftd = pfr->ftd;
 
+  cx_time_t            fresh_age_time;
+
   struct timeval       timenow;
   struct timeval       timediff;
 
@@ -103,12 +105,24 @@ static void PzframeDataEvproc(int            uniq,
   int                  max_nelems;
 
 ////fprintf(stderr, "%s %s %p\n", strcurtime(), __FUNCTION__, pfr);
-    if (reason == CDA_REF_R_RSLVSTAT)
+    if      (reason == CDA_REF_R_RSLVSTAT)
     {
         if (ptr2lint(info_ptr) != CDA_RSLVSTAT_FOUND)
             for (cn = 0;  cn < ftd->chan_count;  cn++)
                 pfr->cur_data[cn].rflags = CXCF_FLAG_NOTFOUND;
         PzframeDataCallCBs(pfr, PZFRAME_REASON_RSLVSTAT, ptr2lint(info_ptr));
+        return;
+    }
+    else if (reason == CDA_REF_R_FRESHCHG)
+    {
+        /* Unspecified fresh age is treated as "switch off checking" */
+        if (cda_fresh_age_of_ref(ref, &fresh_age_time) <= 0)
+        {
+            fresh_age_time.sec  = 0;
+            fresh_age_time.nsec = 0;
+        }
+        pfr->fresh_age_timeval.tv_sec  = fresh_age_time.sec;
+        pfr->fresh_age_timeval.tv_usec = fresh_age_time.nsec / 1000;
         return;
     }
 
@@ -198,6 +212,21 @@ static void PzframeDataEvproc(int            uniq,
 
     /* Call upstream */
     PzframeDataCallCBs(pfr, PZFRAME_REASON_DATA, info_changed);
+}
+
+static void PzframeDevSEvproc(int            uniq,
+                              void          *privptr1,
+                              cda_dataref_t  ref,
+                              int            reason,
+                              void          *info_ptr,
+                              void          *privptr2)
+{
+  pzframe_data_t      *pfr = privptr2;
+  int                  val;
+
+    if (cda_get_icval(ref, &val) < 0) return;
+    /* Call upstream */
+    PzframeDataCallCBs(pfr, PZFRAME_REASON_DEVSTATE, val);
 }
 
 static void PzframeRDsCEvproc(int            uniq,
@@ -371,8 +400,14 @@ int  PzframeDataRealize   (pzframe_data_t *pfr,
 
             if      (is_marker)
             {
-                evmask   = CDA_REF_EVMASK_UPDATE | CDA_REF_EVMASK_RSLVSTAT;
+                evmask   = CDA_REF_EVMASK_UPDATE | CDA_REF_EVMASK_RSLVSTAT | CDA_REF_EVMASK_FRESHCHG;
                 evproc   = PzframeDataEvproc;
+                privptr2 = pfr;
+            }
+            else if ((ftd->chan_dscrs[cn].chan_type & PZFRAME_CHAN__DEVSTATE_MASK) != 0)
+            {
+                evmask   = CDA_REF_EVMASK_UPDATE;
+                evproc   = PzframeDevSEvproc;
                 privptr2 = pfr;
             }
             else if ((ftd->chan_dscrs[cn].chan_type & PZFRAME_CHAN_IMMEDIATE_MASK) != 0)

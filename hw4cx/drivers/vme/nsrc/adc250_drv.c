@@ -33,8 +33,6 @@ static pzframe_chinfo_t chinfo[] =
     [ADC250_CHAN_ISTART]        = {PZFRAME_CHTYPE_PZFRAME_STD, 0},
     [ADC250_CHAN_WAITTIME]      = {PZFRAME_CHTYPE_PZFRAME_STD, 0},
     [ADC250_CHAN_CALIBRATE]     = {PZFRAME_CHTYPE_INDIVIDUAL,  0},
-    [ADC250_CHAN_FGT_CLB]       = {PZFRAME_CHTYPE_INDIVIDUAL,  0},
-    [ADC250_CHAN_VISIBLE_CLB]   = {PZFRAME_CHTYPE_VALIDATE,    0},
     [ADC250_CHAN_CALC_STATS]    = {PZFRAME_CHTYPE_VALIDATE,    0},
 
     [ADC250_CHAN_PTSOFS]        = {PZFRAME_CHTYPE_VALIDATE,    0},
@@ -59,7 +57,6 @@ static pzframe_chinfo_t chinfo[] =
     [ADC250_CHAN_PGA_UNIQ_ID]   = {PZFRAME_CHTYPE_AUTOUPDATED, 0},
 
     [ADC250_CHAN_ELAPSED]       = {PZFRAME_CHTYPE_PZFRAME_STD, 0},
-    [ADC250_CHAN_CLB_STATE]     = {PZFRAME_CHTYPE_AUTOUPDATED, 0},
     [ADC250_CHAN_XS_PER_POINT]  = {PZFRAME_CHTYPE_STATUS,      -1},
     [ADC250_CHAN_XS_DIVISOR]    = {PZFRAME_CHTYPE_AUTOUPDATED, 0},
     [ADC250_CHAN_XS_FACTOR]     = {PZFRAME_CHTYPE_AUTOUPDATED, 0},
@@ -172,8 +169,44 @@ typedef struct
 
 //--------------------------------------------------------------------
 
+static psp_lkp_t adc250_timing_lkp[] =
+{
+    {"int",   ADC4X250_CLK_SRC_VAL_INT},
+    {"front", ADC4X250_CLK_SRC_VAL_FP},
+    {"back",  ADC4X250_CLK_SRC_VAL_BP},
+    {NULL, 0}
+};
+
+static psp_lkp_t adc250_trig_type_lkp[] =
+{
+    {"disable",   ADC4X250_TRIG_ENA_VAL_DISABLE},
+    {"int",       ADC4X250_TRIG_ENA_VAL_INT},
+    {"front",     ADC4X250_TRIG_ENA_VAL_EXT},
+    {"back",      ADC4X250_TRIG_ENA_VAL_BP},
+    {"back+sync", ADC4X250_TRIG_ENA_VAL_BP_SYNC},
+    {NULL, 0}
+};
+
+static psp_lkp_t adc250_range_lkp[] =
+{
+    {"0.5", ADC4X250_RANGE_VAL_0_5V},
+    {"1",   ADC4X250_RANGE_VAL_1V},
+    {"2",   ADC4X250_RANGE_VAL_2V},
+    {"4",   ADC4X250_RANGE_VAL_4V},
+    {NULL, 0}
+};
+
 static psp_paramdescr_t adc250_params[] =
 {
+    PSP_P_INT    ("ptsofs",   adc250_privrec_t, nxt_args[ADC250_CHAN_PTSOFS],     -1, 0, ADC250_MAX_ALLOWED_NUMPTS-1),
+    PSP_P_INT    ("numpts",   adc250_privrec_t, nxt_args[ADC250_CHAN_NUMPTS],     -1, 1, ADC250_MAX_ALLOWED_NUMPTS),
+    PSP_P_LOOKUP ("timing",   adc250_privrec_t, nxt_args[ADC250_CHAN_TIMING],     -1, adc250_timing_lkp),
+    PSP_P_LOOKUP ("trigger",  adc250_privrec_t, nxt_args[ADC250_CHAN_TRIG_TYPE],  -1, adc250_trig_type_lkp),
+    PSP_P_INT    ("trig_n",   adc250_privrec_t, nxt_args[ADC250_CHAN_TRIG_INPUT], -1, 0, ADC4X250_ADC_TRIG_SOURCE_TTL_INPUT_bits),
+    PSP_P_LOOKUP ("rangeA",   adc250_privrec_t, nxt_args[ADC250_CHAN_RANGE0 + 0], -1, adc250_range_lkp),
+    PSP_P_LOOKUP ("rangeB",   adc250_privrec_t, nxt_args[ADC250_CHAN_RANGE0 + 1], -1, adc250_range_lkp),
+    PSP_P_LOOKUP ("rangeC",   adc250_privrec_t, nxt_args[ADC250_CHAN_RANGE0 + 2], -1, adc250_range_lkp),
+    PSP_P_LOOKUP ("rangeD",   adc250_privrec_t, nxt_args[ADC250_CHAN_RANGE0 + 3], -1, adc250_range_lkp),
     PSP_P_END()
 };
 
@@ -186,9 +219,9 @@ static void Return1Param(adc250_privrec_t *me, int n, int32 v)
 
 static void ReturnDevInfo(adc250_privrec_t *me)
 {
-  int32  v_devid;
-  int32  v_ver;
-  int32  v_uniq;
+  uint32  v_devid;
+  uint32  v_ver;
+  uint32  v_uniq;
 
     me->lvmt->a32rd32(me->handle, ADC4X250_R_DEVICE_ID, &v_devid);
     me->lvmt->a32rd32(me->handle, ADC4X250_R_VERSION,   &v_ver);
@@ -298,7 +331,7 @@ static void adc250_hbt(int devid, void *devptr,
                        void *privptr __attribute__((unused)));
 static void  Init1Param(adc250_privrec_t *me, int n, int32 v)
 {
-    /*if (me->nxt_args[n] < 0)*/ me->nxt_args[n] = v;
+    if (me->nxt_args[n] < 0) me->nxt_args[n] = v;
     me->nxt_args[n] = ValidateParam(&(me->pz), n, me->nxt_args[n]);
 }
 static int   InitParams(pzframe_drv_t *pdr)
@@ -307,6 +340,7 @@ static int   InitParams(pzframe_drv_t *pdr)
 
   int               n;
   uint32            w;
+  int               r;
 
 /*
     Note: to stop the device, do
@@ -316,7 +350,7 @@ static int   InitParams(pzframe_drv_t *pdr)
 
     /*!!! Stop device */
     me->lvmt->a32wr32(me->handle, ADC4X250_R_CTRL,       ADC4X250_CTRL_ADC_BREAK_ACK); // Stop (or drop ADC_CMPLT)
-    me->lvmt->a32rd32(me->handle, ADC4X250_R_INT_STATUS, &w); // Drop IRQ
+    me->lvmt->a32rd32(me->handle, ADC4X250_R_INT_STATUS, &w); // Drop INT_STATUS bits (in fact, not required)
 
     /*!!! Program IRQ? */
     if (me->irq_n != 5)
@@ -332,10 +366,14 @@ static int   InitParams(pzframe_drv_t *pdr)
     ReturnClbInfo(me);
 
     /* Read current values from device */
-    me->lvmt->a32rd32(me->handle, ADC4X250_R_TIMER,             &w);
+    r = me->lvmt->a32rd32(me->handle, ADC4X250_R_TIMER,         &w);
 fprintf(stderr, "%s *** %s[%d] ***\n", strcurtime_msc(), __FUNCTION__, me->devid);
-fprintf(stderr, "\t\tTIMER=%08x\n", w);
-//    if (w > ADC4X250_TIMER_PRETRIG) w -= ADC4X250_TIMER_PRETRIG;
+fprintf(stderr, "\t\tTIMER=%08x r=%d\n", w, r);
+    if (r < 0)
+    {
+        DoDriverLog(me->devid, 0, "a32rd32(ADC4X250_R_TIMER): %d; probably a missing/unconfigured device, terminating", r);
+        return -CXRF_CAMAC_NO_X;
+    }
     if (w <= 1)                        w = 1024;
     if (w > ADC250_MAX_ALLOWED_NUMPTS) w = ADC250_MAX_ALLOWED_NUMPTS;
     Init1Param(me, ADC250_CHAN_NUMPTS, w);
@@ -409,7 +447,7 @@ static int  StartMeasurements(pzframe_drv_t *pdr)
 
     /* a. Prepare: stop/init the device */
     me->lvmt->a32wr32(me->handle, ADC4X250_R_CTRL,       ADC4X250_CTRL_ADC_BREAK_ACK); // Stop
-    me->lvmt->a32rd32(me->handle, ADC4X250_R_INT_STATUS, &w); // Drop IRQ
+    me->lvmt->a32rd32(me->handle, ADC4X250_R_INT_STATUS, &w); // Drop INT_STATUS bits
     /* b. Set parameters */
     me->lvmt->a32wr32(me->handle, ADC4X250_R_TIMER,
                       me->cur_args[ADC250_CHAN_PTSOFS] +
@@ -437,9 +475,7 @@ static int  StartMeasurements(pzframe_drv_t *pdr)
     else
         me->start_mask = ADC4X250_CTRL_START;
     /* b. Related activity */
-    me->do_return =
-        (me->start_mask != ADC4X250_CTRL_CALIB  ||
-         (me->cur_args[ADC250_CHAN_VISIBLE_CLB] & CX_VALUE_LIT_MASK) != 0);
+    me->do_return  = me->start_mask != ADC4X250_CTRL_CALIB;
     me->force_read = me->start_mask == ADC4X250_CTRL_CALIB;
 
     /* Let's go! */
@@ -488,7 +524,7 @@ static int  AbortMeasurements(pzframe_drv_t *pdr)
   int               n;
 
     me->lvmt->a32wr32(me->handle, ADC4X250_R_CTRL,       ADC4X250_CTRL_ADC_BREAK_ACK); // Stop
-    me->lvmt->a32rd32(me->handle, ADC4X250_R_INT_STATUS, &w); // Drop IRQ
+    me->lvmt->a32rd32(me->handle, ADC4X250_R_INT_STATUS, &w); // Drop INT_STATUS bits
 
     if (me->cur_args[ADC250_CHAN_NUMPTS] != 0)
         bzero(me->retdata,
@@ -510,12 +546,11 @@ static rflags_t ReadMeasurements(pzframe_drv_t *pdr)
   int32             w; // Note SIGNEDNESS
   uint32            status;
 
-  uint32            buf[1024];
-
   int               nl;
   uint32            ro; // Read Offset
   ADC250_DATUM_T   *dp;
   int               n;
+  ADC250_DATUM_T    tmpv;
 
 ////fprintf(stderr, "%s %s ENTRY\n", strcurtime_msc(), __FUNCTION__);
     /* Was it a calibration? */
@@ -530,12 +565,22 @@ static rflags_t ReadMeasurements(pzframe_drv_t *pdr)
     numduplets = (me->cur_args[ADC250_CHAN_NUMPTS] + 1) / 2;
     for (nl = 0;  nl < ADC250_NUM_LINES;  nl++)
     {
-#if 0
-        
-#else
         dp = me->retdata + nl * me->cur_args[ADC250_CHAN_NUMPTS];
         ro = ADC4X250_DATA_ADDR_CHx_base + nl * ADC4X250_DATA_ADDR_CHx_incr +
-             (me->cur_args[ADC250_CHAN_PTSOFS] / 2) * 4;
+             (me->cur_args[ADC250_CHAN_PTSOFS] / 2) * 4 +
+             (ADC4X250_TIMER_PRETRIG           / 2) * 4;
+#if 1
+        // 1. Read the whole data block as 32-bit words
+        n = me->lvmt->a32rd32v(me->handle, ro, (uint32*)dp, numduplets);
+////fprintf(stderr, "[%d] a32rd32v=%d err=%d/<%s>\n", me->devid, n, errno, strerror(errno));
+        // 2. Swap even and odd 16-bit halfwords (those arrive swapped because of big-endian)
+        for (n = numduplets;  n > 0;  n--)
+        {
+            tmpv  = dp[0];
+            dp[0] = dp[1]; dp++;
+            dp[0] = tmpv;  dp++;
+        }
+#else
         for (n = numduplets;  n > 0;  n--, ro += 4)
         {
             me->lvmt->a32rd32(me->handle, ro, &w);
@@ -547,7 +592,7 @@ static rflags_t ReadMeasurements(pzframe_drv_t *pdr)
     for (n = ADC250_CHAN_STATS_first;  n <= ADC250_CHAN_STATS_last;  n++)
         me->cur_args[n] = me->nxt_args[n] = 0;
 
-/*!!! ADC250_CHAN_CLB_STATE, ADC250_CHAN_CLB_FAILx, ADC250_CHAN_OVERFLOWx */
+/*!!! ADC250_CHAN_CLB_FAILx, ADC250_CHAN_OVERFLOWx */
     me->lvmt->a32rd32(me->handle, ADC4X250_R_STATUS, &status);
     for (n = 0;  n < ADC250_NUM_ADCS;  n++)
         me->cur_args[ADC250_CHAN_OVERFLOW0 + n] =
@@ -709,7 +754,7 @@ static void adc250_rw_p (int devid, void *devptr,
         {
 ////fprintf(stderr, "%s chn=%d action=%d\n", strcurtime_msc(), chn, action);
             if (chn == ADC250_CHAN_DATA)
-                me->data_rqd                          = 1;
+                me->data_rqd                        = 1;
             else
                 me->line_rqd[chn-ADC250_CHAN_LINE0] = 1;
 
@@ -748,12 +793,6 @@ static void adc250_rw_p (int devid, void *devptr,
                      if (action == DRVA_WRITE)
                           me->nxt_args[chn] = (val != 0);
                      ReturnInt32Datum(devid, chn, me->nxt_args[chn], 0);
-                }
-                else if (chn == ADC250_CHAN_FGT_CLB)
-                {
-                    if (action == DRVA_WRITE  &&  val == CX_VALUE_COMMAND)
-                        /*!!! InvalidateCalibrations(me) */;
-                    ReturnInt32Datum(devid, chn, 0, 0);
                 }
             }
             else /*  ct == PZFRAME_CHTYPE_PZFRAME_STD, which also returns UPSUPPORTED for unknown */
@@ -817,7 +856,7 @@ me->lvmt->a32rd32(me->handle, ADC4X250_R_INT_STATUS, &w);
 ////fprintf(stderr, "zINT_STATUS=%08x\n", w);
 me->lvmt->a32wr32(me->handle, ADC4X250_R_CTRL,       ADC4X250_CTRL_ADC_BREAK_ACK); // Stop (or drop ADC_CMPLT)
 
-    /*!!! Here MUST call smth to read ADC4X250_R_INT_STATUS (thus dropping IRQ) */
+    /*!!! Here MUST call smth to read ADC4X250_R_INT_STATUS (and, probably, analyze its content) */
     if (me->do_return == 0  &&  me->force_read) ReadMeasurements(&(me->pz));
     pzframe_drv_drdy_p(&(me->pz), me->do_return, 0);
 }
@@ -845,7 +884,8 @@ fprintf(stderr, "%s businfo[2]=%08x jumpers=0x%x irq=%d vector=%d\n", strcurtime
                                bus_major, bus_minor,
                                jumpers << 24, FASTADC_SPACE_SIZE,
                                32, FASTADC_ADDRESS_MODIFIER,
-                               me->irq_n, me->irq_vect, FASTADC_IRQ_P);
+                               me->irq_n, me->irq_vect, FASTADC_IRQ_P,
+                               NULL, VME_LYR_OPTION_NONE);
     if (me->handle < 0) return me->handle;
 
     for (n = 0;  n < countof(chinfo);  n++)

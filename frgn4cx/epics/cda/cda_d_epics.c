@@ -43,7 +43,7 @@ typedef struct
 enum
 {
     FDI_MIN_VAL   = 1,
-    FDI_MAX_COUNT = 10000,  // An arbitrary limit; shouldn't be >FD_SETSIZE
+    FDI_MAX_COUNT = 1000,  // An arbitrary limit; should be <FD_SETSIZE
     FDI_ALLOC_INC = 100,
 };
 
@@ -61,7 +61,7 @@ GENERIC_SLOTARRAY_DEFINE_GROWING(static, Fdi, fd_info_t,
 
 static void RlsFdiSlot(int id)
 {
-  fd_info_t *fdi;
+  fd_info_t *fdi = AccessFdiSlot(id);
 
     if (fdi->fd == 0) return;
     sl_del_fd(fdi->handle);
@@ -345,7 +345,15 @@ static void NewDataCB    (struct event_handler_args      ARGS)
 
     switch (ARGS.type)
     {
-        case DBR_TIME_STRING: value_p = &(((const struct dbr_time_string *)(ARGS.dbr))->value); break;
+        case DBR_TIME_STRING: value_p = &(((const struct dbr_time_string *)(ARGS.dbr))->value); 
+                              nelems = sizeof(((const struct dbr_time_string *)(ARGS.dbr))->value) - 1;
+//fprintf(stderr, "\tnelems=%d count=%d\n", nelems, ARGS.count);
+                              while (nelems > 0  &&  ((char*)(value_p))[nelems-1] == '\0') nelems--;
+                              for (nelems = 0;
+                                   nelems < sizeof(((const struct dbr_time_string *)(ARGS.dbr))->value)
+                                   &&  ((char*)(value_p))[nelems] != '\0';
+                                   nelems++);
+                              break;
         case DBR_TIME_SHORT:
         /* ==DBR_TIME_INT */  value_p = &(((const struct dbr_time_short  *)(ARGS.dbr))->value); break;
         case DBR_TIME_FLOAT:  value_p = &(((const struct dbr_time_float  *)(ARGS.dbr))->value); break;
@@ -355,8 +363,6 @@ static void NewDataCB    (struct event_handler_args      ARGS)
         case DBR_TIME_DOUBLE: value_p = &(((const struct dbr_time_double *)(ARGS.dbr))->value); break;
         default: return;
     }
-
-    /*!!! timestamp -- ? */
 
     cda_dat_p_update_dataset(me->sid, 1, &(hi->dataref),
                              &value_p, &dtype, &nelems,
@@ -548,4 +554,6 @@ CDA_DEFINE_DAT_PLUGIN(epics, "EPICS (Channel Access) data-access plugin",
                       cda_d_epics_new_chan, NULL,
                       NULL,
                       cda_d_epics_snd_data, NULL,
-                      cda_d_epics_new_srv,  cda_d_epics_del_srv);
+                      cda_d_epics_new_srv,  cda_d_epics_del_srv,
+                      NULL, NULL,
+                      NULL, NULL);

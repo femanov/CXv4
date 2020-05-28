@@ -50,7 +50,7 @@ static pzframe_chan_dscr_t vsdc2_1_chan_dscrs[] =
 
     [VSDC2_CHAN_CUR_PTSOFS0]  = {"cur_ptsofs",   1},
     [VSDC2_CHAN_CUR_NUMPTS0]  = {"cur_numpts"},
-    [VSDC2_NUMCHANS] = {"_devstate"},
+    [VSDC2_NUMCHANS] = {"_devstate", 0, PZFRAME_CHAN__DEVSTATE_MASK},
 };
 
 #define LINE_DSCR(N,x)                                   \

@@ -6,11 +6,12 @@
 ######################################################################
 
 CDA_UTILS=		cdaclient das-experiment dataset-save pipe2cda
-EXES=			drvinfo ppf4td_test \
+EXES=			drvinfo ppf4td_test ppf4td_test_double \
 			cxclient cx-chan-search $(CDA_UTILS)
 
 drvinfo_COMPONENTS=	drvinfo.o drvinfo_publics.o
 ppf4td_test_COMPONENTS=	ppf4td_test.o
+ppf4td_test_double_COMPONENTS=	ppf4td_test_double.o
 cxclient_COMPONENTS=	cxclient.o
 cx-chan-search_COMPONENTS=	cx-chan-search.o
 
@@ -30,7 +31,7 @@ drvinfo:		SPECIFIC_LDFLAGS=-Wl,-export-dynamic
 drvinfo:		$(LIBCXSD) \
 			$(LIBUSEFUL) $(LIBCXSCHEDULER) $(LIBMISC)
 
-ppf4td_test:		$(LIBUSEFUL) $(LIBMISC)
+ppf4td_test ppf4td_test_double:		$(LIBUSEFUL) $(LIBMISC)
 
 cxclient:		$(LIBCX_SYNC) \
 			$(LIBUSEFUL) $(LIBCXSCHEDULER) $(LIBMISC)

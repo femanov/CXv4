@@ -1,4 +1,4 @@
-devtype adc250 r1i3132620,r4i783155,r5i,w30i,r100i {
+devtype adc250 r1h3132620,r4h783155,r5i,w30i,r100i {
 	data		0
 	line<0-3>	1
 	marker		9
@@ -8,8 +8,8 @@ devtype adc250 r1i3132620,r4i783155,r5i,w30i,r100i {
 	istart		12
 	waittime	13
 	calibrate	14
-	fgt_clb		15
-	visible_clb	16
+	# absent in ADC250:	fgt_clb		15
+	# absent in ADC250:	visible_clb	16
 	calc_stats	17
 
 	ptsofs		20
@@ -30,7 +30,7 @@ devtype adc250 r1i3132620,r4i783155,r5i,w30i,r100i {
 	pga_uniq_id	47
 
 	elapsed		50
-	clb_state	51
+	# absent in ADC250:	clb_state	51
 	xs_per_point	52
 	xs_divisor	53
 	xs_factor	54

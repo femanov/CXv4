@@ -1,4 +1,4 @@
-# linac1:11 -- Linac magsys/magcor
+# canhw:11 -- Linac magsys/magcor
 #### 0. Includes #####################################################
 include(`g0603.devtype')
 include(`c0612.devtype')

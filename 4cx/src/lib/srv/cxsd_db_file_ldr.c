@@ -3,8 +3,8 @@
 
 
 /////////////////////////////////////////////////////////////////////
-static CxsdDb file_ldr(const char *argv0,
-                       const char *reference)
+static CxsdDb file_db_ldr(const char *argv0,
+                          const char *reference)
 {
   ppf4td_ctx_t  ctx;
 
@@ -25,7 +25,7 @@ static void file_dbldr_term_m(void);
 
 DEFINE_CXSD_DBLDR(file, "CxsdDb-loader from file",
                   file_dbldr_init_m, file_dbldr_term_m,
-                  file_ldr);
+                  file_db_ldr);
 
 static int  file_dbldr_init_m(void)
 {

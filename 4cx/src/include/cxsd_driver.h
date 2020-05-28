@@ -341,7 +341,12 @@ void StdSimulated_rw_p(int devid, void *devptr,
 
 
 const char * GetDevTypename(int devid);
+const char * GetDevInstname(int devid);
 void         GetDevLogPrms (int devid, int *curlevel_p, int *curmask_p);
+
+int          GetDevPlace   (int  devid,
+                            int *first_p,
+                            int *count_p);
 
 void       * GetLayerVMT   (int devid);
 const char * GetLayerInfo  (const char *lyrname, int bus_n);

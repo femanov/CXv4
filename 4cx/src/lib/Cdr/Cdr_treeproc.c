@@ -27,6 +27,9 @@ enum {NUMAVG = 30};
 enum {MMXCAP = 30};
 
 
+static int _Cdr_show_changed_knobs = 0;
+
+
 data_section_t *CdrCreateSection(DataSubsys sys,
                                  const char *type,
                                  char       *name, size_t namelen,
@@ -468,6 +471,8 @@ int   CdrRealizeSubsystem(DataSubsys  subsys,
   int             cda_opts = (subsys->readonly)? CDA_OPT_READONLY : 0;
   int             numsrvs;
 
+  char           *envv;
+
   static const char FROM_CMDLINE_STR[] = "from_cmdline";
 
     CdrClearErr();
@@ -526,6 +531,9 @@ int   CdrRealizeSubsystem(DataSubsys  subsys,
             FillConnsOfContainer(numsrvs, p->data, NULL, REALIZE_PASS_1);
             FillConnsOfContainer(numsrvs, p->data, NULL, REALIZE_PASS_2);
         }
+
+    _Cdr_show_changed_knobs = (envv = getenv("CDR_SHOW_CHANGED_KNOBS")) != NULL  &&
+                              (*envv == '1'  ||  tolower(*envv) == 'y');
 
     return 0;
 }
@@ -1135,6 +1143,8 @@ void  CdrProcessKnobs    (DataSubsys subsys, int cause_conn_n, int options,
   cxdtype_t   raw_dtype;
   time_t      timenow = time(NULL);
 
+  int         v_ne_curv_flag; // "V is NotEqual to CURV, an FLAG value for passing to set_knob_controlvalue()"
+
   int         rn;
   
   /* For LOGT_DEVN */
@@ -1315,7 +1325,12 @@ void  CdrProcessKnobs    (DataSubsys subsys, int cause_conn_n, int options,
 
                     k->u.k.curcolv = cl_v;
                 }
-                
+
+                /* Note: NaN!=NaN */
+                v_ne_curv_flag = ((v != k->u.k.curv) ||
+                                  k->curstate == KNOBSTATE_JUSTCREATED)?
+                                 0 : DATATREE_FROMLOCAL_FLAG_NOVALUECHANGE;
+
                 /* Store new values... */
                 k->u.k.curv           = v;
                 k->u.k.curv_raw       = raw;
@@ -1349,7 +1364,9 @@ void  CdrProcessKnobs    (DataSubsys subsys, int cause_conn_n, int options,
                      !k->wasjustset
                     )
                    )
-                    set_knob_controlvalue(k, v, 0);
+                    set_knob_controlvalue(k, v, v_ne_curv_flag);
+                if (_Cdr_show_changed_knobs)
+                    set_knob_otherop(k, !v_ne_curv_flag); // This is a diagnostic: shows changed knobs in orange for 1 cycle
                 
                 if ((options & CDR_OPT_SYNTHETIC) == 0) k->wasjustset = 0;
                 

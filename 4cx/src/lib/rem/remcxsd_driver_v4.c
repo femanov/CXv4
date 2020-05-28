@@ -157,7 +157,8 @@ void ReturnDataSet    (int devid,
         hdr.pktsize      = pktsize;
         hdr.command      = REMDRV_C_PONG_Y;
         if (fdio_send(dev->fhandle, &hdr, pktsize) < 0)
-            goto TERMINATE;
+            {fprintf(stderr, "[%d] send(pong)\n", devid);
+            goto TERMINATE;}
         return;
     }
 
@@ -168,7 +169,8 @@ void ReturnDataSet    (int devid,
             seglen = SEGLEN_MAX;
 
         if (fdio_lock_send  (dev->fhandle) < 0)
-            goto TERMINATE;
+            {fprintf(stderr, "[%d] lock_send()\n", devid);
+            goto TERMINATE;}
         for (stage = 0;  stage <= 1;  stage++)
         {
             if (stage != 0)
@@ -196,16 +198,20 @@ void ReturnDataSet    (int devid,
                     fdio_send(dev->fhandle, ad2snd, seglen * sizeof(ad2snd[0])) < 0  ||
                     fdio_send(dev->fhandle, ne2snd, seglen * sizeof(ne2snd[0])) < 0  ||
                     fdio_send(dev->fhandle, rf2snd, seglen * sizeof(rf2snd[0])) < 0)
-                    goto TERMINATE;
+                    {fprintf(stderr, "[%d] send(ad/ne/rf)\n", devid);
+                    goto TERMINATE;}
                 if (timestamps != NULL  &&
                      /* Note: we don't use zeroes[] but send an extra int32 from ts2snd[], since ts2snd[]'s size is multiple of 8 */
                     fdio_send(dev->fhandle, ts2snd, seglen * sizeof(ts2snd[0]) * 3) < 0)
-                    goto TERMINATE;
+                    {fprintf(stderr, "[%d] send(timestamps)\n", devid);
+                    goto TERMINATE;}
                 if (fdio_send(dev->fhandle, dt2snd, seglen * sizeof(dt2snd[0])) < 0)
-                    goto TERMINATE;
+                    {fprintf(stderr, "[%d] send(dtypes)\n", devid);
+                    goto TERMINATE;}
                 if (padsize    != 0     &&
                     fdio_send(dev->fhandle, zeroes, padsize) < 0)
-                    goto TERMINATE;
+                    {fprintf(stderr, "[%d] send(padding)\n", devid);
+                    goto TERMINATE;}
             }
 
             for (x = 0, valuestotal = 0;  x < seglen;  x++)
@@ -229,16 +235,19 @@ void ReturnDataSet    (int devid,
                 {
                     if (size    != 0  &&
                         fdio_send(dev->fhandle, values[x], size)    < 0)
-                        goto TERMINATE;
+                        {fprintf(stderr, "[%d] send(values)\n", devid);
+                        goto TERMINATE;}
                     if (padsize != 0  &&
                         fdio_send(dev->fhandle, zeroes,    padsize) < 0)
-                        goto TERMINATE;
+                        {fprintf(stderr, "[%d] send(padding2)\n", devid);
+                        goto TERMINATE;}
                         
                 }
             }
         }
         if (fdio_unlock_send(dev->fhandle) < 0)
-            goto TERMINATE;
+            {fprintf(stderr, "[%d] unlock_send()\n", devid);
+            goto TERMINATE;}
 
         addrs  += seglen;
         dtypes += seglen;
@@ -302,6 +311,7 @@ void SetChanRDs       (int devid,
     pkt.data.phys_r         = phys_r;
     pkt.data.phys_d         = phys_d;
     if (fdio_send(dev->fhandle, &pkt, sizeof(pkt)) < 0)
+        fprintf(stderr, "[%d] %s()\n", devid, __FUNCTION__),
         FreeDevID(devid);
 }
 
@@ -327,6 +337,7 @@ void SetChanFreshAge  (int devid,
     pkt.data.age_sec_lo32   = fresh_age.sec; /*!!! lo32()!!! */
     pkt.data.age_sec_hi32   = 0; /*!!! hi32() !!! */
     if (fdio_send(dev->fhandle, &pkt, sizeof(pkt)) < 0)
+        fprintf(stderr, "[%d] %s()\n", devid, __FUNCTION__),
         FreeDevID(devid);
 }
 
@@ -357,6 +368,7 @@ void SetChanQuant     (int devid,
     pkt.data.q_dtype        = q_dtype;
     memcpy(pkt.data.q_data,  &q, q_size);
     if (fdio_send(dev->fhandle, &pkt, sizeof(pkt)) < 0)
+        fprintf(stderr, "[%d] %s()\n", devid, __FUNCTION__),
         FreeDevID(devid);
 }
 
@@ -388,6 +400,7 @@ void SetChanRange     (int devid,
     memcpy(pkt.data.range_min, &minv, r_size);
     memcpy(pkt.data.range_max, &maxv, r_size);
     if (fdio_send(dev->fhandle, &pkt, sizeof(pkt)) < 0)
+        fprintf(stderr, "[%d] %s()\n", devid, __FUNCTION__),
         FreeDevID(devid);
 }
 
@@ -411,6 +424,7 @@ void SetChanReturnType(int devid,
     pkt.hdr.var.group.count = count;
     pkt.data.return_type    = return_type;
     if (fdio_send(dev->fhandle, &pkt, sizeof(pkt)) < 0)
+        fprintf(stderr, "[%d] %s()\n", devid, __FUNCTION__),
         FreeDevID(devid);
 }
 
@@ -442,6 +456,7 @@ void  SetDevState     (int devid, int state,
     if ( fdio_send(dev->fhandle, &pkt, sizeof(pkt)) < 0  ||
         (dlen != 0  &&
          fdio_send(dev->fhandle, description, dlen) < 0))
+        fprintf(stderr, "[%d] %s()\n", devid, __FUNCTION__),
         FreeDevID(devid);
 
     if (state == DEVSTATE_OFFLINE) FreeDevID(devid);
@@ -459,7 +474,8 @@ void  ReRequestDevData(int devid)
     pkt.pktsize = sizeof(pkt);
     pkt.command = REMDRV_C_REREQD;
     r = fdio_send(dev->fhandle, &pkt, pkt.pktsize);
-    if (r < 0) FreeDevID(devid);
+    if (r < 0)         fprintf(stderr, "[%d] %s()\n", devid, __FUNCTION__),
+FreeDevID(devid);
 }
 
 void       * GetLayerVMT   (int devid)

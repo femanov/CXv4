@@ -12,6 +12,7 @@ CLIENTS=	kozdev cac208 canadc40 candac16 cdac20 ceac124 \
 		s_u0632 \
 		\
 		s_adc200me s_adc812me dl200me_s dl200me_f \
+		dl250 \
 		weld02 senkov_ebc senkov_vip \
 		tvac320 panov_ubs \
 		smc8

@@ -72,6 +72,7 @@ typedef struct
     cda_hwcnref_t    hwr;              // For varparms is cda_varparm_t
     int              is_ready;
     int              rds_rcvd;
+    int              lockstat; /* Note: maybe join is_ready+rds_rcvd+lockstat into a single status-word? */
 
     int              options;          // Saves cda_add_chan(.options)
     cxdtype_t        dtype;            // Data type
@@ -750,6 +751,8 @@ cda_context_t  cda_new_context(int                   uniq,   void *privptr1,
   cda_dat_p_rec_t  *pdt;
   char             *dcln_p;
 
+  char             *envv;
+
     cda_clear_err();
 
     if (defpfx == NULL) defpfx = "";
@@ -796,11 +799,8 @@ cda_context_t  cda_new_context(int                   uniq,   void *privptr1,
     if (cda_progname[0] == '\0'  &&  argv0[0] != '\0')
         strzcpy(cda_progname, argv0, sizeof(cda_progname));
 
-    {
-      char *envv;
-
-        _cda_debug_names = (envv = getenv("CDA_DEBUG_NAMES")) != NULL  &&  *envv == '1';
-    }
+    _cda_debug_names = (envv = getenv("CDA_DEBUG_NAMES")) != NULL  &&
+                       (*envv == '1'  ||  tolower(*envv) == 'y');
 
     cda_add_context_evproc(cid, evmask, evproc, privptr2);
 
@@ -1126,7 +1126,7 @@ cda_dataref_t  cda_add_chan   (cda_context_t         cid,
     new_chan_r = CDA_DAT_P_ERROR;
     if (pdt->new_chan != NULL)
         new_chan_r = pdt->new_chan(ref, target,
-                                   options & CDA_DATAREF_OPT_ON_UPDATE,
+                                   options & (CDA_DATAREF_OPT_ON_UPDATE | CDA_DATAREF_OPT_EXCLUSIVE),
                                    dtype, max_nelems);
 #if 1 /* 18.02.2015: return ERROR upon error in channel registration */
     if (new_chan_r < 0)
@@ -1342,7 +1342,7 @@ static int compare_ref_sids(const void *a, const void *b)
     return (ri_a->sid > ri_b->sid) - (ri_a->sid - ri_b->sid);
 }
 int            cda_lock_chans (int count, cda_dataref_t *refs,
-                               int operation)
+                               int operation, int lockset_id)
 {
   int            n;
   int            first_n;
@@ -1410,7 +1410,7 @@ int            cda_lock_chans (int count, cda_dataref_t *refs,
         }
         si->metric->do_lock(si->pdt_privptr,
                             hwr_count, si->hwr_arr_buf,
-                            operation, -1);
+                            operation, lockset_id);
     }
 
     return 0;
@@ -2081,6 +2081,8 @@ static int srv_checker(srvinfo_t *p, void *privptr)
     return
         p->cid    == model->cid     &&
         p->metric == model->metric  &&
+        p->being_destroyed == 0     &&
+        (p->options & CDA_DAT_P_GET_SERVER_OPT_PRIV_SRV) == 0  &&
         strcasecmp(p->srvrspec, model->srvrspec) == 0  &&
         /* Note: could have used
                ((p->options ^ model->options) & CDA_DAT_P_GET_SERVER_OPT_SRVTYPE_mask) == 0
@@ -2106,16 +2108,15 @@ static int find_or_add_a_server(cda_context_t    cid,
 
     if (srvrspec == NULL) srvrspec = "";
 
-    srv_cmp_info.cid      = cid;
-    srv_cmp_info.metric   = metric;
-    srv_cmp_info.srvrspec = srvrspec;
-    srv_cmp_info.options  = options;
-    
-    sid = ForeachSrvSlot(srv_checker, &srv_cmp_info);
-    if (sid > 0)
+    if ((options & CDA_DAT_P_GET_SERVER_OPT_PRIV_SRV) == 0)
     {
-        si = AccessSrvSlot(sid);
-        return si->being_destroyed? CDA_SRVCONN_ERROR : sid;
+        srv_cmp_info.cid      = cid;
+        srv_cmp_info.metric   = metric;
+        srv_cmp_info.srvrspec = srvrspec;
+        srv_cmp_info.options  = options;
+
+        sid = ForeachSrvSlot(srv_checker, &srv_cmp_info);
+        if (sid > 0) return sid;
     }
 
     /* Okay, allocate a new one... */
@@ -2203,6 +2204,7 @@ void *cda_dat_p_get_server         (cda_dataref_t    source_ref,
 
     if (CheckRef(source_ref) != 0) return NULL;
 
+    if ((ri->options & CDA_DATAREF_OPT_PRIV_SRV) != 0) options |= CDA_DAT_P_GET_SERVER_OPT_PRIV_SRV;
     sid = find_or_add_a_server(ri->cid, metric, srvrspec, options);
     if (sid < 0) return NULL;
 
@@ -2392,6 +2394,7 @@ void  cda_dat_p_update_dataset     (cda_srvconn_t  sid,
   size_t           ssiz;
   int              repr;
   size_t           size;
+  int              is_text_int_compat;
 
   double           v;
   int              n;
@@ -2509,8 +2512,15 @@ void  cda_dat_p_update_dataset     (cda_srvconn_t  sid,
             bzero(dst + size*nels, size);
         }
 
+        // Treat TEXT and INT of same size as compatible (e.g. INT8 and TEXT (byte and char))
+        is_text_int_compat =
+            (ssiz == size)  &&
+            ((srpr == CXDTYPE_REPR_INT   &&  repr == CXDTYPE_REPR_TEXT)  ||
+             (srpr == CXDTYPE_REPR_TEXT  &&  repr == CXDTYPE_REPR_INT));
+
         /* a. Incompatible? */
-        if      (dtypes[x] != ri->current_dtype  &&
+        if      (!is_text_int_compat             &&
+                 dtypes[x] != ri->current_dtype  &&
                  (
                   (srpr != CXDTYPE_REPR_INT  &&  srpr != CXDTYPE_REPR_FLOAT)
                   ||
@@ -2527,14 +2537,16 @@ void  cda_dat_p_update_dataset     (cda_srvconn_t  sid,
                     strcurtime(), __FUNCTION__, ri->reference, dtypes[x], ri->current_dtype);
         }
         /* b. Simple copy? */
-        else if (
-                 dtypes[x] == ri->current_dtype  &&
+        else if (is_text_int_compat  ||
                  (
-                  ri->phys_count == 0
-                  ||
-                  (ri->options & CDA_DATAREF_OPT_NO_RD_CONV) != 0
-                  ||
-                  (repr != CXDTYPE_REPR_INT  &&  repr != CXDTYPE_REPR_FLOAT)
+                  dtypes[x] == ri->current_dtype  &&
+                  (
+                   ri->phys_count == 0
+                   ||
+                   (ri->options & CDA_DATAREF_OPT_NO_RD_CONV) != 0
+                   ||
+                   (repr != CXDTYPE_REPR_INT  &&  repr != CXDTYPE_REPR_FLOAT)
+                  )
                  )
                 )
         {
@@ -2819,6 +2831,71 @@ void  cda_dat_p_defunct_dataset    (cda_srvconn_t  sid,
     }
 }
 
+void  cda_dat_p_report_dataset_lockstat
+                                   (cda_srvconn_t  sid,
+                                    int            count,
+                                    cda_dataref_t *refs,
+                                    int            lockstat)
+{
+  srvinfo_t       *si = AccessSrvSlot(sid);
+  ctxinfo_t       *ci;
+
+  int              x;
+  cda_dataref_t    ref;
+  refinfo_t       *ri;
+
+  ref_call_info_t  call_info;
+
+    if (CheckSid(sid) != 0) return;
+    ci = AccessCtxSlot(si->cid);
+
+    /* Note: opposite to cda_dat_p_defunct_dataset(), here we do
+             NOT perform action and call in two consecutive loops,
+             but rather in a single one.
+             That's because we need to know "previous" state
+             in order to compare with a new one
+             (to skip calling client if the state hadn't changed). */
+
+    /*!!! Additionally there's currently no check that all refs
+          belong to the same sid */
+
+
+    call_info.uniq     = ci->uniq;
+    call_info.privptr1 = ci->privptr1;
+    call_info.reason   = CDA_REF_R_LOCKSTAT;
+    call_info.evmask   = 1 << call_info.reason;
+    call_info.info_ptr = lint2ptr(lockstat);
+
+    for (x = 0;  x < count;  x++)
+    {
+        /* Get pointer to the channel in question */
+        ref = refs[x];
+        if (CheckRef(ref) != 0)
+        {
+            /*!!!Bark? */
+            goto NEXT_TO_REPORT;
+        }
+        ri = AccessRefSlot(ref);
+
+        if (ri->lockstat == lockstat) goto NEXT_TO_REPORT;
+        ri->lockstat = lockstat;
+
+        ci->being_processed++;
+
+        call_info.ref = ref;
+        ForeachRefCbSlot(ref_evproc_caller, &call_info, ri);
+
+        ci->being_processed--;
+        if (ci->being_processed == 0  &&  ci->being_destroyed)
+        {
+            TryToReleaseContext(ci);
+            return;
+        }
+
+ NEXT_TO_REPORT:;
+    }
+}
+
 void  cda_fla_p_update_fla_result  (cda_dataref_t  ref,
                                     double         value,
                                     CxAnyVal_t     raw,
@@ -3017,6 +3094,53 @@ void  cda_dat_p_set_ready          (cda_dataref_t  ref, int is_ready)
         AccessSrvSlot(ri->sid)->state == CDA_DAT_P_OPERATING)
         CallSndData(ri);
 }
+
+#if 0
+void  cda_dat_p_report_lockstat    (cda_dataref_t  ref, int lockstat)
+{
+  refinfo_t     *ri;
+  ctxinfo_t     *ci;
+
+  ref_call_info_t  call_info;
+
+    if (CheckRef(ref) != 0)
+    {
+        /*!!!Bark? */
+        return;
+    }
+    ri = AccessRefSlot(ref);
+
+    if (ri->in_use != REF_TYPE_CHN)
+    {
+        /*!!!Bark? */
+        return;
+    }
+
+    lockstat = lockstat != 0;
+    if (lockstat == ri->lockstat) return;
+    ri->lockstat = lockstat;
+
+    /* Notify who requested */
+    ci = AccessCtxSlot(ri->cid);
+
+    ci->being_processed++;
+
+    call_info.uniq     = ci->uniq;
+    call_info.privptr1 = ci->privptr1;
+    call_info.reason   = CDA_REF_R_LOCKSTAT;
+    call_info.evmask   = 1 << call_info.reason;
+    call_info.info_ptr = lint2ptr(lockstat);
+    call_info.ref      = ref;
+    ForeachRefCbSlot(ref_evproc_caller, &call_info, ri);
+
+    ci->being_processed--;
+    if (ci->being_processed == 0  &&  ci->being_destroyed)
+    {
+        TryToReleaseContext(ci);
+        return;
+    }
+}
+#endif
 
 void  cda_dat_p_set_phys_rds       (cda_dataref_t  ref,
                                     int            phys_count,

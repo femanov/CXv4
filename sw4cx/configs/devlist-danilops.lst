@@ -1,0 +1,7 @@
+include(`ceac124.devtype')
+include(`mps20_ceac124.devtype')
+include(`iset_walker.devtype')
+include(`devlist_magx_macros.m4')
+
+dev the_ctl ceac124@sktcankoz ~ 0,63
+MAGX_MPS25_CEAC124_DEV(the_mps, the_ctl)

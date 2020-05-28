@@ -49,6 +49,8 @@ enum
     CDA_DATAREF_OPT_NO_WR_WAIT = 1 << 25,  // Don't buffer writes until {R,D} info is received
     CDA_DATAREF_OPT_rsrvd24    = 1 << 24,  // 
     CDA_DATAREF_OPT_DEBUG      = 1 << 23,
+    CDA_DATAREF_OPT_PRIV_SRV   = 1 << 22,  // Create a separate server connection for this channel
+    CDA_DATAREF_OPT_EXCLUSIVE  = 1 << 21,  // Try to obtain exclusive write access (write lock)
 };
 
 /* Processing options - for cda_process_ref() */
@@ -189,7 +191,7 @@ int            cda_del_dataref_evproc(cda_dataref_t         ref,
                                       void                 *privptr2);
 
 int            cda_lock_chans (int count, cda_dataref_t *refs,
-                               int operation);
+                               int operation, int lockset_id);
 
 char *cda_combine_base_and_spec(cda_context_t         cid,
                                 const char           *base,
@@ -267,6 +269,8 @@ int            cda_hwinfo_of_ref        (cda_dataref_t  ref,
                                          int       *nelems_p,
                                          int       *srv_hwid_p,
                                          int       *cln_hwr_p);
+
+int            cda_lock_stat_of_ref     (cda_dataref_t  ref);
 
 int                 cda_status_of_ref_sid(cda_dataref_t ref);
 

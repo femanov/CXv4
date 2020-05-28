@@ -8,11 +8,13 @@ CLIENTS=	rfsyn_eng v5rfsyn v5ie v5kls v5cnv \
 		sukhpanel blm v5adc200_kkrs \
 		ttv \
 		ist_cdac20 v1k_cdac20 v3h_a40d16 mps20_ceac124 \
+		v5p2camera \
 		k500gid25s \
+		v5k500vepp4 \
 		gid25x4 v4gid25s v4k500mag \
 		vepp34info vepp5info \
 		v5ringcurmon4v4 \
-		baachi verona weldcc xweldcc
+		baachi verona weldcc xweldcc lhebwcc
 AUX_SCREEN_FILES=	subsys_magx_macros.m4 gid25_subsys_macros.m4
 
 EXPORTSFILES3=	weld_mes_up_mv2mka.lst

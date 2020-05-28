@@ -80,6 +80,16 @@ static void SetRunMode (int is_loop)
     ShowRunMode();
 }
 
+static void ShowSvdMode(void)
+{
+  int state;
+
+    if     (global_gui->d->vmt.svd_state == NULL) return;
+    state = global_gui->d->vmt.svd_state(global_gui);
+    XhSetCommandOnOff  (pz_win, PZFRAME_MAIN_CMD_SET_GOOD, state);
+    XhSetCommandEnabled(pz_win, PZFRAME_MAIN_CMD_RST_GOOD, state);
+}
+
 //////////////////////////////////////////////////////////////////////
 
 typedef struct
@@ -144,13 +154,6 @@ static void PzframeMainSaveData(const char *filename, const char *comment)
         XhMakeMessage(pz_win, "Error saving to \"%s\": %s", filename, strerror(errno));
 }
 
-static void LEDS_KeepaliveProc(XtPointer     closure __attribute__((unused)),
-                               XtIntervalId *id      __attribute__((unused)))
-{
-    XtAppAddTimeOut(xh_context, 1000, LEDS_KeepaliveProc, NULL);
-    MotifKnobs_leds_update(&global_leds);
-}
-
 static xh_actdescr_t toolslist[] =
 {
     XhXXX_TOOLCMD   (CHL_STDCMD_LOAD_MODE,  "Read measurement from file", btn_open_xpm,  btn_mini_open_xpm),
@@ -160,7 +163,7 @@ static xh_actdescr_t toolslist[] =
     XhXXX_TOOLCHK   (PZFRAME_MAIN_CMD_LOOP,  "Periodic measurement",      btn_start_xpm, btn_mini_start_xpm),
     XhXXX_TOOLCMD   (PZFRAME_MAIN_CMD_ONCE,  "One measurement",           btn_once_xpm,  btn_mini_once_xpm),
     XhXXX_SEPARATOR (),
-    XhXXX_TOOLCMD   (PZFRAME_MAIN_CMD_SET_GOOD, "Save current data as good", btn_setgood_xpm, btn_mini_setgood_xpm),
+    XhXXX_TOOLCHK   (PZFRAME_MAIN_CMD_SET_GOOD, "Save current data as good", btn_setgood_xpm, btn_mini_setgood_xpm),
     XhXXX_TOOLCMD   (PZFRAME_MAIN_CMD_RST_GOOD, "Forget saved data",         btn_rstgood_xpm, btn_mini_rstgood_xpm),
     XhXXX_TOOLLEDS  (),
     XhXXX_TOOLCMD   (CHL_STDCMD_SHOW_HELP,   "Short help",                 btn_help_xpm, btn_mini_help_xpm),
@@ -230,12 +233,18 @@ static int CommandProc(XhWindow win, const char *cmd, int info_int)
     else if (strcmp(cmd, PZFRAME_MAIN_CMD_SET_GOOD) == 0)
     {
         if (global_gui->d->vmt.svd_ctl != NULL)
+        {
             global_gui->d->vmt.svd_ctl(global_gui, 1);
+            ShowSvdMode();
+        }
     }
     else if (strcmp(cmd, PZFRAME_MAIN_CMD_RST_GOOD) == 0)
     {
         if (global_gui->d->vmt.svd_ctl != NULL)
+        {
             global_gui->d->vmt.svd_ctl(global_gui, 0);
+            ShowSvdMode();
+        }
     }
     else if (strcmp(cmd, CHL_STDCMD_SHOW_HELP)  == 0)
         ChlShowHelp(win, CHL_HELP_ALL &~ CHL_HELP_MOUSE);
@@ -426,7 +435,8 @@ int  PzframeMain(int argc, char *argv[],
                             toolslist);
     XhSetWindowCmdProc (pz_win, CommandProc);
 
-    global_gui->look.noleds = !opts.notoolbar;
+    global_gui->look.embed_leds = opts.notoolbar;
+    global_gui->look.embed_tbar = opts.notoolbar;
     if (global_gui->d->vmt.realize != NULL  &&
         global_gui->d->vmt.realize(global_gui,
                                    CNCRTZE(XhGetWindowWorkspace(pz_win)),
@@ -447,11 +457,11 @@ int  PzframeMain(int argc, char *argv[],
         MotifKnobs_leds_create(&global_leds,
                                leds_grid, opts.minitoolbar? -15 : 20,
                                global_gui->pfr->cid, MOTIFKNOBS_LEDS_PARENT_GRID);
-        LEDS_KeepaliveProc(NULL, NULL);
     }
 
     /**** Run *******************************************************/
     SetRunMode(global_gui->pfr->cfg.running);
+    ShowSvdMode();
     XhShowWindow(pz_win);
 
     if (file_to_load != NULL)

@@ -196,10 +196,14 @@ void *find_knobs_nearest_upmethod(DataKnob k, int vmtoffset)
 int  set_knob_controlvalue(DataKnob k, double      v, int fromlocal)
 {
   int                   ret     = 0;
+  int                   valchg; // Value HAD changed (i.e., DATATREE_FROMLOCAL_FLAG_NOVALUECHANGE is NOT set)
   dataknob_knob_data_t *kd      = &(k->u.k);
   dataknob_knob_vmt_t  *vmtlink = (dataknob_knob_vmt_t *)(k->vmtlink);
   double                minv, maxv;
   _k_sndphys_f          SndPhys;
+
+    valchg = (fromlocal & DATATREE_FROMLOCAL_FLAG_NOVALUECHANGE) == 0;
+    fromlocal &=~ DATATREE_FROMLOCAL_FLAG_NOVALUECHANGE;
 
     /* Is it a knob at all? */
     if (k->type != DATAKNOB_KNOB) return -1;
@@ -258,6 +262,7 @@ int  set_knob_controlvalue(DataKnob k, double      v, int fromlocal)
     if (
         (!fromlocal  ||
          (k->behaviour & DATAKNOB_B_IS_BUTTON) == 0)  &&
+        valchg                                        &&
         vmtlink != NULL                               &&
         vmtlink->unif.type == DATAKNOB_KNOB           &&
         vmtlink->SetValue != NULL)
@@ -300,6 +305,8 @@ int  set_knob_textvalue   (DataKnob k, const char *s, int fromlocal)
   int                   ret     = 0;
   dataknob_text_vmt_t  *vmtlink = (dataknob_text_vmt_t *)(k->vmtlink);
   _k_sndtext_f          SndText;
+
+    fromlocal &=~ DATATREE_FROMLOCAL_FLAG_NOVALUECHANGE;
 
     /* Is it a text at all? */
     if (k->type != DATAKNOB_TEXT) return -1;
@@ -351,7 +358,9 @@ int  set_knob_vectvalue   (DataKnob k, const double *data, int nelems,
   dataknob_vect_vmt_t  *vmtlink = (dataknob_vect_vmt_t *)(k->vmtlink);
   _k_sndvect_f          SndVect;
 
-    /* Is it a text at all? */
+    fromlocal &=~ DATATREE_FROMLOCAL_FLAG_NOVALUECHANGE;
+
+    /* Is it a vect at all? */
     if (k->type != DATAKNOB_VECT) return -1;
 
     /* Set the value in widget */

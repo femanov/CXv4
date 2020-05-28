@@ -1257,4 +1257,6 @@ CDA_DEFINE_DAT_PLUGIN(v2cx, "CXv2 data-access plugin",
                       cda_d_v2cx_new_chan, NULL,
                       NULL,
                       cda_d_v2cx_snd_data, NULL,
-                      cda_d_v2cx_new_srv,  cda_d_v2cx_del_srv);
+                      cda_d_v2cx_new_srv,  cda_d_v2cx_del_srv,
+                      NULL, NULL,
+                      NULL, NULL);

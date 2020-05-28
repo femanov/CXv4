@@ -86,7 +86,7 @@ static pzframe_chan_dscr_t c061621_chan_dscrs[] =
                                    CXDTYPE_TEXT, 20, -1},
 
 //    [] = {""},
-    [C061621_NUMCHANS] = {"_devstate"},
+    [C061621_NUMCHANS] = {"_devstate", 0, PZFRAME_CHAN__DEVSTATE_MASK},
 };
 
 static fastadc_line_dscr_t c061621_line_dscrs[] =

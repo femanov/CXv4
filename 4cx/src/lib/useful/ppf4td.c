@@ -3,6 +3,13 @@
 #include <string.h>
 #include <ctype.h>
 
+#ifndef MAY_USE_FLOAT
+  #define MAY_USE_FLOAT 1
+#endif
+#if MAY_USE_FLOAT
+  #include <math.h>
+#endif
+
 #include "misclib.h"
 
 #include "ppf4td.h"
@@ -392,7 +399,7 @@ int         ppf4td_nextc     (ppf4td_ctx_t *ctx, int *ch_p)
             model = ctx->vmt->linesync_type == PPF4TD_LINESYNC_HASH? hash_model : hlin_model;
 
             sniffgot = 0;
-            while (sniffgot < strlen(model)             &&
+            while ((size_t)sniffgot < strlen(model)     &&
                    PeekNextCh(ctx, &sniffchr) > 0       &&
                    (sniffbuf[sniffgot] = sniffchr,
                     sniffbuf[sniffgot] == model[sniffgot]))
@@ -400,7 +407,7 @@ int         ppf4td_nextc     (ppf4td_ctx_t *ctx, int *ch_p)
                 ReadNextCh(ctx, &sniffchr);
                 sniffgot++;
             }
-            if (sniffgot < strlen(model))
+            if ((size_t)sniffgot < strlen(model))
             {
                 /* No, that's not what expected */
                 UnGetStr(ctx, sniffbuf, sniffgot);
@@ -503,7 +510,7 @@ int         ppf4td_get_ident (ppf4td_ctx_t *ctx, int flags, char   *buf, size_t 
 
         if ((flags & PPF4TD_FLAG_JUST_SKIP) == 0)
         {
-            if (x >= bufsize)
+            if ((size_t)x >= bufsize)
             {
                 errno = PPF4TD_E2LONG;
                 return -1;
@@ -679,9 +686,510 @@ int         ppf4td_get_quad  (ppf4td_ctx_t *ctx, int flags, int64  *vp,  int def
     return 0;
 }
 
+#if MAY_USE_FLOAT
+// <0: error, ==0: EOF, >0: OK
+enum
+{
+    PPF4TD_FLAG_EOL_ERR = PPF4TD_FLAG_internal1,
+};
+static int dblp_check_eol(ppf4td_ctx_t *ctx, int flags)
+{
+  int  r;
+  int  ch;
+
+    r = ppf4td_is_at_eol(ctx);
+    if (r < 0)                            return r;
+    if (r > 0)
+    {
+        if ((flags & PPF4TD_FLAG_EOL_ERR) != 0)
+            {errno = PPF4TD_EEOL; return -1;}
+        else return 0;
+    }
+    if ((flags & PPF4TD_FLAG_HSHTERM) == 0)  return +1;
+    r = ppf4td_peekc    (ctx, &ch);
+    if (r < 0)                            return r;
+    if (ch == '#') 
+    {
+        if ((flags & PPF4TD_FLAG_EOL_ERR) != 0)
+            {errno = PPF4TD_EEOL; return -1;}
+        else return 0;
+    }
+    return +1;
+}
+static int dblp_peekc(ppf4td_ctx_t *ctx, int flags, int *ch_p)
+{
+  int  r;
+  int  ch;
+
+    r = ppf4td_peekc(ctx, &ch);
+    if (r <  0)                   return -1;
+    if (r == 0)
+    {
+        if ((flags & PPF4TD_FLAG_EOL_ERR) != 0)
+            {errno = PPF4TD_EEOF; return -1;}
+        else                      return 0;
+    }
+    if ((flags & PPF4TD_FLAG_EOLTERM) != 0  &&
+        (ch == '\r'  ||  ch == '\n'  ||
+         ((flags & PPF4TD_FLAG_HSHTERM) != 0  &&  ch == '#')))
+    {
+        if ((flags & PPF4TD_FLAG_EOL_ERR) != 0)
+            {errno = PPF4TD_EEOL; return -1;}
+        else                      return 0;
+    }
+    *ch_p = ch;
+    return +1;
+}
+static int dblp_nextc(ppf4td_ctx_t *ctx, int flags, int *ch_p)
+{
+  int  r;
+  int  ch;
+
+    r = ppf4td_peekc(ctx, &ch);
+    if (r <  0)                   return -1;
+    if (r == 0)
+    {
+        if ((flags & PPF4TD_FLAG_EOL_ERR) != 0)
+            {errno = PPF4TD_EEOF; return -1;}
+        else                      return 0;
+    }
+    if ((flags & PPF4TD_FLAG_EOLTERM) != 0  &&
+        (ch == '\r'  ||  ch == '\n'  ||
+         ((flags & PPF4TD_FLAG_HSHTERM) != 0  &&  ch == '#')))
+    {
+        if ((flags & PPF4TD_FLAG_EOL_ERR) != 0)
+            {errno = PPF4TD_EEOL; return -1;}
+        else                      return 0;
+    }
+    *ch_p = ch;
+    ppf4td_nextc(ctx, &ch);
+    return +1;
+}
+/*
+  [+|-]INF[INITY]
+  [+|-]NAN[(junk)]
+  [+|-]0xHEXNUMBER - 0xH[.HHHH][p[+|-]N{NN}]
+  [+|-]DECIMAL     - [NNN][.[NNN]][e[+|-]N{N}]
+ */
+static int get_one_double(ppf4td_ctx_t *ctx, int flags, double *vp)
+{
+  int   r;
+  int   ch;
+  int   nx;
+
+  char  buf[400]; // So that 1e308 fits
+  int   buf_used;
+
+  int   was_radix;
+
+  double  v;
+  char   *endp;
+
+#define CHECK_BUF_USED() do {if ((size_t)buf_used >= sizeof(buf)-1){errno = PPF4TD_E2LONG; return -1;}} while (0)
+
+    buf_used = 0;
+
+    if (dblp_nextc(ctx, flags | PPF4TD_FLAG_EOL_ERR, &ch) <= 0) return -1;
+    if (ch == '-'  ||  ch == '+')
+    {
+        buf[buf_used++] = ch;
+        if (dblp_nextc(ctx, flags | PPF4TD_FLAG_EOL_ERR, &ch) <= 0) return -1;
+    }
+
+    // First, check if it starts with "0x"
+    if (ch == '0')
+    {
+        r = dblp_peekc(ctx, flags, &nx);
+        // Just a "0" with a following EOL/EOF?  Okay, that's 0.0.
+        if (r == 0)
+        {
+            *vp = 0.0;
+            return 0;
+        }
+        if (nx == 'x'  ||  nx == 'X')
+        {
+            // Okay - that's a 0xHEXNUMBER
+            buf[buf_used++] = ch;
+            buf[buf_used++] = nx;
+            dblp_nextc(ctx, flags, &ch);
+
+            // An obligatory 1st digit
+            if (dblp_nextc(ctx, flags | PPF4TD_FLAG_EOL_ERR, &ch) <= 0) return -1;
+            if (!isdigit(ch)) {errno = PPF4TD_EFLOAT; return -1;}
+            buf[buf_used++] = ch;
+
+            was_radix = 0;
+            while (1)
+            {
+                r = dblp_peekc(ctx, flags, &ch);
+                if (r < 0) return r;
+                if (r == 0)               goto STRTOD_AND_RETURN;
+                if (ch == 'p'  ||  ch == 'P') {dblp_nextc(ctx, flags, &ch); goto HEX_EXPONENT;}
+
+                if (ch == '.'  &&  !was_radix) was_radix = 1; // and proceed - store
+                else if (!isdigit(ch))    goto STRTOD_AND_RETURN;
+                dblp_nextc(ctx, flags, &ch);
+                CHECK_BUF_USED();
+                buf[buf_used++] = ch;
+            }
+
+ HEX_EXPONENT:;
+            CHECK_BUF_USED();
+            buf[buf_used++] = ch;
+            if (dblp_nextc(ctx, flags | PPF4TD_FLAG_EOL_ERR, &ch) <= 0) return -1;
+            if (ch == '-'  ||  ch == '+')
+            {
+                CHECK_BUF_USED();
+                buf[buf_used++] = ch;
+                if (dblp_nextc(ctx, flags | PPF4TD_FLAG_EOL_ERR, &ch) <= 0) return -1;
+            }
+            if (!isdigit(ch))
+            {
+                errno = PPF4TD_EFLOAT;
+                return -1;
+            }
+            while (1)
+            {
+                CHECK_BUF_USED();
+                buf[buf_used++] = ch;
+                r = dblp_peekc(ctx, flags, &ch);
+                if (r <= 0)       goto STRTOD_AND_RETURN;
+                if (!isdigit(ch)) goto STRTOD_AND_RETURN;
+                dblp_nextc(ctx, flags, &ch);
+            }
+
+            goto STRTOD_AND_RETURN;
+        }
+    }
+
+    // Either a digit, or a decimal point, or an exponent?
+    if ((ch >= '0'  &&  ch <= '9')  ||
+         ch == '.'                  ||
+        (ch == 'e'  ||  ch == 'E'))
+    {
+        if (ch == '.')                goto DEC_RADIX;
+        if (ch == 'e'  ||  ch == 'E') goto DEC_EXPONENT;
+        buf[buf_used++] = ch;
+        while (1)
+        {
+            r = dblp_peekc(ctx, flags, &ch);
+            if (r < 0) return r;
+            if (r == 0)               goto STRTOD_AND_RETURN;
+            if (ch == '.')                {dblp_nextc(ctx, flags, &ch); goto DEC_RADIX;} // "BREAK_INTEGER_PART"
+            if (ch == 'e'  ||  ch == 'E') {dblp_nextc(ctx, flags, &ch); goto DEC_EXPONENT;}
+
+            if (!isdigit(ch))         goto STRTOD_AND_RETURN;
+            dblp_nextc(ctx, flags, &ch);
+            CHECK_BUF_USED();
+            buf[buf_used++] = ch;
+        }
+
+ DEC_RADIX:;
+        CHECK_BUF_USED();
+        buf[buf_used++] = ch;
+        while (1)
+        {
+            r = dblp_peekc(ctx, flags, &ch);
+            if (r < 0) return r;
+            if (r == 0)               goto STRTOD_AND_RETURN;
+            if (ch == 'e'  ||  ch == 'E') {dblp_nextc(ctx, flags, &ch); goto DEC_EXPONENT;} // "BREAK_FRACTION_PART"
+
+            if (!isdigit(ch))         goto STRTOD_AND_RETURN;
+            dblp_nextc(ctx, flags, &ch);
+            CHECK_BUF_USED();
+            buf[buf_used++] = ch;
+        }
+
+ DEC_EXPONENT:;
+        CHECK_BUF_USED();
+        buf[buf_used++] = ch;
+        if (dblp_nextc(ctx, flags | PPF4TD_FLAG_EOL_ERR, &ch) <= 0) return -1;
+        if (ch == '-'  ||  ch == '+')
+        {
+            CHECK_BUF_USED();
+            buf[buf_used++] = ch;
+            if (dblp_nextc(ctx, flags | PPF4TD_FLAG_EOL_ERR, &ch) <= 0) return -1;
+        }
+        if (!isdigit(ch))
+        {
+            errno = PPF4TD_EFLOAT;
+            return -1;
+        }
+        while (1)
+        {
+            CHECK_BUF_USED();
+            buf[buf_used++] = ch;
+            r = dblp_peekc(ctx, flags, &ch);
+            if (r <= 0)       goto STRTOD_AND_RETURN;
+            if (!isdigit(ch)) goto STRTOD_AND_RETURN;
+            dblp_nextc(ctx, flags, &ch);
+        }
+
+        goto STRTOD_AND_RETURN;
+    }
+
+    // NAN, INF/INFINITY
+    if (tolower(ch) == 'n'  ||  tolower(ch) == 'i')
+    {
+        while (1)
+        {
+            CHECK_BUF_USED();
+            buf[buf_used++] = ch;
+            r = dblp_peekc(ctx, flags, &ch);
+            if (r <= 0)       goto STRTOD_AND_RETURN;
+            if (!(tolower(ch) >= 'a'  &&
+                  tolower(ch) <= 'z')) goto STRTOD_AND_RETURN;
+            dblp_nextc(ctx, flags, &ch);
+        }
+    }
+
+    // None of the above?
+    errno = PPF4TD_EFLOAT;
+    return -1;
+
+ STRTOD_AND_RETURN:;
+    buf[buf_used] = '\0';
+    v = strtod(buf, &endp);
+    if (endp == buf  ||  *endp != '\0')
+    {
+        errno = PPF4TD_EFLOAT;
+        return -1;
+    }
+    *vp = v;
+
+    return 0;
+#undef CHECK_BUF_USED
+}
+typedef struct
+{
+    double v;
+    char   t;
+} dbl_elem_t;
+/*
+    ppf4td_get_double() is a simple implementation of a shunting-yard algorithm
+    (aka Dijkstra algorithm).  It supports only parenthesis and basic binary operations.
+    The "power" ('^') operation is NOT supported.
+ */
 int         ppf4td_get_double(ppf4td_ctx_t *ctx, int flags, double *vp)
 {
+  int         r;
+  int         ch;
+  double      val;
+  double      a1, a2;
+
+  dbl_elem_t  outq[100];
+  dbl_elem_t  istk[50];
+
+  int         outq_used;
+  int         istk_iptr; // "iptr" is index/pointer - akin SP (stack pointer), goes from -1 (empty) to MAX=countof(istk)-1 (grows UP instead of usual stacks' down, for possible fuyure realloc()-on-demand); points to current-top istk[] element
+  int         brace_lvl;
+
+  int         num_exp; // The next token should be a number or a '('
+
+  int         outq_idx;
+
+    // Skip whitespace only if spaces are NOT declared as separators (for "123-456" range-spec to be valud but "123- 456" not)
+    if ((flags & PPF4TD_FLAG_SPCTERM) == 0)
+        ppf4td_skip_white(ctx);
+
+    // Strip off extra flags
+    flags &= (PPF4TD_FLAG_EOLTERM | PPF4TD_FLAG_HSHTERM);
+    // HSHTERM implies EOLTERM
+    if ((flags & PPF4TD_FLAG_HSHTERM) != 0) flags |= PPF4TD_FLAG_EOLTERM;
+
+    if (dblp_peekc(ctx, flags | PPF4TD_FLAG_EOL_ERR, &ch) < 0) return -1;
+
+    if (ch != '(') return get_one_double(ctx, flags, vp);
+
+    /* Okay - an "(EXPRESSION)" */
+    ppf4td_nextc(ctx, &ch); // Skip '('
+    outq_used = 0;
+    istk_iptr = -1+1;
+    istk[istk_iptr].t = '(';
+    brace_lvl = 1;
+
+    // Step I: parse input stream till a closing ')'
+    num_exp = 1;
+    while (1)
+    {
+        ppf4td_skip_white(ctx);
+        if (dblp_peekc(ctx, flags | PPF4TD_FLAG_EOL_ERR, &ch) < 0) return -1;
+
+        if      (ch == ')')
+        {
+            ppf4td_nextc(ctx, &ch);
+            if (num_exp)  {errno = PPF4TD_EEXPR; return -1;}
+
+            while (istk_iptr >= 0)
+            {
+                // Is it an opening '('?
+                if (istk[istk_iptr].t == '(') goto OPEN_BRACE_FOUND_IN_ISTK;
+
+                if (outq_used >= countof(outq))
+                    {errno = PPF4TD_ECMPLX; return -1;}
+                outq[outq_used].t = istk[istk_iptr].t;
+                outq_used++;
+                istk_iptr--;
+            }
+            // We are here if no '(' was found in istk[] - that's an error
+            errno = PPF4TD_EEXPR;
+            return -1;
+
+ OPEN_BRACE_FOUND_IN_ISTK:;
+            // Just discard the '('
+            istk_iptr--;
+
+            brace_lvl--;
+            if (brace_lvl == 0) goto END_PARSE;
+            // Leave num_exp=0
+        }
+        else if (ch == '(')
+        {
+            ppf4td_nextc(ctx, &ch);
+            if (!num_exp) {errno = PPF4TD_EEXPR; return -1;}
+
+            if (istk_iptr >= countof(istk)-1)
+                {errno = PPF4TD_ECMPLX; return -1;}
+            ++istk_iptr;
+            istk[istk_iptr].t = '(';
+            brace_lvl++;
+            // Leave num_exp=1
+        }
+        else if (ch == '*'  ||  ch == '/')
+        {
+            ppf4td_nextc(ctx, &ch);
+            if (num_exp)  {errno = PPF4TD_EEXPR; return -1;}
+
+            while (istk_iptr >= 0  &&
+                   (istk[istk_iptr].t == '*'  ||  istk[istk_iptr].t == '/'))
+            {
+                if (outq_used >= countof(outq))
+                    {errno = PPF4TD_ECMPLX; return -1;}
+                outq[outq_used].t = istk[istk_iptr].t;
+                outq_used++;
+                istk_iptr--;
+            }
+
+            if (istk_iptr >= countof(istk)-1)
+                {errno = PPF4TD_ECMPLX; return -1;}
+            ++istk_iptr;
+            istk[istk_iptr].t = ch;
+
+            num_exp = 1;
+        }
+        else if ((ch == '+'  ||  ch == '-')  &&  !num_exp)
+        {
+            ppf4td_nextc(ctx, &ch);
+
+            while (istk_iptr >= 0  &&
+                   istk[istk_iptr].t != '(' /* That means ANY operator */)
+            {
+                if (outq_used >= countof(outq))
+                    {errno = PPF4TD_ECMPLX; return -1;}
+                outq[outq_used].t = istk[istk_iptr].t;
+                outq_used++;
+                istk_iptr--;
+            }
+
+            if (istk_iptr >= countof(istk)-1)
+                {errno = PPF4TD_ECMPLX; return -1;}
+            ++istk_iptr;
+            istk[istk_iptr].t = ch;
+
+            num_exp = 1;
+        }
+        else /* Let's assume that is a number... */
+        {
+            if (!num_exp) {errno = PPF4TD_EEXPR; return -1;}
+            r = get_one_double(ctx, flags, &val);
+            if (r < 0) return r;
+
+            // Put it to the output
+            if (outq_used >= countof(outq))
+                {errno = PPF4TD_ECMPLX; return -1;}
+            outq[outq_used].t = '=';
+            outq[outq_used].v = val;
+            outq_used++;
+
+            // Next token should be an operator
+            num_exp = 0;
+        }
+
+    }
+ END_PARSE:;
+
+    // Step II: flush stack into output queue
+    while (istk_iptr >= 0)
+    {
+        if (outq_used >= countof(outq))
+            {errno = PPF4TD_ECMPLX; return -1;}
+        outq[outq_used].t = istk[istk_iptr].t;
+        outq_used++;
+        istk_iptr--;
+    }
+
+#if 0
+    printf("\n");
+    for (outq_idx = 0;  outq_idx < outq_used;  outq_idx++)
+        if (outq[outq_idx].t == '=') printf(" %f", outq[outq_idx].v);
+        else                         printf(" %c", outq[outq_idx].t);
+    printf("\n");
+#endif
+
+    // Step III: calculate the result from output queue
+    // We use the same istk[]
+    for (outq_idx = 0;  outq_idx < outq_used;  outq_idx++)
+    {
+        ch = outq[outq_idx].t;
+        if (ch == '=')
+        {
+            if (istk_iptr >= countof(istk)-1)
+                {errno = PPF4TD_ECMPLX; return -1;}
+            ++istk_iptr;
+            istk[istk_iptr] = outq[outq_idx];
+        }
+        else
+        {
+            /* Note: ALL operations are binary, so:
+                     1) we get 2 operands from the stack,
+                     2) perform the operation,
+                     3) put result to the stack */
+
+            // Check for istk underflow
+            if (istk_iptr < 1)
+            {
+                fprintf(stderr, "\n%s %s::%s(),%s:%d: WARNING: istk[] underflow\n",
+                        strcurtime(), __FILE__, __FUNCTION__,
+                        ctx->_curref, ctx->_curline);
+            
+                {errno = PPF4TD_ECMPLX; return -1;}
+            }
+
+            a2 = istk[istk_iptr--].v;
+            a1 = istk[istk_iptr--].v;
+
+            if      (ch == '+') val = a1 + a2;
+            else if (ch == '-') val = a1 - a2;
+            else if (ch == '*') val = a1 * a2;
+            else if (ch == '/') val = a1 / a2;
+            else                val = NAN;
+
+            istk[++istk_iptr].v = val;
+        }
+    }
+
+    if (istk_iptr < 0) *vp = NAN;
+    else               *vp = istk[istk_iptr].v;
+
+    return 0;
 }
+#else
+int         ppf4td_get_double(ppf4td_ctx_t *ctx, int flags, double *vp)
+{
+    errno = PPF4TD_ECMPLX;
+    return -1;
+}
+#endif /* MAY_USE_FLOAT */
 
 static int getxdigit(ppf4td_ctx_t *ctx, int *xdigit_p)
 {
@@ -819,7 +1327,7 @@ int         ppf4td_get_string(ppf4td_ctx_t *ctx, int flags, char   *buf, size_t 
         /* Okay, finally store the character */
         if ((flags & PPF4TD_FLAG_JUST_SKIP) == 0)
         {
-            if (x >= bufsize)
+            if ((size_t)x >= bufsize)
             {
                 errno = PPF4TD_E2LONG;
                 return -1;
@@ -848,7 +1356,7 @@ int         ppf4td_read_line (ppf4td_ctx_t *ctx, int flags, char   *buf, size_t 
         if (ppf4td_nextc(ctx, &ch) < 0) return -1;
         if (ch == EOF  ||  ch == '\n') break;
 
-        if (x >= bufsize)
+        if ((size_t)x >= bufsize)
         {
             errno = PPF4TD_E2LONG;
             return -1;
@@ -880,6 +1388,9 @@ static char *_ppf4td_errlist[] =
     "String too long",
     "Underminated quote",
     "Hex-digit expected",
+    "Floating-point number expected",
+    "Syntax error in expression",
+    "Expression is too complex",
 };
 
 char       *ppf4td_strerror  (int errnum)

@@ -40,14 +40,6 @@ typedef struct
 } privrec_t;
 
 
-static const char *GetDevInstname(int devid)
-{
-  cxsd_hw_dev_t  *dev = cxsd_hw_devices + devid;
-
-    //CHECK_SANITY_OF_DEVID(NULL);
-
-    return CxsdDbGetStr(cxsd_hw_cur_db, dev->db_ref->instname_ofs);
-}
 static int mqtt_mapping_init_d(int devid, void *devptr,
                                int businfocount, int businfo[],
                                const char *auxinfo)
@@ -96,7 +88,7 @@ static int mqtt_mapping_init_d(int devid, void *devptr,
     inst_name_len = strlen(inst_name);
 
     me->devid = devid;
-    CxsdHwGetDevPlace(devid, &dev_first, &(me->numchans));
+    GetDevPlace(devid, &dev_first, &(me->numchans));
 
     for (stage = 0;  stage <= 1;  stage++)
     {

@@ -116,21 +116,30 @@ void  cx_perror2 (const char *s, const char *argv0)
  *  Note: this list should be kept in sync with
  *  include/cxlib.h::CAR_XXX enum.
  */
-static char *_cx_carlist[] = {
-    "Connection succeeded",
-    "Connection failed",
-    "Connection was closed on error",
-    "Server cycle notification had arrived",
+typedef struct
+{
+    int         reason;
+    const char *description;
+} reason_descr_t;
+static reason_descr_t _cx_cardescrs[] = {
+    {CAR_CONNECT,     "Connection succeeded"},
+    {CAR_CONNFAIL,    "Connection failed"},
+    {CAR_ERRCLOSE,    "Connection was closed on error"},
+    {CAR_CYCLE,       "Server cycle notification had arrived"},
+    {CAR_MUSTER,      "MUSTER"},
+    {CAR_EACCESS,     "Access to server denied"},
 
-    "Data chunk had arrived",
-    "RSLV result",
-    "FRESH_AGE",
-    "STRS",
-    "RDS",
-    "QUANT",
+    {CAR_NEWDATA,     "Data chunk had arrived"},
+    {CAR_RSLV_RESULT, "RSLV result"},
+    {CAR_FRESH_AGE,   "FRESH_AGE"},
+    {CAR_STRS,        "STRS"},
+    {CAR_RDS,         "RDS"},
+    {CAR_QUANT,       "QUANT"},
+    {CAR_RANGE,       "RANGE"},
+    {CAR_LOCKSTAT,    "LOCKSTAT"},
     
-    "Echo packet",
-    "Connection was killed by server",
+    {CAR_ECHO,        "Echo packet"},
+    {CAR_KILLED,      "Connection was killed by server"},
 };
 
 
@@ -143,15 +152,16 @@ static char *_cx_carlist[] = {
 
 char *cx_strreason(int reason)
 {
-  static char buf[100];
-  
-    if (reason < 0  ||  reason >= (signed)(sizeof(_cx_carlist) / sizeof(_cx_carlist[0])))
-    {
-        sprintf(buf, "Unknown reason code %d", reason);
-        return buf;
-    }
+  int         n;
 
-    return _cx_carlist[reason];
+  static char buf[100];
+
+    for (n = 0;  n < countof(_cx_cardescrs);  n++)
+        if (_cx_cardescrs[n].reason == reason)
+            return _cx_cardescrs[n].description;
+
+    sprintf(buf, "Unknown reason code %d", reason);
+    return buf;
 }
 
 

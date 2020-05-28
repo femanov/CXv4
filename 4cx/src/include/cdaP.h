@@ -41,7 +41,9 @@ enum
 enum
 {
     CDA_DAT_P_GET_SERVER_OPT_NONE         = 0,
-    CDA_DAT_P_GET_SERVER_OPT_NOLIST       = 16 << 16,
+    CDA_DAT_P_GET_SERVER_OPT_NOLIST       = 1  << 31,
+
+    CDA_DAT_P_GET_SERVER_OPT_PRIV_SRV     = 1  << 22, // Value unified with CDA_DATAREF_OPT_PRIV_SRV - Create a separate server connection
 
     CDA_DAT_P_GET_SERVER_OPT_SRVTYPE_mask = 0x000000FF,
 };
@@ -89,7 +91,7 @@ typedef int  (*cda_dat_p_snd_data_f)(void *pdt_privptr, cda_hwcnref_t hwr,
                                      cxdtype_t dtype, int nelems, void *value);
 typedef int  (*cda_dat_p_lock_op_f) (void *pdt_privptr,
                                      int   count, cda_hwcnref_t *hwrs,
-                                     int   operation, int lock_id);
+                                     int   operation, int lockset_id);
 
 typedef int  (*cda_dat_p_new_srv_f) (cda_srvconn_t  sid, void *pdt_privptr,
                                      int            uniq,
@@ -97,6 +99,11 @@ typedef int  (*cda_dat_p_new_srv_f) (cda_srvconn_t  sid, void *pdt_privptr,
                                      const char    *argv0,
                                      int            srvtype);
 typedef int  (*cda_dat_p_del_srv_f) (cda_srvconn_t  sid, void *pdt_privptr);
+
+typedef int  (*cda_dat_p_chan_ioctl_f)(void *pdt_privptr, cda_hwcnref_t hwr,
+                                       int   opcode, void *info_ptr);
+typedef int  (*cda_dat_p_srv_ioctl_f) (void *pdt_privptr,
+                                       int   opcode, void *info_ptr);
 
 
 typedef struct cda_dat_p_rec_t_struct
@@ -138,7 +145,9 @@ typedef struct cda_dat_p_rec_t_struct
                               new_chan, del_chan,                    \
                               set_type,                              \
                               snd_data, do_lock,                     \
-                              new_srv,  del_srv)                     \
+                              new_srv,  del_srv,                     \
+                              chan_ioctl, srv_ioctl,                 \
+                              rsrvd_1, rsrvd_2)                      \
     cda_dat_p_rec_t CDA_DAT_P_MODREC_NAME(name) =                    \
     {                                                                \
         {                                                            \
@@ -292,6 +301,11 @@ void  cda_dat_p_update_dataset     (cda_srvconn_t  sid,
 void  cda_dat_p_defunct_dataset    (cda_srvconn_t  sid,
                                     int            count,
                                     cda_dataref_t *refs);
+void  cda_dat_p_report_dataset_lockstat
+                                   (cda_srvconn_t  sid,
+                                    int            count,
+                                    cda_dataref_t *refs,
+                                    int            lockstat);
 void  cda_fla_p_update_fla_result  (cda_dataref_t  ref,
                                     double         value,
                                     CxAnyVal_t     raw,

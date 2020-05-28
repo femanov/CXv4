@@ -104,6 +104,10 @@ typedef struct // Is a slightly modified copy from CxsdDbCpntInfo_t
     int                 rsrvd6_ofs;
     int                 units_ofs;
     int                 dpyfmt_ofs;
+
+    /* Additional strings */
+    int                 dbprops_ofs;
+    int                 drvinfo_ofs;
 } CxsdDbDcPrInfo_t; // "DcPr" -- Device Channel PRoperties
 
 typedef struct

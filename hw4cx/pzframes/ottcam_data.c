@@ -38,7 +38,7 @@ static pzframe_chan_dscr_t ottcam_chan_dscrs[] =
     [OTTCAM_CHAN_CUR_RRQ_MSECS] = {"cur_rrq_msecs"},
 
 //    [] = {""},
-    [OTTCAM_NUMCHANS] = {"_devstate"},
+    [OTTCAM_NUMCHANS] = {"_devstate", 0, PZFRAME_CHAN__DEVSTATE_MASK},
 };
 
 pzframe_type_dscr_t *ottcam_get_type_dscr(void)

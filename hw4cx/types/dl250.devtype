@@ -1,0 +1,79 @@
+devtype dl250 w24+i,w276i,r100i,w50i,r50i {
+	t_<1-16>		0
+	t_f<1-8>		16
+
+	enable_<1-16>		25
+	enable_f<1-8>		41
+	enable_24		49
+
+	autodisable_<1-16>	50
+	autodisable_f<1-8>	66
+	autodisable_24		74
+
+	ilk_mask_<1-16>		75
+	ilk_mask_f<1-8>		91
+	ilk_mask_24		99
+
+	ilk_ext_<1-16>		100
+	ilk_ext_f<1-8>		116
+	ilk_ext_24		124
+
+	ilk_dz0_<1-16>		125
+	ilk_dz0_f<1-8>		141
+	ilk_dz0_24		149
+
+	ilk_dz1_<1-16>		150
+	ilk_dz1_f<1-8>		166
+	ilk_dz1_24		174
+
+	ilk_dz2_<1-16>		175
+	ilk_dz2_f<1-8>		191
+	ilk_dz2_24		199
+
+	ilk_dz3_<1-16>		200
+	ilk_dz3_f<1-8>		216
+	ilk_dz3_24		224
+
+	start_type_<1-16>	225
+	start_type_f<1-16>	241
+	start_type_all		249
+
+	start_input_<1-16>	250
+	start_input_f<1-8>	266
+	start_input_all		274
+
+	#
+	ready_<1-16>		300
+	ready_f<1-8>		316
+	ready_24		324
+
+	ailk_<1-16>		325
+	ailk_f<1-8>		341
+	ailk_24			349
+
+	#
+	clk_mode		400
+
+	do_shot			410
+	auto_shot		411
+	auto_msec		412
+
+	device_id		450
+	hw_version		451
+	rio_present		452
+	front_present		453
+	sw_version		454
+	uniq_id			455
+	capabilities		456
+	baseaddr		457
+	addrspace		458
+
+	clk_pllok		461
+	clk_intbad		462
+	clk_extbad		463
+	clk_source		464
+
+	was_shot		470
+	#
+	auto_left		475
+}

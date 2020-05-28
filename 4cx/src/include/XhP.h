@@ -11,6 +11,13 @@ extern "C"
 #include "Xh.h"
 
 
+typedef struct {
+    int          type;
+    const char  *cmd;
+    Widget       btn;
+    int          pressed;
+} XhToolBtnInfo;
+
 typedef struct _WindowInfo {
     struct         _WindowInfo *next;
 
@@ -26,7 +33,8 @@ typedef struct _WindowInfo {
     Widget         tbarBanner;
     Widget         tbarLoggia;
     int            tbarLoggiaAsked;
-    
+    XhToolBtnInfo *tbarButtons;  /* Created buttons info */
+
     Widget         statsForm;    /* Statusline form */
     Widget         statsLine;    /* An XmLabel/XmText itself */
     char           mainmessage[256];

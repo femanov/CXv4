@@ -1,4 +1,4 @@
-# ring1:12 -- ring magsys/magcor
+# canhw:12 -- ring magsys/magcor
 #### 0. Includes #####################################################
 include(`cac208.devtype')
 include(`canadc40.devtype')

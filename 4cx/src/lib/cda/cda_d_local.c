@@ -713,4 +713,6 @@ CDA_DEFINE_DAT_PLUGIN(local, "Local data-access plugin",
                       cda_d_local_new_chan, cda_d_local_del_chan,
                       NULL,
                       cda_d_local_snd_data, NULL,
-                      cda_d_local_new_srv,  cda_d_local_del_srv);
+                      cda_d_local_new_srv,  cda_d_local_del_srv,
+                      NULL, NULL,
+                      NULL, NULL);

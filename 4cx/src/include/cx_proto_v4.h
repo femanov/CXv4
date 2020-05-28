@@ -118,6 +118,7 @@ enum
     CXC_SETMON  = CXC_REQ_CMD('C', 'M', 's'),
     CXC_DELMON  = CXC_REQ_CMD('C', 'M', 'd'),
     CXC_CHGMON  = CXC_REQ_CMD('C', 'M', 'c'),
+    CXC_LOCK_OP = CXC_REQ_CMD('C', 'l', 'o'), // Future handle-based code will be 'lk'
     CXC_PEEK    = CXC_REQ_CMD('C', 'p', 'k'),
     CXC_RQRDC   = CXC_REQ_CMD('C', 'r', 'd'),
     CXC_RQWRC   = CXC_REQ_CMD('C', 'w', 'r'),
@@ -193,6 +194,15 @@ typedef struct
     int32      dtype_and_cond; // byte0:dtype, byte1:cond
     uint8      moninfo[8];
 } CxV4MonitorChunk;
+
+typedef struct
+{
+    CxV4Chunk  ck;
+    int32      cpid;
+    int32      operation;
+    uint32     lockstat_result;
+    uint32     _padding_;
+} CxV4LockOpChunk;
 
 typedef struct
 {

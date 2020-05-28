@@ -9,9 +9,12 @@ ARLIBS=		libcxsd.a libcxsd_plugins.a
 libcxsd.a_COMPONENTS=	cxsd_logger.o \
 			cxsd_modmgr.o cxsd_driver.o \
 			cxsd_db.o cxsd_db_plugmgr.o \
-			cxsd_hw.o
+			cxsd_hw.o \
+			cxsd_access.o cxsd_access_plugmgr.o
 libcxsd_plugins.a_COMPONENTS=	cxsd_db_via_ppf4td.o \
 			cxsd_db_file_ldr.o \
+			cxsd_access_via_ppf4td.o \
+			cxsd_access_file_ldr.o \
 			cxsd_fe_cx.o
 
 #SOLIBS=		        cxsd_fe_cx.so cxsd_db_file_ldr.so

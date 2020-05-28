@@ -1189,6 +1189,8 @@ int  FastadcDataCopy2Svd(fastadc_data_t *adc)
         }
     }
 
+    adc->use_svd = 1;
+
     return 0;
 }
 

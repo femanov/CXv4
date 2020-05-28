@@ -109,7 +109,7 @@ static void PerformWrite(refrec_t *rp)
   int            r;
 
 ////    fprintf(stderr, "W\n");
-fprintf(stderr, "num2wr=%d\n", rp->ur.num2wr);
+////fprintf(stderr, "num2wr=%d\n", rp->ur.num2wr);
     buf = rp->ur.databuf;
     if (buf == NULL) buf = &(rp->ur.val2wr);
     if ((r = cda_snd_ref_data(rp->ur.ref, rp->ur.dtype, rp->ur.num2wr, buf)) >= 0)

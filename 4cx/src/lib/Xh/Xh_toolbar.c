@@ -10,38 +10,24 @@ enum {
     MAX_BUTTONS = 100
 };
 
-static void ActOnCB    (Widget     w,
-                        XtPointer  closure,
-                        int        type)
+static void toolCB(Widget     w,
+                   XtPointer  closure,
+                   XtPointer  call_data  __attribute__((unused)))
 {
   XhWindow       window = XhWindowOf(ABSTRZE(w));
-  void          *userData;
+  int            b      = ptr2lint(closure);
   int            info_int;
 
-    if (type == XhACT_COMMAND)
+    if (window->tbarButtons[b].type == XhACT_COMMAND)
         info_int = 0;
     else
     {
-        XtVaGetValues(w, XmNuserData, &userData, NULL);
-        info_int = !(ptr2lint(userData));
-        XtVaSetValues(w, XmNuserData, lint2ptr(info_int), NULL);
-        XhInvertButton(ABSTRZE(w));
+        info_int = window->tbarButtons[b].pressed = !(window->tbarButtons[b].pressed);
+        XhInvertButton(window->tbarButtons[b].btn);
     }
 
     if (window->commandproc != NULL)
-        window->commandproc(window, closure, info_int);
-}
-static void COMMAND_CB (Widget     w,
-                        XtPointer  closure,
-                        XtPointer  call_data  __attribute__((unused)))
-{
-    ActOnCB(w, closure, XhACT_COMMAND);
-}
-static void CHECKBOX_CB(Widget     w,
-                        XtPointer  closure,
-                        XtPointer  call_data  __attribute__((unused)))
-{
-    ActOnCB(w, closure, XhACT_CHECKBOX);
+        window->commandproc(window, window->tbarButtons[b].cmd, info_int);
 }
 
 void XhCreateToolbar(XhWindow window, xh_actdescr_t  buttons[], int use_mini)
@@ -57,6 +43,8 @@ void XhCreateToolbar(XhWindow window, xh_actdescr_t  buttons[], int use_mini)
 
   char          **pixmap;
   int             padding;
+
+  int             num_buttons;
 
   int             b;
   int             count;
@@ -90,6 +78,18 @@ void XhCreateToolbar(XhWindow window, xh_actdescr_t  buttons[], int use_mini)
                                         XmNtopOffset,       padding,
                                         NULL);
     window->toolHolder = container;
+
+    /* Create a working-copy of toolbar description */
+    /* Obtain number of buttons[] */
+    for (num_buttons = 0;  buttons[num_buttons].type != XhACT_END;  num_buttons++);
+    num_buttons++;  // For XhACT_END
+    window->tbarButtons = XtMalloc(sizeof(XhToolBtnInfo) * num_buttons);
+    bzero(window->tbarButtons, sizeof(XhToolBtnInfo) * num_buttons);
+    for (b = 0;  b < num_buttons;  b++)
+    {
+        window->tbarButtons[b].type = buttons[b].type;
+        window->tbarButtons[b].cmd  = buttons[b].cmd;
+    }
 
     for (b = 0, firstflushed = -1, count = 0;
          b < MAX_BUTTONS  &&  buttons[b].type != XhACT_END;
@@ -188,17 +188,15 @@ void XhCreateToolbar(XhWindow window, xh_actdescr_t  buttons[], int use_mini)
                 tools[count] = XtVaCreateManagedWidget(!use_mini?"toolButton":"miniToolButton", xmPushButtonWidgetClass, container,
                                                        XmNtraversalOn, False,
                                                        XmNlabelType,   XmPIXMAP,
-                                                       XmNuserData,    lint2ptr(0),
                                                        NULL);
                 XhAssignPixmap(ABSTRZE(tools[count]), pixmap);
                 XhSetBalloon  (ABSTRZE(tools[count]), buttons[b].tip);
+                window->tbarButtons[b].btn = tools[count];
 
-                if      (buttons[b].type == XhACT_COMMAND)
+                if      (buttons[b].type == XhACT_COMMAND  ||
+                         buttons[b].type == XhACT_CHECKBOX)
                     XtAddCallback(tools[count], XmNactivateCallback,
-                                  COMMAND_CB,  buttons[b].cmd);
-                else if (buttons[b].type == XhACT_CHECKBOX)
-                    XtAddCallback(tools[count], XmNactivateCallback,
-                                  CHECKBOX_CB, buttons[b].cmd);
+                                  toolCB,  lint2ptr(b));
         }
 
         count++;
@@ -252,69 +250,42 @@ void XhCreateToolbar(XhWindow window, xh_actdescr_t  buttons[], int use_mini)
 
 void XhSetCommandOnOff  (XhWindow window, const char *cmd, int is_pushed)
 {
-#if 0
-  WidgetList  children;
-  Cardinal    numChildren;
-  Cardinal    i;
-  privrec_t  *privrec;
+  int            b;
+  void          *userData;
+  int            info_int;
 
-    if (window->toolHolder == NULL) return;
-  
-//    fprintf(stderr, "%s(,cmd=%d, on=%d)\n", __FUNCTION__, cmd, is_pushed);
+    if (window->tbarButtons == NULL) return;
+
     is_pushed = (is_pushed != 0);
-  
-    XtVaGetValues(window->toolHolder,
-                  XmNchildren,    &children,
-                  XmNnumChildren, &numChildren,
-                  NULL);
-    
-    for (i = 0;  i < numChildren;  i++)
-        if (XmIsPushButton(children[i]))
+
+    for (b = 0;  window->tbarButtons[b].type != XhACT_END;  b++)
+        if (window->tbarButtons[b].type == XhACT_CHECKBOX     &&
+            strcasecmp(window->tbarButtons[b].cmd, cmd) == 0  &&
+            window->tbarButtons[b].pressed != is_pushed)
         {
-            XtVaGetValues(children[i], XmNuserData, &privrec, NULL);
-            if (privrec != NULL                               &&
-                privrec->magic   == TOOLBUTTON_PRIVREC_MAGIC  &&
-                privrec->type    == XhACT_CHECKBOX            &&
-                privrec->cmd     == cmd                       &&
-                privrec->pressed != is_pushed)
-            {
-                XhInvertButton(ABSTRZE(children[i]));
-                privrec->pressed = !(privrec->pressed);
-            }
+            window->tbarButtons[b].pressed = is_pushed;
+            XhInvertButton(ABSTRZE(window->tbarButtons[b].btn));
         }
-#endif
 }
 
 void XhSetCommandEnabled(XhWindow window, const char *cmd, int is_enabled)
 {
-#if 0
-  WidgetList  children;
-  Cardinal    numChildren;
-  Cardinal    i;
-  privrec_t  *privrec;
+  int            b;
+  void          *userData;
+  int            info_int;
 
-    if (window->toolHolder == NULL) return;
-  
+    if (window->tbarButtons == NULL) return;
+
     is_enabled = (is_enabled != 0);
 
-    XtVaGetValues(window->toolHolder,
-                  XmNchildren,    &children,
-                  XmNnumChildren, &numChildren,
-                  NULL);
-    
-    for (i = 0;  i < numChildren;  i++)
-        if (XmIsPushButton(children[i]))
+    for (b = 0;  window->tbarButtons[b].type != XhACT_END;  b++)
+        if (window->tbarButtons[b].cmd != NULL                &&
+            strcasecmp(window->tbarButtons[b].cmd, cmd) == 0  &&
+            window->tbarButtons[b].btn != NULL                &&
+            XtIsSensitive(window->tbarButtons[b].btn) != is_enabled)
         {
-            XtVaGetValues(children[i], XmNuserData, &privrec, NULL);
-            if (privrec != NULL                               &&
-                privrec->magic   == TOOLBUTTON_PRIVREC_MAGIC  &&
-                privrec->cmd     == cmd                       &&
-                XtIsSensitive(children[i]) != is_enabled)
-            {
-                XtSetSensitive(children[i], is_enabled);
-            }
+            XtSetSensitive(window->tbarButtons[b].btn, is_enabled);
         }
-#endif
 }
 
 void XhSetToolbarBanner (XhWindow window, const char *text)

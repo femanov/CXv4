@@ -17,6 +17,7 @@
 #include "Xh_globals.h"
 #include "Knobs.h"
 #include "MotifKnobsP.h" // For ABSTRZE() and MOTIFKNOBS_INTER*_SPACING
+#include "datatreeP.h"   // For DATAKNOB_COLZ_NORMAL
 
 #include "pzframe_gui.h"
 
@@ -68,6 +69,18 @@ static void SetRunMode (pzframe_gui_t *gui, int is_loop)
     ShowRunMode(gui);
 }
 
+static void ShowSvdMode(pzframe_gui_t *gui)
+{
+  int state;
+
+    if     (gui->d->vmt.svd_state == NULL) return;
+    state = gui->d->vmt.svd_state(gui);
+    if (gui->setg_button != NULL)
+        SetMiniToolButtonOnOff(gui->setg_button, state);
+    if (gui->rstg_button != NULL)
+        XtSetSensitive        (gui->rstg_button, state);
+}
+
 //////////////////////////////////////////////////////////////////////
 
 // GetCblistSlot()
@@ -104,6 +117,33 @@ static void UpdateParamKnob(pzframe_gui_t *gui, int cn)
     SetSimpleKnobState(gui->k_params[cn], choose_knobstate(NULL, pfr->cur_data[cn].rflags));
 }
 
+static void SetMainState  (pzframe_gui_t *gui, knobstate_t newstate)
+{
+    if (gui->curstate == newstate) return;
+
+    gui->curstate = newstate;
+    if (gui->d->vmt.newstate != NULL)
+        gui->d->vmt.newstate(gui);
+}
+
+static void SetRollerState(pzframe_gui_t *gui, knobstate_t newstate)
+{
+  Pixel  fg;
+  Pixel  bg;
+
+    if (gui->roller_curstate == newstate) return;
+    gui->roller_curstate = newstate;
+    if (gui->roller != NULL)
+    {
+        MotifKnobs_ChooseColors(DATAKNOB_COLZ_NORMAL, newstate,
+                                gui->roller_deffg, gui->roller_defbg, &fg, &bg);
+        XtVaSetValues(gui->roller,
+                      XmNforeground, fg,
+                      XmNbackground, bg,
+                      NULL);
+    }
+}
+
 static void PzframeGuiEventProc(pzframe_data_t *pfr,
                                 int             reason,
                                 int             info_int,
@@ -114,7 +154,7 @@ static void PzframeGuiEventProc(pzframe_data_t *pfr,
   int                  info_changed;
   int                  cn;
 
-  static char          roller_states[4] = "/-\\|";
+  static char          roller_chars[4] = "/-\\|";
   char                 buf[100];
 
 ////fprintf(stderr, "%s %s\n", strcurtime(), __FUNCTION__);
@@ -129,8 +169,10 @@ static void PzframeGuiEventProc(pzframe_data_t *pfr,
 
         /* Rotate the roller */
         gui->roller_ctr = (gui->roller_ctr + 1) & 3;
-        sprintf(buf, "%c", roller_states[gui->roller_ctr]);
+        sprintf(buf, "%c", roller_chars[gui->roller_ctr]);
         if (gui->roller != NULL) XmTextSetString(gui->roller, buf);
+        /* ...and de-colorize it */
+        SetRollerState(gui, KNOBSTATE_NONE);
 
         XhProcessPendingXEvents();
     }
@@ -143,9 +185,38 @@ static void PzframeGuiEventProc(pzframe_data_t *pfr,
     else if (reason == PZFRAME_REASON_RSLVSTAT)
     {
         if (info_int != CDA_RSLVSTAT_FOUND)
+        {
+            SetMainState(gui, KNOBSTATE_NOTFOUND);
             for (cn = 0;  cn < ftd->chan_count;  cn++)
                 if (gui->k_params[cn] != NULL)
                     SetSimpleKnobState(gui->k_params[cn], KNOBSTATE_NOTFOUND);
+        }
+        else
+        {
+            /* A special case: display previously-NOTFOUND as some other state,
+               to show that hardware had appeared */
+            if (gui->curstate == KNOBSTATE_NOTFOUND)
+                /* Note the absence of PZFRAME_B_ARTIFICIAL check:
+                   artificial pzframes shouldn't receive RSLVSTAT events at all */
+                SetMainState(gui, KNOBSTATE_JUSTCREATED);
+            for (cn = 0;  cn < ftd->chan_count;  cn++)
+                if (gui->k_params[cn] != NULL  &&
+                    gui->k_params[cn]->curstate == KNOBSTATE_NOTFOUND)
+                    SetSimpleKnobState(gui->k_params[cn], KNOBSTATE_JUSTCREATED);
+        }
+    }
+    else if (reason == PZFRAME_REASON_DEVSTATE)
+    {
+        if (info_int <= 0)
+        {
+            if (gui->curstate == KNOBSTATE_JUSTCREATED)
+                SetMainState(gui, KNOBSTATE_SFERR);
+        }
+        else
+        {
+            if (gui->curstate == KNOBSTATE_SFERR)
+                SetMainState(gui, KNOBSTATE_JUSTCREATED);
+        }
     }
 
     /* Call upstream */
@@ -162,6 +233,7 @@ void  PzframeGuiInit       (pzframe_gui_t *gui, pzframe_data_t *pfr,
     gui->d   = gkd;
     gui->curstate = (gkd->ftd->behaviour & PZFRAME_B_ARTIFICIAL) != 0 ?
         KNOBSTATE_NONE : KNOBSTATE_JUSTCREATED;
+    gui->roller_curstate = KNOBSTATE_NONE;
 }
 
 int   PzframeGuiRealize    (pzframe_gui_t *gui)
@@ -177,7 +249,6 @@ int   PzframeGuiRealize    (pzframe_gui_t *gui)
     }
 
     PzframeDataAddEvproc(gui->pfr, PzframeGuiEventProc, gui);
-    ShowRunMode   (gui);
 
     return 0;
 }
@@ -193,12 +264,7 @@ void  PzframeGuiUpdate     (pzframe_gui_t *gui, int info_changed)
 
     /* Set visible state */
     newstate = choose_knobstate(NULL, pfr->rflags);
-    if (gui->curstate != newstate)
-    {
-        gui->curstate = newstate;
-        if (gui->d->vmt.newstate != NULL)
-            gui->d->vmt.newstate(gui);
-    }
+    SetMainState(gui, newstate);
 
     /* Display current params */
     for (cn = 0;  cn < ftd->chan_count;  cn++)
@@ -248,6 +314,7 @@ static void ShowStats  (pzframe_gui_t *gui)
     {
         gettimeofday(&timenow, NULL);
         timeval_subtract(&timediff, &timenow, &(gui->pfr->timeupd));
+
         if (timediff.tv_sec > 3600 * 99)
             sprintf(buf, "---");
         else
@@ -266,6 +333,11 @@ static void ShowStats  (pzframe_gui_t *gui)
                 sprintf(buf, " %lds",
                         secs);
         }
+
+        if ((gui->pfr->fresh_age_timeval.tv_sec  > 0  ||
+             gui->pfr->fresh_age_timeval.tv_usec > 0)  &&
+            TV_IS_AFTER(timediff, gui->pfr->fresh_age_timeval))
+            SetRollerState(gui, KNOBSTATE_DEFUNCT);
     }
     XmTextSetString(gui->time_show, buf);
 }
@@ -331,7 +403,10 @@ static void SetGoodBtnCB(Widget     w,
   pzframe_gui_t     *gui   = closure;
 
     if (gui->d->vmt.svd_ctl != NULL)
+    {
         gui->d->vmt.svd_ctl(gui, 1);
+        ShowSvdMode(gui);
+    }
 }
 
 static void RstGoodBtnCB(Widget     w,
@@ -341,14 +416,16 @@ static void RstGoodBtnCB(Widget     w,
   pzframe_gui_t     *gui   = closure;
 
     if (gui->d->vmt.svd_ctl != NULL)
+    {
         gui->d->vmt.svd_ctl(gui, 0);
+        ShowSvdMode(gui);
+    }
 }
 
 void  PzframeGuiMkCommons  (pzframe_gui_t *gui, Widget parent)
 {
   Widget     w;
   XmString   s;
-  Widget     b;
 
     if (gui->commons != NULL) return;
 
@@ -358,7 +435,7 @@ void  PzframeGuiMkCommons  (pzframe_gui_t *gui, Widget parent)
 
     w = NULL;
 
-    if (gui->look.noleds == 0)
+    if (gui->look.embed_leds)
     {
         gui->local_leds_form = XtVaCreateManagedWidget("alarmLeds", xmFormWidgetClass, gui->commons,
                                                        XmNtraversalOn, False,
@@ -377,6 +454,10 @@ void  PzframeGuiMkCommons  (pzframe_gui_t *gui, Widget parent)
                                           XmNeditable,              False,
                                           XmNtraversalOn,           False,
                                           NULL);
+    XtVaGetValues(gui->roller,
+                  XmNforeground, &(gui->roller_deffg),
+                  XmNbackground, &(gui->roller_defbg),
+                  NULL);
     attachleft(gui->roller, w, 0);
     w = gui->roller;
 
@@ -419,7 +500,7 @@ void  PzframeGuiMkCommons  (pzframe_gui_t *gui, Widget parent)
         attachleft    (gui->save_button, w, 0);
         w = gui->save_button;
     }
-    if (gui->look.noleds == 0) /*!!! A bit misleading "noleds" name; it is used by pzframe_knobplugin.c and pzframe_gui.c to signify "create local toolbar" */
+    if (gui->look.embed_tbar)
     {
         gui->loop_button =
             XtVaCreateManagedWidget("miniToolButton", xmPushButtonWidgetClass, gui->commons,
@@ -448,46 +529,42 @@ void  PzframeGuiMkCommons  (pzframe_gui_t *gui, Widget parent)
             w = gui->once_button;
         }
 
+        ShowRunMode   (gui);
     }
-    if ((gui->pfr->ftd->behaviour & (PZFRAME_B_NO_SVD)) == 0)
+    if (gui->look.embed_tbar  &&
+        (gui->pfr->ftd->behaviour & (PZFRAME_B_NO_SVD)) == 0)
     {
-        b =
+        gui->setg_button =
             XtVaCreateManagedWidget("miniToolButton", xmPushButtonWidgetClass, gui->commons,
                                     XmNlabelString, s = XmStringCreateLtoR("G", xh_charset),
                                     XmNtraversalOn, False,
                                     NULL);
         XmStringFree(s);
-        XhAssignPixmap(b, btn_mini_setgood_xpm);
-        XhSetBalloon  (b, "Save current data as good");
-        XtAddCallback (b, XmNactivateCallback, SetGoodBtnCB, gui);
-        attachleft    (b, w, 0);
-        w = b;
+        XhAssignPixmap(gui->setg_button, btn_mini_setgood_xpm);
+        XhSetBalloon  (gui->setg_button, "Save current data as good");
+        XtAddCallback (gui->setg_button, XmNactivateCallback, SetGoodBtnCB, gui);
+        attachleft    (gui->setg_button, w, 0);
+        w = gui->setg_button;
 
-        b =
+        gui->rstg_button =
             XtVaCreateManagedWidget("miniToolButton", xmPushButtonWidgetClass, gui->commons,
                                     XmNlabelString, s = XmStringCreateLtoR("X", xh_charset),
                                     XmNtraversalOn, False,
                                     NULL);
         XmStringFree(s);
-        XhAssignPixmap(b, btn_mini_rstgood_xpm);
-        XhSetBalloon  (b, "Forget saved data");
-        XtAddCallback (b, XmNactivateCallback, RstGoodBtnCB, gui);
-        attachleft    (b, w, 0);
-        w = b;
+        XhAssignPixmap(gui->rstg_button, btn_mini_rstgood_xpm);
+        XhSetBalloon  (gui->rstg_button, "Forget saved data");
+        XtAddCallback (gui->rstg_button, XmNactivateCallback, RstGoodBtnCB, gui);
+        attachleft    (gui->rstg_button, w, 0);
+        w = gui->rstg_button;
+
+        ShowSvdMode   (gui);
     }
 
     /*!!! should save XtAppAddTimeOut() for "destroy()" to be possible */
     XtAppAddTimeOut(xh_context, 1000, Fps10HzProc, gui);
 }
 
-static void LEDS_KeepaliveProc(XtPointer     closure,
-                               XtIntervalId *id      __attribute__((unused)))
-{
-  pzframe_gui_t *gui = closure;
-
-    XtAppAddTimeOut(xh_context, 1000, LEDS_KeepaliveProc, closure);
-    MotifKnobs_leds_update(&(gui->leds));
-}
 void  PzframeGuiMkLeds     (pzframe_gui_t *gui)
 {
   CxWidget  leds_grid;
@@ -500,7 +577,6 @@ void  PzframeGuiMkLeds     (pzframe_gui_t *gui)
     MotifKnobs_leds_create(&(gui->leds),
                            leds_grid, -15,
                            gui->pfr->cid, MOTIFKNOBS_LEDS_PARENT_GRID);
-    LEDS_KeepaliveProc((XtPointer)gui, NULL);
 }
 
 static void ParamKCB(DataKnob k, double v, void *privptr)

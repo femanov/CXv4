@@ -241,6 +241,17 @@ static void UnRegisterInsrvHwr(insrv_lcn_t    lcn,
         else
             n++;
 #endif
+
+    /* In application to locking/unlocking, however, we consider this risk of
+      "cpoint/mapping-aliased hardware channels" as TOLERABLE (or even negligible).
+
+      (Mainly because a super-uber-correct implementation would be too expensive,
+      probably requiring modifications to cxsd_hw (such as reference-counting of
+      per-gcidlocks).) */
+    if (cxsd_hw_channels[gcid].locker == p->uniq)
+        CxsdHwLockChannels(p->uniq,
+                           1, &gcid,
+                           CX_LOCK_ALLORNOTHING);
 }
 
 //#### Data-access plugin ############################################
@@ -268,6 +279,9 @@ typedef struct
 
     hwrinfo_t       *hwrs_list;
     int              hwrs_list_allocd;
+
+    cxsd_gchnid_t   *gcn_arr_buf;      // Buffer for internal use by cda_d_insrv_lock_op()
+    int              gcn_arr_buf_allocd;
 } cda_d_insrv_privrec_t;
 
 enum
@@ -314,6 +328,7 @@ static void DestroyInsrvPrivrec(cda_d_insrv_privrec_t *me)
     if (me->read_fd  >= 0)           close     (me->read_fd);  me->read_fd  = -1;
     if (me->fdhandle >= 0)           sl_del_fd (me->fdhandle); me->fdhandle = -1;
     if (me->lcn      >= LCN_MIN_VAL) RlsLcnSlot(me->lcn);      me->lcn      = -1;
+    safe_free(me->gcn_arr_buf);
 }
 
 //--------------------------------------------------------------------
@@ -517,6 +532,23 @@ static int  cda_d_insrv_new_chan(cda_dataref_t ref, const char *name,
 #endif
                                                    ? CDA_DAT_P_IS_UPDATE : CDA_DAT_P_IS_CURVAL);
 
+    if ((options & CDA_DATAREF_OPT_EXCLUSIVE) != 0)
+    {
+#if 1
+        CxsdHwLockChannels(me->uniq,
+                           1, &(hi->gcid),
+                           CX_LOCK_WR | CX_LOCK_ALLORNOTHING);
+        cda_dat_p_report_dataset_lockstat(me->sid,
+                                          1, &(hi->gcid),
+                                          cxsd_hw_channels[hi->gcid].locker == me->uniq);
+#else
+        cda_dat_p_report_lockstat(hi->dataref,
+                                  CxsdHwLockChannels(me->uniq,
+                                                     1, &(hi->gcid),
+                                                     CX_LOCK_WR | CX_LOCK_ALLORNOTHING) == 0);
+#endif
+    }
+
     return CDA_DAT_P_OPERATING;
 }
 
@@ -554,6 +586,67 @@ static int  cda_d_insrv_snd_data(void *pdt_privptr, cda_hwcnref_t hwr,
                &dtype, &nelems, &value);
 
     return CDA_PROCESS_DONE;
+}
+
+static int  cda_d_insrv_lock_op (void *pdt_privptr,
+                                 int   count, cda_hwcnref_t *hwrs,
+                                 int   operation, int lockset_id)
+{
+  cda_d_insrv_privrec_t *me = pdt_privptr;
+
+  hwrinfo_t             *hi;
+  int                    n;
+  int                    first;
+  int                    lockstat;
+
+  int                    r;
+
+    /* Provide a sufficient space */
+    if (GrowUnitsBuf(&(me->gcn_arr_buf), &(me->gcn_arr_buf_allocd),
+                     count, sizeof(*(me->gcn_arr_buf))) < 0) return -1;
+
+    /* Walk through hwrs[], checking them and storing their gcids */
+    for (n = 0;  n < count;  n++)
+    {
+        if (hwrs[n] < 0  ||  hwrs[n] >= me->hwrs_list_allocd  ||
+            (hi = AccessHwrSlot(hwrs[n], me))->in_use == 0)
+        {
+            /*!!!Bark? */
+            errno = EBADF;
+            return -1;
+        }
+        me->gcn_arr_buf[n] = hi->gcid;
+    }
+
+    /*!!! lockset_id -- ? */
+
+    r = CxsdHwLockChannels(me->uniq, count, me->gcn_arr_buf, operation);
+    if (r < 0) return r;
+
+    /* Report lockstate(s):
+           * Report TRUE states, based on .locker field
+             (instead of guessed by CxsdHwLockChannels() success).
+           * Use "flush-style" approach, grouping reported channels
+             by their lockstates; the same "search/group" loop is used
+             in CxsdHwDoIO(). */
+    for (n = 0;  n < count;  /*NO-OP*/)
+    {
+        /* Get "model" parameters */
+        first = n;
+        lockstat = cxsd_hw_channels[me->gcn_arr_buf[n]].locker == me->uniq;
+
+        /* Find out how many channels can be packed */
+        while (n < count
+               &&
+               (cxsd_hw_channels[me->gcn_arr_buf[n]].locker == me->uniq) == lockstat)
+            n++;
+
+        cda_dat_p_report_dataset_lockstat(me->sid,
+                                          n - first, hwrs + first,
+                                          lockstat);
+    }
+
+    return r;
 }
 
 static int  cda_d_insrv_new_srv (cda_srvconn_t  sid, void *pdt_privptr,
@@ -631,5 +724,7 @@ CDA_DEFINE_DAT_PLUGIN(insrv, "Insrv (inserver) data-access plugin",
                       '.', ':', '\0',
                       cda_d_insrv_new_chan, cda_d_insrv_del_chan,
                       NULL,
-                      cda_d_insrv_snd_data, NULL,
-                      cda_d_insrv_new_srv,  cda_d_insrv_del_srv);
+                      cda_d_insrv_snd_data, cda_d_insrv_lock_op,
+                      cda_d_insrv_new_srv,  cda_d_insrv_del_srv,
+                      NULL, NULL,
+                      NULL, NULL);

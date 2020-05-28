@@ -64,6 +64,7 @@ static inline long  ptr2lint(void *p){return (long )p;}
 
 #define IS_A_TEMPORARY_CONNECT_ERROR() \
     (                                  \
+     ERRNO_WOULDBLOCK()     ||         \
      errno == ETIMEDOUT     ||         \
      errno == ECONNREFUSED  ||         \
      errno == EHOSTUNREACH  ||         \

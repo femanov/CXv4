@@ -418,6 +418,7 @@ static int  cdac20_init_d(int devid, void *devptr,
                                KOZDEV_NUMCHANS*2/*!!!*/ +
                                (DEVSPEC_TABLE_MAX_FILE_BYTES / 7 + 1)*2 /* *2 because of GETDEVSTAT packets */,
                                CANKOZ_LYR_OPTION_NONE);
+fprintf(stderr, "[%d] add=%d\n", devid, me->handle);
     if (me->handle < 0) return me->handle;
     me->lvmt->add_devcode(me->handle, DEVTYPE_CEAC51);
     me->lvmt->add_devcode(me->handle, DEVTYPE_CEAC51A);
@@ -449,6 +450,7 @@ static int  cdac20_init_d(int devid, void *devptr,
     SetChanReturnType(devid, KOZDEV_CHAN_OUT_TAB_ERRDESCR,1,                        IS_AUTOUPDATED_TRUSTED);
     ReportTableStatus(devid, NULL);
 
+fprintf(stderr, "[%d] returning OPERATING\n", devid);
     return DEVSTATE_OPERATING;
 }
 

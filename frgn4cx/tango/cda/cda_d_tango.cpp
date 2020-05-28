@@ -965,7 +965,9 @@ CDA_DEFINE_DAT_PLUGIN(tango, "TANGO data-access plugin",
                       cda_d_tango_new_chan, NULL,
                       NULL,
                       cda_d_tango_snd_data, NULL,
-                      cda_d_tango_new_srv,  cda_d_tango_del_srv);
+                      cda_d_tango_new_srv,  cda_d_tango_del_srv,
+                      NULL, NULL,
+                      NULL, NULL);
 
 
 } /* extern "C" */

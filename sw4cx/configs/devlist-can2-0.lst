@@ -1,0 +1,36 @@
+devtype vepp3dt r10d1,r10i,r1t4,r2t100 {
+	Ibeam		0	drvinfo:CurrentTotal-RB
+	Isep1		1	drvinfo:@!:CurrentSep1-RB
+	Isep2		2	drvinfo:@!:CurrentSep2-RB
+	Emag		3	drvinfo:@!:EnergySet-RB
+
+	# Integers
+	status		10	drvinfo:@!:Status-RB
+	polarity	11	drvinfo:@!:Polarity-RB
+
+	# Strings
+	mode		20	drvinfo:@!:TableName-RB
+	statust         21	drvinfo:@!:Status-RB
+	polarityt       22	drvinfo:@!:Polarity-RB
+}
+
+devtype vepp4dt r10d,r10i,r10t100 {
+	Ibeam		0	drvinfo:CurrentTotal-RB
+	Ieleb1		1	drvinfo:@!:CurrentE1-RB
+	Ieleb2		2	drvinfo:@!:CurrentE2-RB
+	Iposb1		3	drvinfo:@!:CurrentP1-RB
+	Iposb2		4	drvinfo:@!:CurrentP2-RB
+	Emag		5	drvinfo:@!:EnergySet-RB
+
+	# Integers
+	status		10	drvinfo:@!:Status-RB
+	polarity	11	drvinfo:@!:InjPolarityRequest-RB
+
+	# Strings
+	mode		20	drvinfo:@!:TableName-RB
+        statust         21      drvinfo:@!:Status-RB
+        polarityt       22	drvinfo:@!:InjPolarityRequest-RB
+}
+
+dev vepp3 vepp3dt/bridge ~ - epics::VEPP3:
+dev vepp4 vepp4dt/bridge ~ - epics::VEPP4:

@@ -328,7 +328,8 @@ static void MarkAsClosed(v4conn_t *cp, int errcode)
     cp->state   = cp->isconnected? CS_CLOSED : CS_OPEN_FAIL;
     cp->errcode = errcode;
 
-    if      (!cp->isconnected)    reason = CAR_CONNFAIL;
+    if      (errcode == CEACCESS) reason = CAR_EACCESS;  // A separate check BEFORE !isconnected, for CXT4_ACCESS_DENIED to be treated specially and NOT lead to reconnect
+    else if (!cp->isconnected)    reason = CAR_CONNFAIL;
     else if (errcode == CEKILLED) reason = CAR_KILLED;
     else                          reason = CAR_ERRCLOSE;
 
@@ -1373,6 +1374,36 @@ int  cx_delmon(int cd, int count, int *hwids, int *param1s, int *param2s,
     return 0;
 }
 
+int  cx_rq_l_o(int cd, int             hwid,  int  param1,  int  param2,
+               int operation)
+{
+  v4conn_t       *cp = AccessV4connSlot(cd);
+  int             r;
+  size_t          bytesize;
+  CxV4LockOpChunk *req;
+
+    if ((r = CheckCd(cd, CT_DATA, CS_CHUNKING)) != 0) return r;
+
+    bytesize = CXV4_CHUNK_CEIL(sizeof(*req));
+    
+    if (GrowSendBuf(cp, cp->sendbuf->DataSize + bytesize) != 0) return -1;
+
+    req  = cp->sendbuf->data + cp->sendbuf->DataSize;
+    bzero(req,  bytesize);
+
+    cp->sendbuf->DataSize += bytesize;
+    cp->sendbuf->NumChunks++;
+
+    req->ck.OpCode   = CXC_LOCK_OP;
+    req->ck.ByteSize = bytesize;
+    req->ck.param1   = param1;
+    req->ck.param2   = param2;
+    req->cpid        = hwid;
+    req->operation   = operation;
+
+    return 0;
+}
+
 static int do_rq_read(int OpCode,
                       int cd, int count, int *hwids, int *param1s, int *param2s)
 {
@@ -1542,6 +1573,9 @@ static void async_CXT4_DATA_IO    (v4conn_t *cp, CxV4Header *rcvd, size_t rcvdsi
   CxV4RangeChunk       *rnge;
   cx_range_info_t       rni;
 
+  CxV4LockOpChunk      *lost;
+  cx_lockstat_info_t    loi;
+
     if (rcvd->Type == CXT4_DATA_IO) _cxlib_break_wait();
 
     numcns = rcvd->NumChunks;
@@ -1672,6 +1706,16 @@ static void async_CXT4_DATA_IO    (v4conn_t *cp, CxV4Header *rcvd, size_t rcvdsi
                 memcpy(rni.range+0, rnge->range_min, sizeof(rni.range[0]));
                 memcpy(rni.range+1, rnge->range_max, sizeof(rni.range[1]));
                 CallNotifier(cp, CAR_RANGE, &rni);
+                break;
+
+            case CXC_CVT_TO_RPY(CXC_LOCK_OP):
+                if (rpy->ByteSize < sizeof(*lost)) continue;
+                lost = (void*)rpy;
+                loi.hwid     = lost->cpid;
+                loi.param1   = rpy->param1;
+                loi.param2   = rpy->param2;
+                loi.lockstat = lost->lockstat_result;
+                CallNotifier(cp, CAR_LOCKSTAT, &loi);
                 break;
         }
     }

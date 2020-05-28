@@ -74,9 +74,9 @@ int      PzframeKnobpluginDoCreate(DataKnob k, CxWidget parent,
                                         k->u.z.tree_base, k->u.z.src,
                                         curbase, sizeof(curbase));
 
-    if ((win = XhWindowOf(parent)) != NULL  &&
-        XhGetWindowAlarmleds(win) != NULL)
-        gui->look.noleds = 1;
+    gui->look.embed_leds = (win = XhWindowOf(parent)) == NULL  ||
+                           XhGetWindowAlarmleds(win)  == NULL;
+    gui->look.embed_tbar = 1;
 
     /*!!! No "constr" -- rely on realize()! */
     if (kp_realize != NULL  &&

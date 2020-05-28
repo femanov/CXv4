@@ -1,4 +1,4 @@
-# linac1:15 adc200s and their selectors
+# cxhw:15 adc200s and their selectors
 #### 0. Includes #####################################################
 include(`adc200.devtype')
 include(`adc250.devtype')

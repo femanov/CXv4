@@ -30,10 +30,6 @@ typedef cxid_t chanaddr_t;
 typedef uint32 rflags_t;
 typedef uint32 cxdtype_t;
 
-typedef int32  cx_ival_t;
-typedef int64  cx_lval_t;
-typedef double cx_dval_t;
-
 typedef struct
 {
     long  sec;
@@ -226,6 +222,9 @@ enum
     CX_LOCK_RD = 1,
     CX_LOCK_WR = 2,
     CX_LOCK_ALLORNOTHING = 1 << 7,
+
+    CX_LOCK_WRITE_SET = CX_LOCK_WR | CX_LOCK_ALLORNOTHING,
+    CX_LOCK_WRITE_RLS =              CX_LOCK_ALLORNOTHING,
 };
 
 

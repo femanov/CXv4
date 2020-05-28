@@ -18,6 +18,7 @@
 #include "cxsd_hwP.h"
 #include "cxsd_frontend.h"
 #include "cxsd_logger.h"
+#include "cxsd_access.h"
 
 #include "starogate_proto.h"
 
@@ -59,6 +60,7 @@ typedef struct
     fdio_handle_t    fhandle;
 
     uint32           ID;
+    CxsdAccessPerms  perms;
 
     moninfo_t       *monitors_list;
     int              monitors_list_allocd;
@@ -330,6 +332,7 @@ static void InteractWithClient(int uniq, void *unsdptr,
   /*static*/ int        nels_1    = 1;
 
   static const char   unrecognized_cmd_msg[] = "500 unrecognized command\n";
+  static const char   write_denied_msg    [] = "403 write permission denied\n";
   static const char   channame_rqd_msg    [] = "501 channel name required\n";
   static const char   value_rqd_msg       [] = "501 value-to-write required\n";
   static const char   channel_notfound_msg[] = "404 channel not found\n";
@@ -480,6 +483,12 @@ static void InteractWithClient(int uniq, void *unsdptr,
     }
     else if (cx_strmemcasecmp(STAROGATE_WRITE_S,  p, len) == 0)
     {
+        if ((cp->perms & CXSD_ACCESS_PERM_WRITE) == 0)
+        {
+            send_or_close(cd, write_denied_msg);
+            return;
+        }
+
         /* Get channel name */
         p = nxt;
         while (*p != '\0'  &&  isspace(*p)) p++;
@@ -556,6 +565,8 @@ static void AcceptConnection(int uniq, void *unsdptr,
 
   int                 cd;
   clientrec_t        *cp;
+  uint32              ip_val;
+  CxsdAccessPerms     perms;
 
   int                 on = 1;
 
@@ -594,6 +605,20 @@ static void AcceptConnection(int uniq, void *unsdptr,
     // Set Close-on-exec:=1
     fcntl(s, F_SETFD, 1);
 
+    /* Get access permissions */
+    ip_val = ntohl(inet_addr(inet_ntoa(((struct sockaddr_in *)&addr)->sin_addr)));
+    perms  = CxsdAccessCheck(NULL, ip_val);
+
+    /* Is it allowed to log in? */
+    if ((perms & CXSD_ACCESS_PERM_CONNECT) == 0)
+    {
+        /* Note: we do NOT send any reply, but just close the socket.
+                 In fact, preferred way will be to block connections
+                 from unwanted hosts at firewal level. */
+        close(s);
+        return;
+    }
+
     /* Get a connection slot... */
     if ((cd = GetConnSlot()) < 0)
     {
@@ -609,6 +634,7 @@ static void AcceptConnection(int uniq, void *unsdptr,
     cp = AccessConnSlot(cd);
     cp->fd    = s;
     cp->ID    = CxsdHwCreateClientID();
+    cp->perms = perms;
 
     /* Okay, let's obtain an fdio slot... */
     cp->fhandle = fdio_register_fd(0, NULL, /*!!!uniq*/

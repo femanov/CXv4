@@ -1,4 +1,4 @@
-# ring1:21 -- ringcamsel, turnmag, ringcurmon
+# canhw:21 -- ringcamsel, turnmag, ringcurmon
 
 # 0. Devtypes
 include(`canadc40.devtype')

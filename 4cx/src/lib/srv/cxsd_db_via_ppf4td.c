@@ -228,6 +228,9 @@ enum
         PPF4TD_FLAG_SPCTERM | PPF4TD_FLAG_HSHTERM | PPF4TD_FLAG_EOLTERM |
         PPF4TD_FLAG_BRCTERM*0
 };
+#ifndef MAY_USE_PPF4TD_GET_DOUBLE
+  #define MAY_USE_PPF4TD_GET_DOUBLE 1
+#endif
 static inline int isletnum(int c)
 {
     return isalnum(c)  ||  c == '_'  ||  c == '-';
@@ -251,10 +254,17 @@ static int ParseSomeProps(const char *argv0,  ppf4td_ctx_t *ctx, CxsdDb db,
   CxAnyVal_t     *a_p;
   int             subfield;
   const char     *subfield_name;
+#if !MAY_USE_PPF4TD_GET_DOUBLE
   char           *p;
   char           *err;
+#endif /* MAY_USE_PPF4TD_GET_DOUBLE */
+#if MAY_USE_PPF4TD_GET_DOUBLE
+  int             l_v;
+  int64           q_v;
+#else
   long            l_v;
   long long       q_v;
+#endif /* MAY_USE_PPF4TD_GET_DOUBLE */
   double          d_v;
 
     fn = 0;
@@ -336,15 +346,21 @@ static int ParseSomeProps(const char *argv0,  ppf4td_ctx_t *ctx, CxsdDb db,
         else if (table[idx].type == SFT_DOUBLE)
         {
 #if MAY_USE_FLOAT
+#if MAY_USE_PPF4TD_GET_DOUBLE
+            if (ppf4td_get_double(ctx, ENTITY_PARSE_FLAGS, &d_v) < 0)
+                return BARK("\"%s\" value (float) expected; %s",
+                            table[idx].name, ppf4td_strerror(errno));
+#else
             r = ppf4td_get_string(ctx, ENTITY_PARSE_FLAGS, strbuf, sizeof(strbuf));
             if (r < 0)
-                return BARK("\"%s\" value (float) expected; %s\n",
+                return BARK("\"%s\" value (float) expected; %s",
                             table[idx].name, ppf4td_strerror(errno));
 
             d_v = strtod(strbuf, &err);
             if (err == strbuf  ||  *err != '\0')
                 return BARK("error in \"%s\" float specification \"%s\"",
                             table[idx].name, strbuf);
+#endif /* MAY_USE_PPF4TD_GET_DOUBLE */
 
             *((double *)ea) = d_v;
 #else
@@ -362,14 +378,20 @@ static int ParseSomeProps(const char *argv0,  ppf4td_ctx_t *ctx, CxsdDb db,
 
             a_p = ea;
 
+#if MAY_USE_PPF4TD_GET_DOUBLE
+            for (subfield = 0;
+                 subfield <= (is_a_range? 1 : 0);
+                 subfield++)
+#else
             r = ppf4td_get_string(ctx, ENTITY_PARSE_FLAGS, strbuf, sizeof(strbuf));
             if (r < 0)
-                return BARK("\"%s\" value%s expected; %s\n",
+                return BARK("\"%s\" value%s expected; %s",
                             table[idx].name, is_a_range? " (MIN-MAX)" : "", ppf4td_strerror(errno));
 
             for (subfield = 0, p = strbuf;
                  subfield <= (is_a_range? 1 : 0);
                  subfield++)
+#endif /* MAY_USE_PPF4TD_GET_DOUBLE */
             {
                 /* Prepare a name for errors */
                 if      (!is_a_range)     subfield_name = "";
@@ -379,10 +401,17 @@ static int ParseSomeProps(const char *argv0,  ppf4td_ctx_t *ctx, CxsdDb db,
                 /* A '-' range separator */
                 if (subfield > 0)
                 {
+#if MAY_USE_PPF4TD_GET_DOUBLE
+                    if (PeekCh(argv0, ctx, table[idx].name, &ch) < 0) return -1;
+                    if (ch != '-')
+                        return BARK("'-' expected before \"%s\"%s value",
+                                    table[idx].name, subfield_name);
+#else
                     if (*p != '-')
                         return BARK("'-' expected before \"%s\"%s value",
                                     table[idx].name, subfield_name);
                     p++;
+#endif /* MAY_USE_PPF4TD_GET_DOUBLE */
                 }
 
                 /* Get a value */
@@ -390,13 +419,27 @@ static int ParseSomeProps(const char *argv0,  ppf4td_ctx_t *ctx, CxsdDb db,
                 {
 #if MAY_USE_INT64
                     if (sizeof_cxdtype(dtype) == sizeof(int64))
+#if MAY_USE_PPF4TD_GET_DOUBLE
+                        r = ppf4td_get_quad(ctx, ENTITY_PARSE_FLAGS, &q_v, 0, NULL);
+#else
                         q_v = strtoull(p, &err, 0);
+#endif /* MAY_USE_PPF4TD_GET_DOUBLE */
                     else
 #endif /* MAY_USE_INT64 */
+#if MAY_USE_PPF4TD_GET_DOUBLE
+                        r = ppf4td_get_int (ctx, ENTITY_PARSE_FLAGS, &l_v, 0, NULL);
+#else
                         l_v = strtoul (p, &err, 0);
+#endif /* MAY_USE_PPF4TD_GET_DOUBLE */
+#if MAY_USE_PPF4TD_GET_DOUBLE
+                    if (r < 0)
+                        return BARK("error in \"%s\"%s int specification; %s",
+                                    table[idx].name, subfield_name, ppf4td_strerror(errno));
+#else
                     if (err == p)
                         return BARK("error in \"%s\"%s int specification \"%s\"",
                                     table[idx].name, subfield_name, p);
+#endif /* MAY_USE_PPF4TD_GET_DOUBLE */
 
                     if      (dtype == CXDTYPE_INT8)   a_p[subfield].i8  = l_v;
                     else if (dtype == CXDTYPE_UINT8)  a_p[subfield].u8  = l_v;
@@ -415,10 +458,16 @@ static int ParseSomeProps(const char *argv0,  ppf4td_ctx_t *ctx, CxsdDb db,
                 else
                 {
 #if MAY_USE_FLOAT
+#if MAY_USE_PPF4TD_GET_DOUBLE
+                    if (ppf4td_get_double(ctx, ENTITY_PARSE_FLAGS, &d_v) < 0)
+                        return BARK("error in \"%s\"%s float specification; %s",
+                                    table[idx].name, subfield_name, ppf4td_strerror(errno));
+#else
                     d_v = strtod(p, &err);
                     if (err == p)
                         return BARK("error in \"%s\"%s float specification \"%s\"",
                                     table[idx].name, subfield_name, p);
+#endif /* MAY_USE_PPF4TD_GET_DOUBLE */
 
                     if (dtype == CXDTYPE_SINGLE)
                         a_p[subfield].f32 = d_v;
@@ -428,15 +477,19 @@ static int ParseSomeProps(const char *argv0,  ppf4td_ctx_t *ctx, CxsdDb db,
                     return BARK("floats are disabled at compile-time");
 #endif
                 }
+#if !MAY_USE_PPF4TD_GET_DOUBLE
 
                 /* Advance to next subfield */
                 p = err;
+#endif /* MAY_USE_PPF4TD_GET_DOUBLE */
             }
 
+#if !MAY_USE_PPF4TD_GET_DOUBLE
             /* Additional check */
             if (*p != '\0')
                 return BARK("junk after \"%s\" value in \"%s\"",
                             table[idx].name, strbuf);
+#endif /* MAY_USE_PPF4TD_GET_DOUBLE */
 
             /* Store dtype */
             ea = ((int8 *)data_p) + table[idx].var_int;
@@ -805,6 +858,8 @@ static somefielddescr_t dcpr_fields[] =
     SFD_FLAG    ("autoupdated_yes",     CxsdDbDcPrInfo_t, return_type, IS_AUTOUPDATED_YES),
     SFD_FLAG    ("autoupdated_trusted", CxsdDbDcPrInfo_t, return_type, IS_AUTOUPDATED_TRUSTED),
     SFD_FLAG    ("ignore_upd_cycle",    CxsdDbDcPrInfo_t, return_type, DO_IGNORE_UPD_CYCLE),
+    SFD_DBSTR   ("dbprops", CxsdDbDcPrInfo_t, dbprops_ofs),
+    SFD_DBSTR   ("drvinfo", CxsdDbDcPrInfo_t, drvinfo_ofs),
     SFD_END()
 };
 static int ParseChanList(const char *argv0, ppf4td_ctx_t *ctx, CxsdDb db,

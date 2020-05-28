@@ -3,7 +3,7 @@
 #include "drv_i/adc250_drv_i.h"
 
 
-enum { ADC250_DTYPE      = CXDTYPE_INT32 };
+enum { ADC250_DTYPE      = CXDTYPE_INT16 };
 
 static void adc250_info2mes(fastadc_data_t      *adc,
                             pzframe_chan_data_t *info,
@@ -41,8 +41,6 @@ static pzframe_chan_dscr_t adc250_chan_dscrs[] =
     [ADC250_CHAN_ISTART]       = {"istart"},
     [ADC250_CHAN_WAITTIME]     = {"waittime"},
     [ADC250_CHAN_CALIBRATE]    = {"calibrate",    0, PZFRAME_CHAN_IS_PARAM | PZFRAME_CHAN_RW_ONLY_MASK},
-    [ADC250_CHAN_FGT_CLB]      = {"fgt_clb",      0, PZFRAME_CHAN_IS_PARAM | PZFRAME_CHAN_RW_ONLY_MASK},
-    [ADC250_CHAN_VISIBLE_CLB]  = {"visible_clb"},
     [ADC250_CHAN_CALC_STATS]   = {"calc_stats"},
 
     [ADC250_CHAN_PTSOFS]       = {"ptsofs"},
@@ -63,7 +61,6 @@ static pzframe_chan_dscr_t adc250_chan_dscrs[] =
     [ADC250_CHAN_PGA_UNIQ_ID]  = {"pga_uniq_id",  0, PZFRAME_CHAN_IMMEDIATE_MASK | PZFRAME_CHAN_ON_CYCLE_MASK},
 
     [ADC250_CHAN_ELAPSED]      = {"elapsed",      0, PZFRAME_CHAN_IMMEDIATE_MASK | PZFRAME_CHAN_ON_CYCLE_MASK},
-    [ADC250_CHAN_CLB_STATE]    = {"clb_state"},
     [ADC250_CHAN_XS_PER_POINT] = {"xs_per_point", 1},
     [ADC250_CHAN_XS_DIVISOR]   = {"xs_divisor",   1},
     [ADC250_CHAN_XS_FACTOR]    = {"xs_factor",    1},
@@ -91,7 +88,7 @@ static pzframe_chan_dscr_t adc250_chan_dscrs[] =
     // LINE[0-3]TOTAL{MIN,MAX} and NUM_LINES are omitted
 
 //    [] = {""},
-    [ADC250_NUMCHANS] = {"_devstate"},
+    [ADC250_NUMCHANS] = {"_devstate", 0, PZFRAME_CHAN__DEVSTATE_MASK},
 };
 
 #define LINE_DSCR(N,x)                                                \

@@ -1,0 +1,146 @@
+
+# From m4-1.4.1-7.src.rpm::m4-1.4.1.tar.gz#utar/m4-1.4.1/examples/foreach.m4
+# foreach(x, (item_1, item_2, ..., item_n), stmt)
+define(`foreach', `pushdef(`$1', `')_foreach(`$1', `$2', `$3')popdef(`$1')')
+define(`_arg1', `$1')
+define(`_foreach',
+        `ifelse(`$2', `()', ,
+                `define(`$1', _arg1$2)$3`'_foreach(`$1', (shift$2), `$3')')')
+#---------------------------------------------------------------------
+
+include(`gid25_subsys_macros.m4')
+include(`subsys_magx_macros.m4')
+
+#--- ringmag
+define(`RINGMAG_SECTION',
+       `
+        noop - " " hlabel
+        noop - $1  hlabel
+        noop - " " hlabel
+        noop - " " hlabel
+        noop - " " hlabel
+        noop - " " hlabel
+       ')
+
+#--- k500gid25s
+define(`LAB2GID', `G`'translit($1,`-',`_')')
+
+define(`THE_LINE', `
+    GID25_K500_LINE(LAB2GID($1)_, LAB2GID($1)., `$1')
+    container $1osc "..." subwin "resizable,compact,noclsbtn" \
+            subwintitle:"$1 oscillogram" content:1 {
+        pzframe adc "" vsdc2_1 "width=400" LAB2GID($1).osc
+    }
+')
+
+define(`GIDS_G0', `5L1,5L2,5L3,5L4')
+define(`GIDS_G1', `5L5,5L6,5L7,5L8')
+define(`GIDS_G2', `5KL2X,5KL3Z,5L9,5L10')
+define(`GIDS_LIST', `GIDS_G0,GIDS_G1,GIDS_G2')
+
+
+#---------------------------------------------------------------------
+
+grouping main v5k500vepp4_data "VEPP-5 K500 data for VEPP-4" lrtb "" content:4 {
+
+    container rst4 "RST4" grid \
+            str1:"Задано, mA\tИзм.\tU, V" \
+            base:canhw:12.rst4 param1:3 param2:18 content:eval(3*18*2) {
+        MAGX_COR208_LINE(q4L1,     "4L1")
+        MAGX_COR208_LINE(c4L4_z,   "4L4-z")
+        MAGX_COR208_LINE(q4L4,     "4L4")
+        MAGX_COR208_LINE(q3L2,     "3L2")
+        MAGX_COR208_LINE(q4L3,     "4L3")
+        MAGX_COR208_LINE(q3L1,     "3L1")
+        MAGX_COR208_LINE(c3C2_x,    "3C2-x")
+        MAGX_COR208_LINE(c4L7_x,   "4L7-x")
+        MAGX_COR208_LINE(q4L6,     "4L6")
+        MAGX_COR208_LINE(q4L5,     "4L5")
+        MAGX_COR208_LINE(q4L2,     "4L2")
+        MAGX_COR208_LINE(c3L4_x,   "3L4-x")
+        MAGX_COR208_LINE(q3L3,     "3L3")
+        MAGX_COR208_LINE(c4C2_x,   "4C2-x")
+        MAGX_COR208_LINE(q4L7,     "4L7")
+        MAGX_COR208_LINE(c4C1_x,   "4C1-x")
+        noop
+        noop
+        noop
+        noop
+        noop
+        noop
+
+        MAGX_COR208_LINE(q3L7,     "3L7")
+        MAGX_COR208_LINE(c3C1_x,      "3C1-x")
+        MAGX_COR208_LINE(q3L6,     "3L6")
+        MAGX_COR208_LINE(q3L5,     "3L5")
+        MAGX_COR208_LINE(c3L7_z,   "3L7-z")
+        MAGX_COR208_LINE(q3L4,     "3L4")
+        MAGX_COR208_LINE(c4M1,     "4M1")
+        MAGX_COR208_LINE(c3M4,     "3M4")
+        MAGX_COR208_LINE(c3M5,     "3M5")
+        MAGX_COR208_LINE(c3M2,     "3M2")
+        MAGX_COR208_LINE(c3M3,     "3M3")
+        MAGX_COR208_LINE(c3M1,     "3M1")
+        MAGX_COR208_LINE(c3F4_z,   "3F4-z")
+        MAGX_COR208_LINE(c4F4_z,   "4F4-z")
+        MAGX_COR208_LINE(c4M4,     "4M4")
+        MAGX_COR208_LINE(c4M5,     "4M5")
+        MAGX_COR208_LINE(c4M2,     "4M2")
+        MAGX_COR208_LINE(c4M3,     "4M3")
+    }
+
+    container rst5 "RST5" grid \
+            str1:"Задано, mA\tИзм.\tU, V" \
+            base:canhw:12.rst5 param1:3 param2:24 content:eval(3*19) {
+        MAGX_COR208_LINE(c5KX3,  "5KX3")
+        MAGX_COR208_LINE(c5KZ4,  "5KZ4")
+        MAGX_COR208_LINE(c5KX5,  "5KX5")
+        MAGX_COR208_LINE(c5KZ6,  "5KZ6")
+        MAGX_COR208_LINE(c5KX7,  "5KX7")
+        MAGX_COR208_LINE(c5KX8,  "5KX8")
+        MAGX_COR208_LINE(c5KZ9,  "5KZ9")
+        MAGX_COR208_LINE(c5KX10, "5KX10")
+        MAGX_COR208_LINE(c5KZ11, "5KZ11")
+        MAGX_COR208_LINE(c5KX12, "5KX12")
+        MAGX_COR208_LINE(q5L11n12, `"5L11,12"')
+        MAGX_COR208_LINE(q5L13n14, `"5L13,14"')
+        MAGX_COR208_LINE(q5L15n16, `"5L15,16"')
+        MAGX_COR208_LINE(q5L17n18, `"5L17,18"')
+        MAGX_COR208_LINE(q5L19n20, `"5L19,20"')
+
+        MAGX_COR208_LINE(c5M1,   "5M1")
+        MAGX_COR208_LINE(c5M2,   "5M2")
+        MAGX_COR208_LINE(c5M3,   "5M3")
+        MAGX_COR208_LINE(c5M4,   "5M4")
+    }
+
+    container ringmag "Магнитная система: выпуск" grid "" \
+            str1:"Задано, A\tИзм., A\td/dT\t \t \t " \
+            base:canhw:12 \
+            param1:6 content:eval(6*8) {
+        MAGX_IST_CDAC20_LINE(d3m4n5, `"3M4,5"',  "ИП1: И-В-1000-10",  1000, 1, icd_3m4, 0, 0)
+        MAGX_IST_CDAC20_LINE(d4m4n5, `"4M4,5"',  "ИП1: И-В-1000-11",  1000, 1, icd_4m4, 0, 0)
+        MAGX_IST_CDAC20_LINE(d3m1t3, `"3M1-3"',  "ИП1: И-В-1000-12",  1000, 1, icd_3m1, 0, 0)
+        MAGX_IST_CDAC20_LINE(d4m1t3, `"4M1-3"',  "ИП1: И-В-1000-13",  1000, 1, icd_4m1, 0, 0)
+        MAGX_IST_CDAC20_LINE(d5m1t4, `"5M1-4"',  "ИП1: ИСТ-13",       1000, 1, icd_i13, 0, 1) # rev
+        MAGX_IST_CDAC20_LINE(d6m1t4, `"6M1-4"',  "ИП1: ИСТ-14",       1000, 1, icd_i14, 0, 1) # rev
+        MAGX_MPS20_CEAC124_LINE(d6m5n6, `"6M5,6"', "ИП1: РСТ5",   13,   1, rst5_mps1)
+        MAGX_MPS20_CEAC124_LINE(d6m7n8, `"6M7,8"', "ИП1: РСТ5",   13,   1, rst5_mps2)
+    } layinfo:newline
+
+    container k500gid25s "Settings and measurements" grid "" \
+            11 0 0 \
+            "Uset, V\tUmes, V\tUVH, V\tImes, A\tCharge\t \t \tStart, us\t \tVsDC start,us\t " \
+            base:canhw:23 \
+            content:eval(11 * 4*3) {
+        foreach(`x', `(GIDS_LIST)', `THE_LINE(x)')
+    }
+}
+
+
+sysname       v5k500vepp4
+defserver     canhw:12
+wintitle main "VEPP-5 K500 data for VEPP-4"
+winname  main v5k500vepp4
+winclass main V5K500VEPP4
+#winopts  main "maxitoolbar,with_save_btn,with_load_btn"

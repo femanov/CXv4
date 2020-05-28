@@ -35,6 +35,7 @@ enum // pzframe_chand_scr_t.chan_type
     PZFRAME_CHAN_NO_RD_CONV_MASK = 1 << 18, // Implies CDA_DATAREF_OPT_NO_RD_CONV
     PZFRAME_CHAN_IMMEDIATE_MASK  = 1 << 19, // Re-display knob immediately
     PZFRAME_CHAN_ON_CYCLE_MASK   = 1 << 20, // Request IMMEDIATE channels w/o ON_UPDATE
+    PZFRAME_CHAN__DEVSTATE_MASK  = 1 << 21, // Is a device's _devstate channel
 };
 
 enum
@@ -43,6 +44,7 @@ enum
     PZFRAME_REASON_PARAM    = 1,
     PZFRAME_REASON_RDSCHG   = 3,
     PZFRAME_REASON_RSLVSTAT = 10,
+    PZFRAME_REASON_DEVSTATE = 11,
 };
 
 
@@ -143,6 +145,8 @@ typedef struct _pzframe_data_t_struct
     struct timeval         timeupd;
 
     rflags_t               rflags;
+
+    struct timeval         fresh_age_timeval;
 
     int                    rds_had_changed;
     int                    other_info_changed;

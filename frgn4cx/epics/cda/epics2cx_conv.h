@@ -23,7 +23,7 @@ static int DBR2cxdtype(chtype DBR_type, cxdtype_t *dtype_p)
     else if (dbr_type_is_CTRL (DBR_type)) DBR_class = DBR_class_CTRL;
     else return -1;
 
-    if      (dbr_type_is_STRING(DBR_type)) return -1/*dtype = CXDTYPE_TEXT*/;
+    if      (dbr_type_is_STRING(DBR_type)) dtype = CXDTYPE_TEXT;
     else if (dbr_type_is_SHORT (DBR_type)  ||
            /*dbr_type_is_INT() doesn't exist  */
              dbr_type_is_ENUM  (DBR_type)) dtype = CXDTYPE_INT16;
@@ -59,7 +59,7 @@ static chtype cxdtype2DBR(cxdtype_t dtype, int DBR_class)
         case CXDTYPE_INT64:  case CXDTYPE_UINT64: return -1;
         case CXDTYPE_SINGLE:                      return base + DBR_FLOAT;
         case CXDTYPE_DOUBLE:                      return base + DBR_DOUBLE;
-        case CXDTYPE_TEXT:                        return -1;
+        case CXDTYPE_TEXT:                        return base + DBR_STRING;
         case CXDTYPE_UCTEXT:                      return -1;
         default: return -1;
     }

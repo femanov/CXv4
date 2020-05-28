@@ -203,6 +203,9 @@ enum
         PPF4TD_FLAG_SPCTERM | PPF4TD_FLAG_HSHTERM | PPF4TD_FLAG_EOLTERM |
         PPF4TD_FLAG_BRCTERM
 };
+#ifndef MAY_USE_PPF4TD_GET_DOUBLE
+  #define MAY_USE_PPF4TD_GET_DOUBLE 1
+#endif
 
 static int INT_fparser(parse_rec_t *rp, const char *name, void *kfp)
 {
@@ -228,6 +231,11 @@ static int INT_fparser(parse_rec_t *rp, const char *name, void *kfp)
 static int DBL_fparser(parse_rec_t *rp, const char *name, void *kfp)
 {
   double *dp = kfp;
+#if MAY_USE_PPF4TD_GET_DOUBLE
+
+    if (ppf4td_get_double(rp->ctx, ENTITY_PARSE_FLAGS, dp) < 0)
+        return BARK("error parsing %s (double): %s", name, ppf4td_strerror(errno));
+#else
   char    buf[100];
   int     r;
   double  v;
@@ -242,6 +250,7 @@ static int DBL_fparser(parse_rec_t *rp, const char *name, void *kfp)
         return BARK("error in %s specification \"%s\"", name, buf);
 
     *dp = v;
+#endif
     
     return 0;
 }
@@ -249,6 +258,21 @@ static int DBL_fparser(parse_rec_t *rp, const char *name, void *kfp)
 static int RNG_fparser(parse_rec_t *rp, const char *name, void *kfp)
 {
   double *dp = kfp;
+#if MAY_USE_PPF4TD_GET_DOUBLE
+  int     ch;
+  double  v1;
+  double  v2;
+
+    if (ppf4td_get_double(rp->ctx, ENTITY_PARSE_FLAGS, &v1) < 0)
+        return BARK("error parsing %s.min: %s", name, ppf4td_strerror(errno));
+
+    if (NextCh(rp, name, &ch) < 0) return -1;
+    if (ch != '-')
+        return BARK("missing range separator '-' in %s specification", name);
+
+    if (ppf4td_get_double(rp->ctx, ENTITY_PARSE_FLAGS, &v2) < 0)
+        return BARK("error parsing %s.max: %s", name, ppf4td_strerror(errno));
+#else
   char    buf[100];
   int     r;
   double  v1;
@@ -271,6 +295,7 @@ static int RNG_fparser(parse_rec_t *rp, const char *name, void *kfp)
     v2 = strtod(p, &err);
     if (err == p  ||  *err != '\0')
         return BARK("error in %s.max specification in \"%s\"", name, buf);
+#endif
 
     dp[0] = v1;
     dp[1] = v2;
@@ -369,11 +394,13 @@ static int PARAM_fparser(parse_rec_t *rp, const char *name, void *kfp)
   char            ident_buf [100];
   char            label_buf [100] = "";
   char            rorw_buf  [5];
+#if !MAY_USE_PPF4TD_GET_DOUBLE
   char            defval_buf[50];
   char            range_buf [100];
 
   char           *p;
   char           *err;
+#endif /* !MAY_USE_PPF4TD_GET_DOUBLE */
 
   CxKnobParam_t  *new_auxparams;
   CxKnobParam_t  *np;
@@ -419,14 +446,28 @@ static int PARAM_fparser(parse_rec_t *rp, const char *name, void *kfp)
     if (PeekCh(rp, name, &ch) < 0) return -1;
     if (ch == '=')
         NextCh(rp, name, &ch);
+#if MAY_USE_PPF4TD_GET_DOUBLE
+    if (ppf4td_get_double(rp->ctx, ENTITY_PARSE_FLAGS, &defval))
+        return BARK("error parsing %s-defval specification; %s", name, ppf4td_strerror(errno));
+#else
     if(ppf4td_get_string(rp->ctx, ENTITY_PARSE_FLAGS, defval_buf, sizeof(defval_buf)) < 0)
         return -1;
     defval = strtod(defval_buf, &err);
     if (err == defval_buf  ||  *err != '\0')
         return BARK("error in %s-defval specification", name);
+#endif
 
     /* And, finally, a range */
     PARAM_BRACE_OR_EOL();
+#if MAY_USE_PPF4TD_GET_DOUBLE
+    if (ppf4td_get_double(rp->ctx, ENTITY_PARSE_FLAGS, &minval) < 0)
+        return BARK("error parsing %s-min: %s", name, ppf4td_strerror(errno));
+    if (NextCh(rp, name, &ch) < 0) return -1;
+    if (ch != '-')
+        return BARK("missing range separator '-' in %s specification", name);
+    if (ppf4td_get_double(rp->ctx, ENTITY_PARSE_FLAGS, &maxval) < 0)
+        return BARK("error parsing %s-max: %s", name, ppf4td_strerror(errno));
+#else
     r = ppf4td_get_string(rp->ctx, ENTITY_PARSE_FLAGS, range_buf, sizeof(range_buf));
     if (r < 0)
         return BARK("double-double range expected in %s spec; %s\n", name, ppf4td_strerror(errno));
@@ -440,6 +481,7 @@ static int PARAM_fparser(parse_rec_t *rp, const char *name, void *kfp)
     maxval = strtod(p, &err);
     if (err == p  ||  *err != '\0')
         return BARK("error in %s-max specification in \"%s\"", name, range_buf);
+#endif
 
     /* ...and a closing brace */
     if (NextCh(rp, name, &ch) < 0) return -1;

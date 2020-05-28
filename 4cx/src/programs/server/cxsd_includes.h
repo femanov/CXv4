@@ -36,6 +36,7 @@
 #include "cxsd_driver.h"
 #include "cxsd_frontend.h"
 #include "cxsd_extension.h"
+#include "cxsd_access.h"
 
 /*  .b cxsd daemon-specific */
 #include "cxsd_vars.h"

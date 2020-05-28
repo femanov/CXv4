@@ -275,12 +275,33 @@ const char * GetDevTypename(int devid)
     return CxsdDbGetStr(cxsd_hw_cur_db, dev_p->db_ref->typename_ofs);
 }
 
+const char * GetDevInstname(int devid)
+{
+  cxsd_hw_dev_t  *dev = cxsd_hw_devices + devid;
+
+    CHECK_SANITY_OF_DEVID(NULL);
+
+    return CxsdDbGetStr(cxsd_hw_cur_db, dev->db_ref->instname_ofs);
+}
+
 void         GetDevLogPrms (int devid, int *curlevel_p, int *curmask_p)
 {
     CHECK_SANITY_OF_DEVID();
 
     if (curlevel_p != NULL) *curlevel_p = cxsd_logger_verbosity;
     if (curmask_p  != NULL) *curmask_p  = cxsd_hw_devices[devid].logmask;
+}
+
+int          GetDevPlace   (int  devid,
+                            int *first_p,
+                            int *count_p)
+{
+    CHECK_SANITY_OF_DEVID_WO_STATE(-1);
+
+    if (first_p != NULL) *first_p = cxsd_hw_devices[devid].first;
+    if (count_p != NULL) *count_p = cxsd_hw_devices[devid].count;
+
+    return 0;
 }
 
 void       * GetLayerVMT   (int devid)

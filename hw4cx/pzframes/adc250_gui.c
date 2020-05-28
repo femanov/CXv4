@@ -37,7 +37,6 @@ static Widget adc250_mkctls(pzframe_gui_t           *gui,
   Widget  vergrid;
   Widget  ctlsep;
   Widget  clbform;
-  Widget  clbgrdg;
   Widget  clbgrid;
 
   Widget  w1;
@@ -223,7 +222,6 @@ static Widget adc250_mkctls(pzframe_gui_t           *gui,
     clbform = XtVaCreateManagedWidget("form", xmFormWidgetClass, ctlform,
                                       XmNshadowThickness, 0,
                                       NULL);
-    clbgrdg = MakeFreeGrid(clbform);
     clbgrid = MakeFreeGrid(clbform);
             
     attachleft  (verform, NULL,    0);
@@ -234,7 +232,7 @@ static Widget adc250_mkctls(pzframe_gui_t           *gui,
 
     // Version info
     w1 = mkparknob(gui, verform,
-                   "look=text     ro label='Dev ID' options='withlabel' dpyfmt=%10.0f",
+                   "look=inttext  ro label='Dev ID' options='withlabel' dpyfmt=%#10.0a",
                    ADC250_CHAN_DEVICE_ID);
     w2 = mkparknob(gui, verform,
                    "look=selector ro label='Var' items='#T0:1ch/1000MSPS\t1:2ch/500MSPS\t2:4ch/250MSPS\t3:UNKNOWN/err'",
@@ -261,20 +259,8 @@ static Widget adc250_mkctls(pzframe_gui_t           *gui,
     XhGridSetSize(vergrid, 3, y);
 
     // Calibrations
-    w1 = mkparknob(gui, clbform,
-                   " look=onoff rw options=color=blue label='Visible calibration'",
-                   ADC250_CHAN_VISIBLE_CLB);
-    attachtop(clbgrdg, NULL,    0);
-    attachtop(w1,      clbgrdg, MOTIFKNOBS_INTERKNOB_V_SPACING);
-    attachtop(clbgrid, w1,      MOTIFKNOBS_INTERKNOB_V_SPACING);
-
-    MakeParKnob(clbgrdg, 0, 0, " look=button rw label='Calibrate'",
+    MakeParKnob(clbgrid, 0, 0, " look=button rw label='Calibrate'",
                 gui, mkparknob, ADC250_CHAN_CALIBRATE);
-    MakeParKnob(clbgrdg, 1, 0, " look=led ro label='Active'",
-                gui, mkparknob, ADC250_CHAN_CLB_STATE);
-    MakeParKnob(clbgrdg, 2, 0, " look=button rw label='Reset'",
-                gui, mkparknob, ADC250_CHAN_FGT_CLB);
-    XhGridSetSize(clbgrdg, 3, 1);
 
     for (nl = 0;  nl < ADC250_NUM_ADCS;  nl++)
     {

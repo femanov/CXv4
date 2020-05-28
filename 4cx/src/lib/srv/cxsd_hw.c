@@ -11,6 +11,11 @@
 #endif
 
 
+#if MAY_USE_FLOAT
+  #include "math.h"  // for round()
+#endif
+
+
 enum {INITIAL_TIMESTAMP_SECS = CX_TIME_SEC_NEVER_READ};  /* Set to was-measured (!=0), but long ago (1970-01-01_00:00:01) */
 enum {INITIAL_CURRENT_CYCLE  = 1};  /* For all channels' initial upd_cycle (=0) to be !=current_cycle */
 
@@ -1474,14 +1479,26 @@ int            CxsdHwGetChanType(cxsd_gchnid_t  gcid,
     return 0;
 }
 
-int            CxsdHwGetDevPlace(int            devid,
-                                 int           *first_p,
-                                 int           *count_p)
+int            CxsdHwGetChanAuxs(cxsd_gchnid_t  gcid,
+                                 char         **dbprops_p,
+                                 char         **drvinfo_p)
 {
-    CHECK_SANITY_OF_DEVID_WO_STATE(-1);
+  int               dbprops_ofs = -1;
+  int               drvinfo_ofs = -1;
 
-    if (first_p != NULL) *first_p = cxsd_hw_devices[devid].first;
-    if (count_p != NULL) *count_p = cxsd_hw_devices[devid].count;
+  CxsdDbDcPrInfo_t *dcpr_p;
+
+    if (gcid <= 0  &&  gcid >= cxsd_hw_numchans) return -1;
+
+    if (cxsd_hw_channels[gcid].dcpr_id > 0)
+    {
+        dcpr_p = cxsd_hw_cur_db->dcprs + cxsd_hw_channels[gcid].dcpr_id;
+        dbprops_ofs = dcpr_p->dbprops_ofs;
+        drvinfo_ofs = dcpr_p->drvinfo_ofs;
+    }
+
+    if (dbprops_p != NULL) *dbprops_p = CxsdDbGetStr(cxsd_hw_cur_db, dbprops_ofs);
+    if (drvinfo_p != NULL) *drvinfo_p = CxsdDbGetStr(cxsd_hw_cur_db, drvinfo_ofs);
 
     return 0;
 }
@@ -1511,12 +1528,19 @@ static inline int IsCompatible(cxsd_hw_chan_t *chn_p,
            any size conversion is possible, which in fact isn't a case
            between TEXTs */
         srpr == repr
+#if 0
+        && (srpr != CXDTYPE_REPR_TEXT  ||  dtype == chn_p->dtype)
+#endif
 #if MAY_USE_FLOAT
         ||
         /* b. float->int, int->float */
         ((srpr == CXDTYPE_REPR_FLOAT  ||  srpr == CXDTYPE_REPR_INT)  &&
          (repr == CXDTYPE_REPR_FLOAT  ||  repr == CXDTYPE_REPR_INT))
 #endif
+        ||
+        (sizeof_cxdtype(dtype) == sizeof_cxdtype(chn_p->dtype)  &&
+         ((srpr == CXDTYPE_REPR_INT   &&  repr == CXDTYPE_REPR_TEXT)  ||
+          (srpr == CXDTYPE_REPR_TEXT  &&  repr == CXDTYPE_REPR_INT)))
        )
         return 1;
 
@@ -1557,7 +1581,11 @@ static void StoreForSending(cxsd_gchnid_t gcid,
     size = sizeof_cxdtype(chn_p->dtype);
 
     /* a. Identical */
-    if      (srpr == repr  &&  ssiz == size)
+    if (ssiz == size  &&
+        (srpr == repr  ||
+         (srpr == CXDTYPE_REPR_INT   &&  repr == CXDTYPE_REPR_TEXT)  ||
+         (srpr == CXDTYPE_REPR_TEXT  &&  repr == CXDTYPE_REPR_INT))
+       )
     {
         if (0  &&  !force) return;
         chn_p->next_wr_nelems = nels;
@@ -1883,6 +1911,7 @@ static int  ConsiderRequest(int            requester,
     /* Okay, it is a write channel...  What do we need? */
     if (action == DRVA_WRITE)
     {
+    ////if (chn_p->locker != 0  &&  chn_p->locker != requester) fprintf(stderr, "[gcid=%d].locker=%d: write attemt by %d\n", gcid, chn_p->locker, requester);
         if (chn_p->locker != 0  &&  chn_p->locker != requester)   return DRVA_IGNORE;
 #if CXSD_HW_SUPPORTS_CXDTYPE_UNKNOWN
         if (reprof_cxdtype(chn_p->dtype) == CXDTYPE_REPR_UNKNOWN) return DRVA_IGNORE;
@@ -2045,7 +2074,91 @@ int  CxsdHwLockChannels (int  requester,
                          int  count, cxsd_gchnid_t *gcids,
                          int  operation)
 {
-    return -1;
+  int             n;
+  int             m;
+  cxsd_hw_chan_t *chn_p;
+  int             do_lock = (operation & CX_LOCK_WR) != 0;
+  int             cur_locker;
+
+////fprintf(stderr, "%s,%d rqr=%d %d, [0]=%d [[0]].locker=%d\n", __FUNCTION__, do_lock, requester, count, gcids[0], cxsd_hw_channels[gcids[0]].locker);
+    if (requester == 0)
+    {
+        errno = EINVAL;
+        return -1;
+    }
+    if ((operation & CX_LOCK_ALLORNOTHING) == 0)
+    {
+        errno = EINVAL;
+        return -1;
+    }
+
+    /* Stage 1: check possibility */
+    for (n = 0;  n < count;  n++)
+    {
+        /* Forbid "invalid" references */
+        /*!!! Check for "< cxsd_hw_devices[0].wauxcount" instead of "<= 0"? */
+        if (gcids[n] <= 0  ||  gcids[n] > cxsd_hw_numchans)
+        {
+            errno = EINVAL;
+            return -1;
+        }
+
+        chn_p = cxsd_hw_channels + gcids[n];
+        if (do_lock)
+        {
+////fprintf(stderr, "\tlocker=%d ? %d\n", chn_p->locker, requester);
+            if (chn_p->locker != 0  &&  chn_p->locker != requester)
+            {
+                /*!!! Ping somehow? */
+                errno = EBUSY;
+                return -1;
+            }
+            if (chn_p->is_internal  &&
+                gcids[n] - cxsd_hw_devices[chn_p->devid].first - cxsd_hw_devices[chn_p->devid].count == CXSD_DB_CHAN_DEVSTATE_OFS)
+                for (m = 0;  m < cxsd_hw_devices[chn_p->devid].count;  m++)
+                {
+                    cur_locker = cxsd_hw_channels[cxsd_hw_devices[chn_p->devid].first + m].locker;
+                    if (cur_locker != 0  &&  cur_locker != requester)
+                    {
+                        /*!!! Ping somehow? */
+                        errno = EBUSY;
+                        return -1;
+                    }
+                }
+        }
+        else
+        {
+            if (chn_p->locker != requester)
+            {
+                errno = EPERM;
+                return -1;
+            }
+            if (chn_p->is_internal  &&
+                gcids[n] - cxsd_hw_devices[chn_p->devid].first - cxsd_hw_devices[chn_p->devid].count == CXSD_DB_CHAN_DEVSTATE_OFS)
+                for (m = 0;  m < cxsd_hw_devices[chn_p->devid].count;  m++)
+                {
+                    cur_locker = cxsd_hw_channels[cxsd_hw_devices[chn_p->devid].first + m].locker;
+                    if (cur_locker != 0  &&  cur_locker != requester)
+                    {
+                        errno = EPERM;
+                        return -1;
+                    }
+                }
+        }
+    }
+
+    /* Stage 2: do action */
+    for (n = 0;  n < count;  n++)
+    {
+        chn_p = cxsd_hw_channels + gcids[n];
+        chn_p->locker = do_lock? requester : 0;
+        if (chn_p->is_internal  &&
+            gcids[n] - cxsd_hw_devices[chn_p->devid].first - cxsd_hw_devices[chn_p->devid].count == CXSD_DB_CHAN_DEVSTATE_OFS)
+            for (m = 0;  m < cxsd_hw_devices[chn_p->devid].count;  m++)
+                cxsd_hw_channels[cxsd_hw_devices[chn_p->devid].first + m].locker = do_lock? requester : 0;
+    }
+
+    return 0;
 }
 
 static void ReqRofWrChsOf(int devid)
@@ -2618,7 +2731,11 @@ void ReturnDataSet    (int devid,
 #endif
 
         /* a. Identical */
-        if      (srpr == repr  &&  ssiz == size)
+        if      (ssiz == size  &&
+                 (srpr == repr  ||
+                  (srpr == CXDTYPE_REPR_INT   &&  repr == CXDTYPE_REPR_TEXT)  ||
+                  (srpr == CXDTYPE_REPR_TEXT  &&  repr == CXDTYPE_REPR_INT))
+                )
         {
             chn_p->current_nelems = nels;
             if (nels > 0)
@@ -3202,10 +3319,17 @@ void cxsd_hw_do_cleanup(int uniq)
 {
   cxsd_gchnid_t  gcid;
 
+    if (uniq == 0) return;
+
     for (gcid = 0;  gcid < cxsd_hw_numchans;  gcid++)
         ForeachChanCbSlot(chan_evproc_cleanuper,
                           lint2ptr(uniq),
                           cxsd_hw_channels + gcid);
+
+    /* This loop goes downwards to process _devstate channels ("lock the whole device") first */
+    for (gcid = cxsd_hw_numchans - 1;  gcid >= 0;  gcid--)
+        if (cxsd_hw_channels[gcid].locker == uniq)
+            CxsdHwLockChannels(uniq, 1, &gcid, CX_LOCK_ALLORNOTHING);
 
     ForeachCycleCBSlot(cycle_evproc_cleanuper, lint2ptr(uniq));
 }

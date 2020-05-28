@@ -1,0 +1,15 @@
+
+grouping main v5p2camera "VEPP5 beam camera at v5p2" grid "noshadow,notitle" \
+        ncols:2 content:4 {
+    pzframe cur "" img878 "" cur
+    pzframe evt "" img878 "" evt
+    pzframe nx1 "" img878 "" nx1
+    pzframe nx2 "" img878 "" nx2
+}
+
+sysname   v5p2camera
+defserver cxhw:26
+wintitle  main "VEPP5 beam camera at v5p2"
+winname   main v5p2camera
+winclass  main V5P2Camera
+winopts   main compact notoolbar

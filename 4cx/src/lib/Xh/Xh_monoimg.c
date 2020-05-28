@@ -239,6 +239,143 @@ static inline int square(int x){return x*x;}
 
 //- 1 ----------------------------------------------------------------
 
+static void PerformCopyMskd1(monoimg_info_t *mi)
+{
+  register uint8  *src;
+  register uint8  *dst;
+  register uint8   msk = mi->bitmask;
+  register int     ctr;
+  
+    for (ctr = mi->datacount,
+         src = mi->mes_data,
+         dst = mi->dsp_data;
+         ctr > 0;
+         ctr--)
+        *dst++ = (*src++) & msk;
+}
+
+static void PerformUndefect1(monoimg_info_t *mi)
+{
+#if 1
+    PerformCopyMskd1(mi);
+#else
+  register uint8  *src;
+  register uint8  *dst;
+  register int     ctr;
+  register int     B;
+  int              sigma2;
+  
+    for (ctr = PIX_W + 1,
+         src = mi->mes_data,
+         dst = mi->dsp_data;
+         ctr > 0;
+         ctr--)
+        *dst++ = (*src++) & mi->bitmask;
+    for (ctr = PIX_W + 1,
+         src = mi->mes_data + PIX_W*PIX_H - (PIX_W+1),
+         dst = mi->dsp_data + PIX_W*PIX_H - (PIX_W+1);
+         ctr > 0;
+         ctr--)
+        *dst++ = (*src++) & mi->bitmask;
+  
+    for (ctr = PIX_W*(PIX_H-2) - 2,
+         src = mi->mes_data + PIX_W + 1,
+         dst = mi->dsp_data + PIX_W + 1;
+         ctr > 0;
+         ctr--, src++, dst++)
+    {
+        B = (
+             (
+                        src[-PIX_W] +
+              src[-1] +               src[+1] +
+                        src[+PIX_W]
+             ) & 4095
+            ) / 4;
+        sigma2 = (
+                                      square(src[-PIX_W]-B) +
+                  square(src[-1]-B) +                         square(src[+1]-B) +
+                                      square(src[+PIX_W]-B)
+                 ) / 8;
+
+        *dst = (square(*src - B) > 9 * sigma2)? B : *src & mi->bitmask;
+    }
+#endif
+}
+
+static void PerformNormalize1(monoimg_info_t *mi)
+{
+  register uint8  *p;
+  register uint8   v;
+  register uint8  curmin, curmax;
+  register int     ctr;
+  uint8 *max_p __attribute__((unused));
+
+  uint8            minval;
+  uint8            maxval;
+
+  uint16          *table = mi->nrm_ramp;
+
+    for (p      = mi->dsp_data,
+         ctr    = mi->datacount,
+         curmin = mi->maxval,
+         curmax = 0;
+
+         ctr != 0;
+         ctr--)
+    {
+        v = *p++;
+        if (v > curmax) curmax = v, max_p = p-1;
+        if (v < curmin) curmin = v;
+    }
+    minval = curmin;
+    maxval = curmax;
+
+    ////fprintf(stderr, "[%d,%d], max=@%d,%d\n", minval, maxval, (max_p-(uint16*)(mi->dsp_data))%mi->data_w, (max_p-(uint16*)(mi->dsp_data))/mi->data_w);
+
+    // Prevent division by zero
+    if (minval == maxval)
+    {
+        if (maxval == 0) maxval = mi->maxval;
+        else             minval = 0;
+    }
+
+    for (ctr = 0;  ctr <= mi->maxval;  ctr++)
+        table[ctr] = mi->invval;
+
+    for (ctr = minval;  ctr <= maxval;  ctr++)
+        table[ctr] = RESCALE_VALUE(ctr, minval, maxval, 0, mi->maxval);
+
+    for (p = mi->dsp_data,  ctr = mi->datacount;
+         ctr != 0;
+         p++,               ctr--)
+        *p = table[*p];
+}
+
+static void BlitDspToImg1(monoimg_info_t *mi)
+{
+  register uint8  *src;
+  register uint32 *dst;
+  register uint8   msk  = mi->bitmask;
+  register int     ctr;
+  register uint32 *ramp = mi->ramp;
+  
+    for (ctr = mi->datacount,  src = mi->dsp_data,  dst = mi->img_data;
+         ctr != 0;
+         ctr--,                src++,               dst++)
+        *dst = ramp[*src & msk];
+}
+
+static uint32 GetValueAtXY1(monoimg_info_t *mi, int x, int y)
+{
+    if (x < 0  ||  x >= mi->show_w  ||
+        y < 0  ||  y >= mi->show_h)
+        return 0;
+
+    return
+        ((uint8  *)(mi->dsp_data))[(y + mi->sofs_y) * mi->data_w +
+                                   (x + mi->sofs_x)];
+}
+
 //- 2 ----------------------------------------------------------------
 
 static void PerformCopyMskd2(monoimg_info_t *mi)
@@ -674,6 +811,11 @@ XhMonoimg  XhCreateMonoimg(Widget parent,
 
     if      (nb == 1)
     {
+        mi->PerformCopyMskd  = PerformCopyMskd1;
+        mi->PerformUndefect  = PerformUndefect1;
+        mi->PerformNormalize = PerformNormalize1;
+        mi->BlitDspToImg     = BlitDspToImg1;
+        mi->GetValueAtXY     = GetValueAtXY1;
     }
     else if (nb == 2)
     {

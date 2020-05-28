@@ -2,7 +2,7 @@
 #define __ADC250_DRV_I_H
 
 
-// r1i3132620,r4i783155,r5i,w30i,r100i
+// r1h3132620,r4h783155,r5i,w30i,r100i
 enum
 {
     /* 0-9: data */
@@ -20,8 +20,8 @@ enum
     ADC250_CHAN_ISTART        = 12,
     ADC250_CHAN_WAITTIME      = 13, 
     ADC250_CHAN_CALIBRATE     = 14,
-    ADC250_CHAN_FGT_CLB       = 15,
-    ADC250_CHAN_VISIBLE_CLB   = 16,
+    // absent in ADC250: ADC250_CHAN_FGT_CLB       = 15,
+    // absent in ADC250: ADC250_CHAN_VISIBLE_CLB   = 16,
     ADC250_CHAN_CALC_STATS    = 17,
 
     ADC250_CHAN_PTSOFS        = 20,
@@ -38,18 +38,20 @@ enum
 // !!! Future "TRIG_MODE" (single/multi/recorder) and TRIG_MULTI_NUM?
 
     /* 40-139: status */
-    ADC250_CHAN_DEVICE_ID     = 40,  ADC250_CHAN_INFO_first = ADC250_CHAN_DEVICE_ID,
+    ADC250_CHAN_DEVICE_ID     = 40,  ADC250_CHAN_HWINFO_first = ADC250_CHAN_DEVICE_ID,
     ADC250_CHAN_BASE_SW_VER   = 41,
     ADC250_CHAN_PGA_SW_VER    = 42,
     ADC250_CHAN_BASE_HW_VER   = 43,
     ADC250_CHAN_PGA_HW_VER    = 44,
     ADC250_CHAN_PGA_VAR       = 45,
     ADC250_CHAN_BASE_UNIQ_ID  = 46,
-    ADC250_CHAN_PGA_UNIQ_ID   = 47,  ADC250_CHAN_INFO_last  = ADC250_CHAN_PGA_UNIQ_ID,
+    ADC250_CHAN_PGA_UNIQ_ID   = 47,  ADC250_CHAN_HWINFO_last  = ADC250_CHAN_PGA_UNIQ_ID,
+                                     ADC250_CHAN_HWINFO_count = ADC250_CHAN_HWINFO_last  -
+                                                                ADC250_CHAN_HWINFO_first + 1,
     // unused 48,49
 
     ADC250_CHAN_ELAPSED       = 50,
-    ADC250_CHAN_CLB_STATE     = 51,
+    // absent in ADC250: ADC250_CHAN_CLB_STATE     = 51,
     ADC250_CHAN_XS_PER_POINT  = 52,
     ADC250_CHAN_XS_DIVISOR    = 53,
     ADC250_CHAN_XS_FACTOR     = 54,

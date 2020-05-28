@@ -140,9 +140,9 @@ D int             cxsd_hw_numchans V(0);
 // Buffers
 D uint8          *cxsd_hw_buffers  V(NULL);
 D size_t          cxsd_hw_buf_size V(0);
-D cxsd_hw_lyr_t  *cxsd_hw_layers   V(0);
-D cxsd_hw_dev_t  *cxsd_hw_devices  V(0);
-D cxsd_hw_chan_t *cxsd_hw_channels V(0);
+D cxsd_hw_lyr_t  *cxsd_hw_layers   V(NULL);
+D cxsd_hw_dev_t  *cxsd_hw_devices  V(NULL);
+D cxsd_hw_chan_t *cxsd_hw_channels V(NULL);
 D uint8          *cxsd_hw_current_val_buf V(NULL);
 D uint8          *cxsd_hw_next_wr_val_buf V(NULL);
 
@@ -218,9 +218,9 @@ int            CxsdHwGetChanType(cxsd_gchnid_t  gcid,
                                  int           *is_rw_p,
                                  cxdtype_t     *dtype_p,
                                  int           *max_nelems_p);
-int            CxsdHwGetDevPlace(int            devid,
-                                 int           *first_p,
-                                 int           *count_p);
+int            CxsdHwGetChanAuxs(cxsd_gchnid_t  gcid,
+                                 char         **dbprops_p,
+                                 char         **drvinfo_p);
 
 /* Note: CxsdHwDoIO MAY modify contents of dtypes[], nelems[] and values[] */
 int  CxsdHwDoIO         (int  requester,

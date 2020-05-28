@@ -1,0 +1,90 @@
+     define(`forloop',
+            `pushdef(`$1', `$2')_forloop(`$1', `$2', `$3', `$4')popdef(`$1')')
+     define(`_forloop',
+            `$4`'ifelse($1, `$3', ,
+                   `define(`$1', incr($1))_forloop(`$1', `$2', `$3', `$4')')')
+
+#---------------------------------------------------------------------
+
+define(`DL250_NUMOUTPUTS', 24)
+
+# 1:line_id(1-16,f1-f8)
+define(`DL250_T_LINE', `
+    knob enable_$1      ""   onoff "color=green" r:enable_$1
+    knob autodisable_$1 ""   onoff "color=black" r:autodisable_$1
+    knob delay_$1       ""   text  ""            r:t_$1           dpyfmt:%12.3f # SSmmmuuu.nnn
+    disp ready_$1       ""   led   ""            r:ready_$1
+    knob start_type_$1  ""   selector            r:start_type_$1  items:"0 Prog\t1 Ext\t2 Sync\t3 TTL\t4 ttl+S\t5 prog\t6 prog\t7 prog"
+    knob start_input_$1 ""   selector            r:start_input_$1 items:"0\t1\t2\t3\t4\t5\t6\t7"
+    knob ailk_$1        "<-" led   "color=red"   r:ailk_$1
+    knob ilk_mask_$1    ""   onoff "color=blue"  r:ilk_mask_$1
+    knob ilk_ext_$1     ""   onoff "color=amber" r:ilk_ext_$1
+    knob ilk_dz0_$1     ""   onoff "color=amber" r:ilk_dz0_$1
+    knob ilk_dz1_$1     ""   onoff "color=amber" r:ilk_dz1_$1
+    knob ilk_dz2_$1     ""   onoff "color=amber" r:ilk_dz2_$1
+    knob ilk_dz3_$1     ""   onoff "color=amber" r:ilk_dz3_$1
+')
+
+grouping main DL250 "DL250" \
+        grid "nocoltitles,norowtitles" content:8 {
+
+    container "" "" grid "nodecor" \
+            2 content:2 {
+        knob tyk  ""       arrowrt "offcol=blue size=giant"  r:do_shot
+        container "" "" grid "nodecor" \
+                1 content:2 {
+            container "" "" grid "nodecor" \
+                    2 content:2 {
+                knob -auto "every"  onoff   "color=green" r:auto_shot
+                knob secs  ""       text    ""            r:auto_msec \
+                        units:"s" dpyfmt:"%4.1f"
+            }
+            container "" "" grid "nodecor" \
+                    2 content:2 {
+                disp - "  !  " led   "panel"       r:was_shot
+                disp - ""      text  ""            r:auto_left dpyfmt:"%6.0f" \
+                                                               tip:"Left before auto-shot"
+            }
+        }
+    }
+
+    noop - - hseparator layinfo:horz=fill
+
+    container "" "" grid "nodecor" ncols:4 content:4 {
+        knob clk_mode    "Clk" choicebs ""                  r:clk_mode items:"Int 50MHz\tCLK125"
+        disp clk_pllok   "PLL" led "color=green,offcol=red" r:clk_pllok
+        disp clk_intbad  "Int" led "color=red,offcol=green" r:clk_intbad
+        disp clk_extbad  "Ext" led "color=red,offcol=green" r:clk_extbad
+    }
+
+    noop - - hseparator layinfo:horz=fill
+
+    container "" "" grid "noshadow,notitle" \
+            coltitles:" \t1\bAutodisable\tT, us\t.\bReady\tStart src\tN\bStart input (TTL0-TTL7)\t!\bActive interlock\tX\bDisable interlocking\tE\bExt\t0\bDZ0\t1\bDZ1\t2\bDZ2\t3\bDZ3" \
+            rowtitles:"" \
+            ncols:13 content:eval(13*DL250_NUMOUTPUTS) {
+        forloop(`N', 1, 16, `DL250_T_LINE(N)')
+        forloop(`N', 1, 8,  `DL250_T_LINE(F`'N)')
+    }
+
+    noop - - hseparator layinfo:horz=fill
+
+    container presence "" grid nodecor ncols:3 content:3 {
+        disp capabilities "Capabilities" inttext "withlabel"  r:capabilities dpyfmt:"%#010.0a" tip:capabilities
+        disp front        "Front"        led     "offcol=red" r:front_present
+        disp rio          "RIO"          led     "offcol=red" r:rio_present
+    }
+    container "" "" grid "notitle,noshadow,nocoltitles" nflrs:2 content:6 {
+        disp device_id    "Dev ID"    inttext "" r:device_id    dpyfmt:"%#010.0a"
+        disp uniq_id      "Uniq ID"   inttext "" r:uniq_id      dpyfmt:"%#010.0a"
+        disp hw_version   "HW ver"    inttext "" r:hw_version   dpyfmt:"%#006.0a"
+        disp sw_version   "SW ver"    inttext "" r:sw_version   dpyfmt:"%#006.0a"
+        disp baseaddr     "Base addr" inttext "" r:baseaddr     dpyfmt:"%#010.0a"
+        disp addrspace    "Addr spc"  inttext "" r:addrspace    dpyfmt:"%#010.0a"
+    }
+}
+
+wintitle main "DL250"
+winname  main dl250
+winclass main DL250
+winopts  main ""

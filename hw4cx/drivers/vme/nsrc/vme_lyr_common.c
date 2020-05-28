@@ -67,6 +67,9 @@ typedef struct
     int               irq_n;
     int               irq_vect;
     vme_irq_proc      irq_proc;
+
+    vme_stat_proc     stat_proc;
+    int               options;
 } vmedevinfo_t;
 
 
@@ -191,7 +194,7 @@ static void vme_lyr_irq_cb(int bus_handle, void *privptr,
   vmedevinfo_t *dp;
   int           handle;
 
-    handle = busi[bus_idx].irqs[irq_n].vect2handle[irq_vect];
+    handle = busi[bus_idx].irqs[irq_n].vect2handle[irq_vect & 0xFF];
 ////fprintf(stderr, "\t%s %d,%d ->%d\n", __FUNCTION__, irq_n, irq_vect, handle);
     if (handle != VME_HANDLE_ABSENT)
     {
@@ -204,7 +207,8 @@ static int vme_add(int devid, void *devptr,
                    int    bus_major, int    bus_minor,
                    uint32 base_addr, uint32 space_size,
                    int    addr_size, int    am,
-                   int irq_n, int irq_vect, vme_irq_proc irq_proc)
+                   int irq_n, int irq_vect, vme_irq_proc irq_proc,
+                   vme_stat_proc stat_proc, int options)
 {
   int           idx;
   int           first_free_idx;
@@ -320,6 +324,8 @@ static int vme_add(int devid, void *devptr,
     dp->irq_n      = irq_n;
     dp->irq_vect   = irq_vect;
     dp->irq_proc   = irq_proc;
+    dp->stat_proc  = stat_proc;
+    dp->options    = options;
 
     if (irq_n > 0)
     {

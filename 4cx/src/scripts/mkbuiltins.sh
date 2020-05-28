@@ -33,6 +33,7 @@ DECLARES_LIST=""
 BUILTINS_LIST=""
 WAS_cxsd_frontend=""
 WAS_cxsd_dbldr=""
+WAS_cxsd_aclldr=""
 WAS_cxsd_drvlyr=""
 WAS_cxsd_extlib=""
 WAS_dat_plugin=""
@@ -57,6 +58,12 @@ do
             BUILTINS_LIST="$BUILTINS_LIST""    &(CXSD_DBLDR_MODREC_NAME   ($MOD_NAME).mr),"$'\n'
             OBJECTS_LIST="$OBJECTS_LIST"$' \\\n'"    cxsd_db_${MOD_NAME}_ldr.o"
             WAS_cxsd_dbldr=Y
+            ;;
+        'cxsd_aclldr')
+            DECLARES_LIST="$DECLARES_LIST""extern DECLARE_CXSD_ACLLDR   ($MOD_NAME);"$'\n'
+            BUILTINS_LIST="$BUILTINS_LIST""    &(CXSD_ACLLDR_MODREC_NAME  ($MOD_NAME).mr),"$'\n'
+            OBJECTS_LIST="$OBJECTS_LIST"$' \\\n'"    cxsd_access_${MOD_NAME}_ldr.o"
+            WAS_cxsd_aclldr=Y
             ;;
         'cxsd_driver')
             DECLARES_LIST="$DECLARES_LIST""extern DECLARE_CXSD_DRIVER   ($MOD_NAME);"$'\n'
@@ -110,6 +117,7 @@ echo "#include \"main_builtins.h\""
 echo ""
 [ -n "$WAS_cxsd_frontend" ]  &&  echo "#include \"cxsd_frontend.h\""
 [ -n "$WAS_cxsd_dbldr"    ]  &&  echo "#include \"cxsd_dbP.h\""
+[ -n "$WAS_cxsd_aclldr"   ]  &&  echo "#include \"cxsd_accessP.h\""
 [ -n "$WAS_cxsd_drvlyr"   ]  &&  echo "#include \"cxsd_driver.h\""
 [ -n "$WAS_cxsd_extlib"   ]  &&  echo "#include \"cxsd_extension.h\""
 [ -n "$WAS_dat_plugin"    ]  &&  echo "#include \"cdaP.h\""

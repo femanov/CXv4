@@ -399,13 +399,21 @@ static void SvdCtl(pzframe_gui_t *inherited_gui,
         FastadcGuiResetSvd(gui);
 }
 
+static int  SvdState(pzframe_gui_t *inherited_gui)
+{
+  fastadc_gui_t *gui = (fastadc_gui_t *)inherited_gui;
+
+    return gui->a.use_svd;
+}
+
 static pzframe_gui_vmt_t fastadc_gui_std_pzframe_vmt =
 {
-    .realize  = DoRealize,
-    .evproc   = NULL,
-    .newstate = UpdateBG,
-    .do_renew = DoRenew,
-    .svd_ctl  = SvdCtl,
+    .realize   = DoRealize,
+    .evproc    = NULL,
+    .newstate  = UpdateBG,
+    .do_renew  = DoRenew,
+    .svd_ctl   = SvdCtl,
+    .svd_state = SvdState,
 };
 void  FastadcGuiFillStdDscr(fastadc_gui_dscr_t *gkd, fastadc_type_dscr_t *atd)
 {
@@ -648,7 +656,7 @@ int   FastadcGuiCopy2Svd   (fastadc_gui_t *gui)
 {
     if (FastadcDataCopy2Svd(&(gui->a)) < 0) return -1;
     XhPlotSetNumSaved(gui->plot, 1);
-    XhPlotUpdate(gui->plot, 0);
+    XhPlotUpdate     (gui->plot, 0);
 
     return 0;
 }

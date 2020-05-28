@@ -1024,4 +1024,6 @@ CDA_DEFINE_DAT_PLUGIN(vcas, "VCAS data-access plugin",
                       cda_d_vcas_new_chan, cda_d_vcas_del_chan,
                       cda_d_vcas_set_type,
                       cda_d_vcas_snd_data, NULL,
-                      cda_d_vcas_new_srv,  cda_d_vcas_del_srv);
+                      cda_d_vcas_new_srv,  cda_d_vcas_del_srv,
+                      NULL, NULL,
+                      NULL, NULL);

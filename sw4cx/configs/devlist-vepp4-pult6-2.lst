@@ -6,6 +6,7 @@ include(`cac208.devtype')
 include(`cpks8.devtype')
 include(`ist_cdac20.devtype')
 include(`vepp4_gimn.devtype')
+include(`iset_walker.devtype')
 include(`devlist_magx_macros.m4')
 
 layerinfo	cangw_gimn25:0	0

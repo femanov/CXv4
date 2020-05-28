@@ -24,3 +24,5 @@ LOCAL_GNTDFILES+=	$(SYMLINKS)
 
 $(SYMLINKS):
 			$(SCRIPTSDIR)/ln-sf_safe.sh $< $@
+
+adc250_drv.so:		$(LIBPZFRAME_DRV)

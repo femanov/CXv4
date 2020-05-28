@@ -182,7 +182,8 @@ fprintf(stderr, "businfo[2]=%08x jumpers=0x%x irq=%d\n", businfo[2], jumpers, me
                                bus_major, bus_minor,
                                jumpers << 4, 4,
                                16, ADDRESS_MODIFIER,
-                               me->irq_n, me->irq_vect, irq_p);
+                               me->irq_n, me->irq_vect, irq_p,
+                               NULL, VME_LYR_OPTION_NONE);
     if (me->handle < 0) return me->handle;
 
     if (me->ch_beg   < 0) me->ch_beg   = KVRdByte(me, ADDR_CHBEG);

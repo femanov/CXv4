@@ -45,7 +45,7 @@ extern "C"
 
 /*==== Cx Asynchronous call Reasons ================================*/
 /* Note: when adding/changing codes, the
-   lib/cxlib/cxlib_utils.c::_cx_carlist[] must be updated coherently. */
+   lib/cxlib/cxlib_utils.c::_cx_cardescrs[] must be updated coherently. */
 enum {
          CAR_CONNECT = 0,     /* Connection succeeded */
          CAR_CONNFAIL,        /* Connection failed */
@@ -53,6 +53,7 @@ enum {
          CAR_CYCLE,           /* Server cycle notification had arrived */
          CAR_RSRVD4,
          CAR_MUSTER,          /* List of channels had probably changed; may re-try resolving */
+         CAR_EACCESS,         /* Access to server denied */
          
          CAR_NEWDATA = 100,   /* Data chunk had arrived */
          CAR_RSLV_RESULT,
@@ -61,6 +62,7 @@ enum {
          CAR_RDS,
          CAR_QUANT,
          CAR_RANGE,
+         CAR_LOCKSTAT,
 
          CAR_ECHO = 200,      /* Echo packet */
          CAR_KILLED,          /* Connection was killed by server */
@@ -153,6 +155,14 @@ typedef struct
 
 typedef struct
 {
+    int        hwid;
+    int        param1;
+    int        param2;
+    int        lockstat;
+} cx_lockstat_info_t;
+
+typedef struct
+{
     int        param1;
     int        param2;
     const char*name;
@@ -183,6 +193,8 @@ int  cx_setmon(int cd, int count, int *hwids, int *param1s, int *param2s,
                int on_update);
 int  cx_delmon(int cd, int count, int *hwids, int *param1s, int *param2s,
                int on_update);
+int  cx_rq_l_o(int cd, int             hwid,  int  param1,  int  param2,
+               int operation);
 int  cx_rd_cur(int cd, int count, int *hwids, int *param1s, int *param2s);
 int  cx_rq_rd (int cd, int count, int *hwids, int *param1s, int *param2s);
 int  cx_rq_wr (int cd, int count, int *hwids, int *param1s, int *param2s,

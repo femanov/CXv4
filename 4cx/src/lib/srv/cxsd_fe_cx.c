@@ -21,6 +21,7 @@
 #include "cxsd_hwP.h"
 #include "cxsd_frontend.h"
 #include "cxsd_logger.h"
+#include "cxsd_access.h"
 
 #include "cx_proto_v4.h"
 #include "endianconv.h"
@@ -119,6 +120,7 @@ typedef struct
     time_t           when;
     uint32           ip;
     struct sockaddr  addr;
+    CxsdAccessPerms  perms;
 
     int              endianness;
     char             progname[40];
@@ -564,6 +566,25 @@ static void ServeGuruRequest(int uniq, void *unsdptr,
     ////fprintf(stderr, "%s inpktsize=%d\n", __FUNCTION__, inpktsize);
 
     if (inpktsize < sizeof(*hdr)) return;
+
+    /* Perform access control */
+    if (1)
+    {
+      struct sockaddr     addr;
+      socklen_t           addrlen;
+      uint32              ip_val;
+      CxsdAccessPerms     perms;
+
+        addrlen = sizeof(addr);
+        if (fdio_last_src_addr(handle, &addr, &addrlen) < 0) return;
+
+        ip_val = ntohl(inet_addr(inet_ntoa(((struct sockaddr_in *)&addr)->sin_addr)));
+        perms  = CxsdAccessCheck(NULL, ip_val);
+
+        /* Is it allowed to connect? */
+        if ((perms & CXSD_ACCESS_PERM_CONNECT) == 0)
+            return;
+    }
 
     if      (l2h_u32(hdr->var1) == CXV4_VAR1_ENDIANNESS_SIG)
     {
@@ -1813,6 +1834,36 @@ static size_t PutRangeChunkReply(v4clnt_t *cp, size_t replydatasize,
     return rpycsize;
 }
 
+static size_t PutLkStChunkReply(v4clnt_t *cp, size_t replydatasize,
+                                int param1, int param2,
+                                cxsd_cpntid_t cpid, uint32 Seq,
+                                int info_int)
+{
+  size_t                 rpycsize;        // RePlY chunk size in bytes
+  CxV4LockOpChunk       *lkop;
+  cxsd_hw_chan_t        *chn_p;
+  cxsd_gchnid_t          gcid;
+
+    gcid = cpid2gcid(cpid);
+    if (gcid <= 0  ||  gcid >= cxsd_hw_numchans) return 0;
+    chn_p = cxsd_hw_channels + gcid;
+
+    rpycsize = CXV4_CHUNK_CEIL(sizeof(*lkop));
+    if (GrowReplyPacket(cp, replydatasize + rpycsize) != 0)
+        {/*!!!*/}
+
+    lkop = (void*)(cp->replybuf->data + replydatasize);
+    bzero(lkop, sizeof(*lkop));
+    lkop->ck.OpCode   = clnt_u32(cp, CXC_CVT_TO_RPY(CXC_LOCK_OP));
+    lkop->ck.ByteSize = clnt_u32(cp, rpycsize);
+    lkop->ck.param1   = param1;
+    lkop->ck.param2   = param2;
+    lkop->cpid        = clnt_i32(cp, cpid);
+    lkop->lockstat_result = clnt_u32(cp, chn_p->locker == cp->ID);
+
+    return rpycsize;
+}
+
 static void MonEvproc(int            uniq,
                       void          *privptr1,
                       cxsd_gchnid_t  gcid,
@@ -2006,8 +2057,12 @@ static void ServeIORequest(v4clnt_t *cp, CxV4Header *hdr, size_t inpktsize)
   int             nelems;
   void           *values;
 
+  int             operation;
+  int             do_lock;
+
   CxV4CpointPropsChunk  *prps;
   CxV4MonitorChunk      *monr;
+  CxV4LockOpChunk       *lkop;
 
     InitReplyPacket(cp, CXT4_DATA_IO, hdr->Seq);
     numrqs = host_u32(cp, hdr->NumChunks);
@@ -2097,7 +2152,12 @@ static void ServeIORequest(v4clnt_t *cp, CxV4Header *hdr, size_t inpktsize)
                     goto NEXT_CHUNK;
                 }
 
-                /*!!! At this point we can perform access control */
+                /* At this point we can perform access control */
+                if ((cp->perms & CXSD_ACCESS_PERM_WRITE) == 0)
+                {
+                    //PUT_ERROR_CHUNK_REPLY(CXT4_EPERM);
+                    goto NEXT_CHUNK;
+                }
 
                 /* Perform checks */
                 /*!!!dtype*/
@@ -2195,7 +2255,7 @@ static void ServeIORequest(v4clnt_t *cp, CxV4Header *hdr, size_t inpktsize)
 
             case CXC_SETMON:
                 monr = (void*)req;
-                cpid = monr->cpid;
+                cpid = host_i32(cp, monr->cpid);
                 ////fprintf(stderr, "SETMON %d\n", monr->cpid);
                 if (SetMonitor(cp, monr, hdr->Seq) == 0)
                 {
@@ -2241,6 +2301,42 @@ static void ServeIORequest(v4clnt_t *cp, CxV4Header *hdr, size_t inpktsize)
             case CXC_DELMON:
                 monr = (void*)req;
                 DelMonitor(cp, monr, hdr->Seq); /*!!! USE RETURN CODE!!!*/
+                break;
+
+            case CXC_LOCK_OP:
+                lkop = (void*)req;
+                cpid      = host_i32(cp, lkop->cpid);
+                gcid      = cpid2gcid(cpid);
+                operation = host_i32(cp, lkop->operation);
+                do_lock   = (operation & CX_LOCK_WR) != 0;
+
+                /* Forbid locking by readonly clients */
+                if ((cp->perms & CXSD_ACCESS_PERM_LOCK) == 0)
+                {
+                    //PUT_ERROR_CHUNK_REPLY(CXT4_EPERM);
+                    goto NEXT_CHUNK;
+                }
+
+                // Perform locking attempt
+                CxsdHwLockChannels(cp->ID,
+                                   1, &gcid,
+                                   operation);
+                // ...and try to record the state in a monitor
+                /* Unfortunately, NO.  We can't reliably find
+                   appropriate monitor, because we don't know
+                   the "cond" value and can't guess it */
+                rpycsize = PutLkStChunkReply(cp, replydatasize,
+                                             req->param1, req->param2,
+                                             gcid,
+                                             hdr->Seq,
+                                             0);
+                if (rpycsize == 0)
+                    PUT_ERROR_CHUNK_REPLY(0);
+                else
+                {
+                    replydatasize += rpycsize;
+                    rpycn++;
+                }
                 break;
 
             default:
@@ -2421,9 +2517,9 @@ static void HandleClientConnect(v4clnt_t *cp, CxV4Header *hdr, size_t inpktsize)
                 from = inet_ntoa(((struct sockaddr_in *)&(cp->addr))->sin_addr);
             }
 
-            logline(LOGF_ACCESS, LOGL_NOTICE, "%s [%d]:fd=%d:h=%d %s@%s:%s (uid=%d, pid,ppid=%d,%d)",
+            logline(LOGF_ACCESS, LOGL_NOTICE, "%s [%d:%d]:fd=%d:h=%d %s@%s:%s (uid=%d, pid,ppid=%d,%d)",
                     "connect",
-                    cp2cd(cp), cp->fd, cp->fhandle,
+                    cp2cd(cp), cp->ID, cp->fd, cp->fhandle,
                     cp->username[0] != '\0'? cp->username : "UNKNOWN",
                     0                      ? ""           : from,
                     cp->progname[0] != '\0'? cp->progname : "UNKNOWN",
@@ -2513,6 +2609,8 @@ static void AcceptCXv4Connection(int uniq, void *unsdptr,
   int                 cd;
   v4clnt_t           *cp;
   fdio_handle_t       fhandle;
+  uint32              ip_val;
+  CxsdAccessPerms     perms;
   
     if (reason != FDIO_R_ACCEPT)
     {
@@ -2545,9 +2643,15 @@ static void AcceptCXv4Connection(int uniq, void *unsdptr,
         return;
     }
 
+    ip_val = handle == unix_serv_handle ?  0
+                                        :  ntohl(inet_addr(inet_ntoa(((struct sockaddr_in *)&addr)->sin_addr)));
+    perms  = CxsdAccessCheck(NULL, ip_val);
+
     /* Is it allowed to log in? */
-    if (0)
+    if ((perms & CXSD_ACCESS_PERM_CONNECT) == 0)
     {
+        logline(LOGF_ACCESS, LOGL_NOTICE, "refused connection from %d.%d.%d.%d",
+                (ip_val >> 24) & 0xFF, (ip_val >> 16) & 0xFF, (ip_val >> 8) & 0xFF, ip_val & 0xFF);
         RefuseConnection(s, CXT4_ACCESS_DENIED);
         close(s);
         return;
@@ -2567,9 +2671,9 @@ static void AcceptCXv4Connection(int uniq, void *unsdptr,
     cp->fd    = s;
     cp->ID    = CxsdHwCreateClientID();
     cp->when  = time(NULL);
-    cp->ip    = handle == unix_serv_handle ?  0
-                                           :  ntohl(inet_addr(inet_ntoa(((struct sockaddr_in *)&addr)->sin_addr)));
+    cp->ip    = ip_val;
     cp->addr  = addr;
+    cp->perms = perms;
 ////fprintf(stderr, "%s() s=%d ID=%08x\n", __FUNCTION__, s, cp->ID);
 
     cp->replybufsize = sizeof(CxV4Header);

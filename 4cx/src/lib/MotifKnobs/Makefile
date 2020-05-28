@@ -10,6 +10,7 @@ libMotifKnobs.a_COMPONENTS=	MotifKnobs_internals.o \
 				MotifKnobs_histplot.o \
 				MotifKnobs_knobset.o \
 				MotifKnobs_text_knob.o \
+				MotifKnobs_inttext_knob.o \
 				MotifKnobs_selector_knob.o \
 				MotifKnobs_choicebs_knob.o \
 				MotifKnobs_alarmonoffled_knob.o \

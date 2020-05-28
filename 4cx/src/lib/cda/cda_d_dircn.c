@@ -605,4 +605,6 @@ CDA_DEFINE_DAT_PLUGIN(dircn, "Dircn data-access plugin",
                       cda_d_dircn_new_chan, cda_d_dircn_del_chan,
                       NULL,
                       cda_d_dircn_snd_data, NULL,
-                      cda_d_dircn_new_srv,  cda_d_dircn_del_srv);
+                      cda_d_dircn_new_srv,  cda_d_dircn_del_srv,
+                      NULL, NULL,
+                      NULL, NULL);

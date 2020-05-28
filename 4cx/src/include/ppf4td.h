@@ -66,6 +66,9 @@ enum
     PPF4TD_E2LONG = -4,
     PPF4TD_EQUOTE = -5,
     PPF4TD_EXDIG  = -6,
+    PPF4TD_EFLOAT = -7,
+    PPF4TD_EEXPR  = -8,
+    PPF4TD_ECMPLX = -9,
 };
 
 
@@ -85,6 +88,8 @@ enum
     PPF4TD_FLAG_COMTERM   = 1 << 13, // COMma
     PPF4TD_FLAG_SEMTERM   = 1 << 14, // SEMicolon
     PPF4TD_FLAG_BRCTERM   = 1 << 15, // '}'-BRaCe, ']'-BRacKet, ')'-PaReN
+
+    PPF4TD_FLAG_internal1 = 1 << 30, // Internal use only
 
     PPF4TD_FLAG_JUST_SKIP = 1 << 31, // get_string()
 };

@@ -10,13 +10,14 @@
 static void InterceptSignals(void *SIGFATAL_handler,
                              void *SIGCHLD_handler,
                              void *SIGHUP_handler,
+                             void *SIGUSR1_handler,
                              void *exitproc0 __attribute__((unused)),
                              void *exitproc2 __attribute__((unused)))
 {
   static int interesting_signals[] =
   {
       SIGINT,  SIGQUIT,   SIGILL,  SIGABRT, SIGIOT,  SIGBUS,
-      SIGFPE,  SIGUSR1,   SIGSEGV, SIGUSR2, SIGALRM, SIGTERM,
+      SIGFPE,  SIGSEGV,   SIGUSR2, SIGALRM, SIGTERM,
 #ifdef SIGSTKFLT
       SIGSTKFLT,
 #endif
@@ -31,6 +32,7 @@ static void InterceptSignals(void *SIGFATAL_handler,
         set_signal(interesting_signals[x], SIGFATAL_handler);
     
     set_signal(SIGHUP,  SIGHUP_handler?  SIGHUP_handler  : SIGFATAL_handler);
+    set_signal(SIGUSR1, SIGUSR1_handler? SIGUSR1_handler : SIGFATAL_handler);
     set_signal(SIGCHLD, SIGCHLD_handler? SIGCHLD_handler : SIG_IGN);
     
     set_signal(SIGPIPE, SIG_IGN);
@@ -63,6 +65,13 @@ static void onhup(int sig)
     logline(LOGF_SYSTEM, 0, "signal %d (\"%s\") arrived, re-opening logs", sig, strsignal(sig));
 }
 
+static void ReadACL     (const char *argv0, int is_running);
+static void onusr1(int sig)
+{
+    logline(LOGF_SYSTEM, 0, "signal %d (\"%s\") arrived, re-reading access-rules config", sig, strsignal(sig));
+    ReadACL(NULL, 1);
+}
+
 static void exitproc2(int code, void *arg __attribute__((unused)))
 {
     if (pid_file_created) unlink(pid_file);
@@ -82,7 +91,7 @@ static void exitproc0(void)
 static void PrepareClean(void)
 {
     if (!option_donttrapsignals)
-        InterceptSignals(onsig, NULL, onhup, exitproc0, exitproc2);
+        InterceptSignals(onsig, NULL, onhup, onusr1, exitproc0, exitproc2);
 }
 
 /* ---- End of cleanup stuff -------------------------------------- */
@@ -171,8 +180,8 @@ static void CreatePidFile(const char *argv0)
 
 enum {ACCESS_HBT_SECS = 600};
 
-static void PerformAccess(int uniq, void *unsdptr,
-                          sl_tid_t tid, void *privptr)
+static void PerformAccessToFiles(int uniq, void *unsdptr,
+                                 sl_tid_t tid, void *privptr)
 {
   int             pid_fd;
   char            pid_buf[1];
@@ -188,7 +197,7 @@ static void PerformAccess(int uniq, void *unsdptr,
     ll_access();
 
     sl_enq_tout_after(0, NULL, /*!!!uniq*/
-                      ACCESS_HBT_SECS * 1000000, PerformAccess, NULL);
+                      ACCESS_HBT_SECS * 1000000, PerformAccessToFiles, NULL);
 }
 
 //////////////////////////////////////////////////////////////////////
@@ -209,6 +218,26 @@ static void ReadHWConfig(const char *argv0)
         normal_exit = 1;
         exit(1);
     }
+}
+
+static void ReadACL     (const char *argv0, int is_running)
+{
+  CxsdAccessList  acl;
+
+    acl = CxsdAccessLoadList(argv0, "file", config_cxhosts_file);
+    if (acl == NULL)
+    {
+        if (is_running)
+            logline(LOGF_SYSTEM, 0, "failed to read \"%s\", so leaving the old access list",
+                    config_cxhosts_file);
+        else
+            fprintf(stderr, "%s %s: WARNING: failed to read \"%s\", so access control will be disabled\n",
+                    strcurtime(), argv0,
+                    config_cxhosts_file);
+                                                        
+        return;
+    }
+    CxsdAccessSetDefACL(acl);
 }
 
 static void on_timeback(void)
@@ -252,12 +281,13 @@ int main(int argc, char *argv[])
     if (cxsd_log_init(cxsd_N, option_verbosity, option_dontdaemonize) < 0)
         {normal_exit = 1; exit(1);}
     ReadHWConfig (argv[0]);
+    ReadACL      (argv[0], 0);
 
     if (option_norun) {normal_exit = 1; exit(0);}
     if (CxsdActivateFrontends(option_instance) != 0) {normal_exit = 1; exit(1);}
     if (!option_dontdaemonize) Daemonize();
     CreatePidFile(argv[0]);
-    PerformAccess(0, NULL, -1, NULL);
+    PerformAccessToFiles(0, NULL, -1, NULL);
     ActivateHW   (argv[0]);
 
     logline(LOGF_ACCESS  , 0, "ACCESS  ");

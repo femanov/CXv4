@@ -26,34 +26,36 @@ extern "C"
 struct _pzframe_gui_t_struct;
 //--------------------------------------------------------------------
 
-typedef Widget (*pzframe_gui_mkstdctl_t) (struct _pzframe_gui_t_struct *gui,
-                                          Widget parent,
-                                          int kind, int a, int b);
+typedef Widget (*pzframe_gui_mkstdctl_t)  (struct _pzframe_gui_t_struct *gui,
+                                           Widget parent,
+                                           int kind, int a, int b);
 
-typedef Widget (*pzframe_gui_mkparknob_t)(struct _pzframe_gui_t_struct *gui,
-                                          Widget parent, const char *spec, int cn);
+typedef Widget (*pzframe_gui_mkparknob_t) (struct _pzframe_gui_t_struct *gui,
+                                           Widget parent, const char *spec, int cn);
 
-typedef int    (*pzframe_gui_realize_t)  (struct _pzframe_gui_t_struct *gui,
-                                          Widget parent,
-                                          cda_context_t   present_cid,
-                                          const char     *base);
-typedef void   (*pzframe_gui_evproc_t)   (struct _pzframe_gui_t_struct *gui,
-                                          int   reason,
-                                          int   info_int,
-                                          void *privptr);
-typedef void   (*pzframe_gui_newstate_t) (struct _pzframe_gui_t_struct *gui);
-typedef void   (*pzframe_gui_do_renew_t) (struct _pzframe_gui_t_struct *gui,
-                                          int   info_changed);
-typedef void   (*pzframe_gui_svd_ctl_t)  (struct _pzframe_gui_t_struct *gui,
-                                          int   on_off);
+typedef int    (*pzframe_gui_realize_t)   (struct _pzframe_gui_t_struct *gui,
+                                           Widget parent,
+                                           cda_context_t   present_cid,
+                                           const char     *base);
+typedef void   (*pzframe_gui_evproc_t)    (struct _pzframe_gui_t_struct *gui,
+                                           int   reason,
+                                           int   info_int,
+                                           void *privptr);
+typedef void   (*pzframe_gui_newstate_t)  (struct _pzframe_gui_t_struct *gui);
+typedef void   (*pzframe_gui_do_renew_t)  (struct _pzframe_gui_t_struct *gui,
+                                           int   info_changed);
+typedef void   (*pzframe_gui_svd_ctl_t)   (struct _pzframe_gui_t_struct *gui,
+                                           int   on_off);
+typedef int    (*pzframe_gui_svd_state_t) (struct _pzframe_gui_t_struct *gui);
 
 typedef struct
 {
-    pzframe_gui_realize_t   realize;
-    pzframe_gui_evproc_t    evproc;
-    pzframe_gui_newstate_t  newstate;
-    pzframe_gui_do_renew_t  do_renew;
-    pzframe_gui_svd_ctl_t   svd_ctl;
+    pzframe_gui_realize_t    realize;
+    pzframe_gui_evproc_t     evproc;
+    pzframe_gui_newstate_t   newstate;
+    pzframe_gui_do_renew_t   do_renew;
+    pzframe_gui_svd_ctl_t    svd_ctl;
+    pzframe_gui_svd_state_t  svd_state;
 } pzframe_gui_vmt_t;
 
 /********************************************************************/
@@ -84,7 +86,8 @@ typedef struct
 {
     int     foldctls;
     int     nocontrols;
-    int     noleds;
+    int     embed_leds;
+    int     embed_tbar;
     int     savebtn;
     char   *subsysname;
 } pzframe_gui_look_t;
@@ -115,11 +118,17 @@ typedef struct _pzframe_gui_t_struct
     Widget                  save_button;
     Widget                  loop_button;
     Widget                  once_button;
+    Widget                  setg_button;
+    Widget                  rstg_button;
     Widget                  roller;
     Widget                  fps_show;
     Widget                  time_show;
     int                     roller_ctr;
     fps_ctr_t               fps_ctr;
+
+    knobstate_t             roller_curstate;
+    Pixel                   roller_deffg;
+    Pixel                   roller_defbg;
 
     // Callbacks
     pzframe_gui_cbinfo_t   *cb_list;

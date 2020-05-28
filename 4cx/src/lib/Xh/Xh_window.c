@@ -240,6 +240,7 @@ void        XhDeleteWindow(XhWindow window)
     /* remove the window from the global window list */
     removeFromWindowList(window);
 
+    if (window->tbarButtons != NULL) XtFree((char *)(window->tbarButtons));
     /* deallocate the window data structure */
     XtFree((char *)window);
 }

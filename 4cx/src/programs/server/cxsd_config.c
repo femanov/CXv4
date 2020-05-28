@@ -330,24 +330,10 @@ static int libs_path_parser(const char *argv0, ppf4td_ctx_t *ctx)
 static int cxhosts_file_parser(const char *argv0, ppf4td_ctx_t *ctx)
 {
   int   r;
-  FILE *fp;
 
     r =    ParseAPath(argv0, ctx,
                       "cxhosts-file", config_cxhosts_file, sizeof(config_cxhosts_file));
     if (r < 0) return r;
-
-    fp = fopen(config_cxhosts_file, "r");
-    if (fp == NULL)
-    {
-        fprintf(stderr, "%s %s: %s:%d: WARNING: fopen(\"%s\"): %s",
-                strcurtime(), argv0,
-                ppf4td_cur_ref(ctx), ppf4td_cur_line(ctx),
-                config_cxhosts_file, strerror(errno));
-        fprintf(stderr, "\n");
-    }
-    else
-        fclose(fp);
-
     return 0;
 }
 

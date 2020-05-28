@@ -40,7 +40,7 @@ static pzframe_chan_dscr_t pxi6363_chan_dscrs[] =
     [PXI6363_CHAN_ALL_RANGEMIN] = {"all_rangemin", 0, 0, CXDTYPE_DOUBLE},
     [PXI6363_CHAN_ALL_RANGEMAX] = {"all_rangemax", 0, 0, CXDTYPE_DOUBLE},
 
-    [PXI6363_NUMCHANS] = {"_devstate"},
+    [PXI6363_NUMCHANS] = {"_devstate", 0, PZFRAME_CHAN__DEVSTATE_MASK},
 };
 
 #define LINE_DSCR(n)                                     \

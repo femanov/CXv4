@@ -1,0 +1,8 @@
+# cxhw:26 -- bt878-images server
+
+include(`img878.devtype')
+
+dev cur img878/noop ~ -
+dev evt img878/noop ~ -
+dev nx1 img878/noop ~ -
+dev nx2 img878/noop ~ -

@@ -16,6 +16,7 @@
 #include "vme_hal.h"
 
 #include "libvmedirect.h"
+#include "libvmedirect_vect_io.h"
 
 
 enum
@@ -146,6 +147,69 @@ static int  vme_hal_close_irq(int bus_handle __attribute__((unused)),
 }
 
 
+#if 1
+#define VME_HAL_DEFINE_IO(AS, name, TS)                          \
+VME_HAL_STORAGE_CLASS int vme_hal_a##AS##wr##TS   (int bus_handle __attribute__((unused)), \
+                                                   int am,       \
+                                                   uint32 addr, uint##TS  value)  \
+{                                                                \
+    if (am != bivme2_hal_last_used_am)                           \
+    {                                                            \
+        bivme2_hal_param_var = am;                               \
+        libvme_ctl(VME_AM_W, &bivme2_hal_param_var);             \
+        bivme2_hal_last_used_am = am;                            \
+    }                                                            \
+                                                                 \
+    return libvme_write_a##AS##_##name(addr, value);             \
+}                                                                \
+                                                                 \
+VME_HAL_STORAGE_CLASS int vme_hal_a##AS##rd##TS   (int bus_handle __attribute__((unused)), \
+                                                   int am,       \
+                                                   uint32 addr, uint##TS *val_p)  \
+{                                                                \
+  uint##TS  w;                                                   \
+  int       r;                                                   \
+                                                                 \
+    if (am != bivme2_hal_last_used_am)                           \
+    {                                                            \
+        bivme2_hal_param_var = am;                               \
+        libvme_ctl(VME_AM_W, &bivme2_hal_param_var);             \
+        bivme2_hal_last_used_am = am;                            \
+    }                                                            \
+                                                                 \
+    r = libvme_read_a##AS##_##name(addr, &w);                    \
+    *val_p = w;                                                  \
+    return r;                                                    \
+}                                                                \
+                                                                 \
+VME_HAL_STORAGE_CLASS int vme_hal_a##AS##wr##TS##v(int bus_handle __attribute__((unused)), \
+                                                   int am,       \
+                                                   uint32 addr, uint##TS *data, int count) \
+{                                                                \
+    if (am != bivme2_hal_last_used_am)                           \
+    {                                                            \
+        bivme2_hal_param_var = am;                               \
+        libvme_ctl(VME_AM_W, &bivme2_hal_param_var);             \
+        bivme2_hal_last_used_am = am;                            \
+    }                                                            \
+                                                                 \
+    return libvme_write_a##AS##_##name##_vect(addr, data, count);\
+}                                                                \
+                                                                 \
+VME_HAL_STORAGE_CLASS int vme_hal_a##AS##rd##TS##v(int bus_handle __attribute__((unused)), \
+                                                   int am,       \
+                                                   uint32 addr, uint##TS *data, int count) \
+{                                                                \
+    if (am != bivme2_hal_last_used_am)                           \
+    {                                                            \
+        bivme2_hal_param_var = am;                               \
+        libvme_ctl(VME_AM_W, &bivme2_hal_param_var);             \
+        bivme2_hal_last_used_am = am;                            \
+    }                                                            \
+                                                                 \
+    return libvme_read_a##AS##_##name##_vect(addr, data, count); \
+}
+#else
 #define VME_HAL_DEFINE_IO(AS, name, TS)                          \
 VME_HAL_STORAGE_CLASS int vme_hal_a##AS##wr##TS   (int bus_handle __attribute__((unused)), \
                                                    int am,       \
@@ -196,7 +260,7 @@ VME_HAL_STORAGE_CLASS int vme_hal_a##AS##wr##TS##v(int bus_handle __attribute__(
                                                                  \
     for (ctr = count, r = 0;                                     \
          ctr > 0  &&  r == 0;                                    \
-         ctr--, addr += sizeof(uint##TS), data += sizeof(uint##TS)) \
+         ctr--, addr += sizeof(uint##TS), data++)                \
         r = libvme_write_a##AS##_##name(addr, *data);            \
     return r;                                                    \
 }                                                                \
@@ -217,10 +281,11 @@ VME_HAL_STORAGE_CLASS int vme_hal_a##AS##rd##TS##v(int bus_handle __attribute__(
                                                                  \
     for (ctr = count, r = 0;                                     \
          ctr > 0  &&  r == 0;                                    \
-         ctr--, addr += sizeof(uint##TS), data += sizeof(uint##TS)) \
+         ctr--, addr += sizeof(uint##TS), data++)                \
         r = libvme_read_a##AS##_##name (addr,  data);            \
     return r;                                                    \
 }
+#endif
 
 VME_HAL_DEFINE_IO(16, byte,  8)
 VME_HAL_DEFINE_IO(16, word,  16)

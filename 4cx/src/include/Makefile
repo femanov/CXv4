@@ -27,6 +27,7 @@ EXPORTSFILES=	misc_types.h misclib.h misc_sepchars.h misc_macros.h fps_counter.h
 		cxsd_db.h cxsd_dbP.h cxsd_hw.h cxsd_hwP.h \
 		cxsd_extension.h cxsd_frontend.h \
 		cxsd_logger.h cxsd_modmgr.h \
+		cxsd_access.h cxsd_accessP.h \
 		\
 		cx.h cxlib.h \
 		remdrv_proto_v4.h remsrv.h remdrvlet.h remcxsd.h remcxsdP.h \

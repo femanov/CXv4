@@ -83,7 +83,7 @@ static pzframe_chan_dscr_t adc4_chan_dscrs[] =
     // LINE[0-3]TOTAL{MIN,MAX} and NUM_LINES are omitted
 
 //    [] = {""},
-    [ADC4_NUMCHANS] = {"_devstate"},
+    [ADC4_NUMCHANS] = {"_devstate", 0, PZFRAME_CHAN__DEVSTATE_MASK},
 };
 
 #define LINE_DSCR(N,x)                                   \

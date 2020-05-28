@@ -79,6 +79,7 @@ static int            print_name       = 0;
 static int            print_parens     = 1;
 static int            print_quotes     = 1;
 static int            print_quants     = 0;
+static int            print_lockstats  = 0;
 static int            print_ranges     = 0;
 static int            print_timestamp  = 0;
 static int            print_rflags     = 0;
@@ -483,6 +484,15 @@ if (0)
             fprintf(outfile, "# %s range(%s)=UNSPECIFIED\n",
                     print_time?strcurtime():"", src_p);
     }
+    else if (reason == CDA_REF_R_LOCKSTAT)
+    {
+        if      (option_relative)                        src_p = rp->ur.spec;
+        else if (cda_src_of_ref(rp->ur.ref, &src_p) < 0) src_p = "UNKNOWN";
+
+        fprintf(outfile, "# %s lockstat(%s)=%d\n",
+                print_time?strcurtime():"", src_p, ptr2lint(info_ptr));
+
+    }
 
     if (num2read == 0  &&  num2write == 0) sl_break();
 }
@@ -591,6 +601,7 @@ static int  ActivateChannel(refrec_t *rp, void *privptr)
                            (CDA_REF_EVMASK_STRSCHG  * print_strings)    |
                            (CDA_REF_EVMASK_FRESHCHG * print_fresh_ages) |
                            (CDA_REF_EVMASK_QUANTCHG * print_quants)     |
+                           (CDA_REF_EVMASK_LOCKSTAT * print_lockstats)  |
                            (CDA_REF_EVMASK_RANGECHG * print_ranges),
                            ProcessDatarefEvent, lint2ptr(rn));
 
@@ -709,6 +720,19 @@ int main(int argc, char *argv[])
                     {
                         case '+': val2set = 1;                break;
                         case '-': val2set = 0;                break;
+                        case 'a': print_curval     =
+                                  print_time       =
+                                  print_rds        =
+                                  print_dtype      =
+                                  print_nelems     =
+                                  print_name       =
+                                  print_timestamp  =
+                                  print_rflags     =
+                                  print_fresh_ages =
+                                  print_hwinfos    =
+                                  print_quants     =
+                                  print_ranges     =
+                                  print_lockstats  = 1;       break;
                         case 'c': print_curval     = val2set; break;
                         case 'C': print_cur_as_new = val2set; break;
                         case 'T': print_time       = val2set; break;
@@ -728,6 +752,7 @@ int main(int argc, char *argv[])
                         case 'H': print_hwinfos++;            break;
                         case 'Q': print_quants     = val2set; break;
                         case 'M': print_ranges     = val2set; break;
+                        case 'L': print_lockstats  = val2set; break;
                         case 'w': print_writes     = val2set; break;
                         case '/': print_unserved   = val2set; break;
                         default:
@@ -795,6 +820,7 @@ int main(int argc, char *argv[])
         if (option_help > 1)
         printf("\n"
                "DISPMODE flags consist of one or more characters:\n"
+               " a  All per-channel diagnostics (same as -DcTRdNntfFQMLSH)\n"
                " c  print Current values (prefixed with '# CURVAL:')\n"
                " C  print Current values as new (useful for a single chan w/o '-m')\n"
                " T  prefix all events with current Times\n"
@@ -812,6 +838,7 @@ int main(int argc, char *argv[])
                " F  print Fresh ages\n"
                " Q  print Quants\n"
                " M  print ranges (Min/Max)\n"
+               " L  print Lock-state changes\n"
                " S  print Strings (label, comment, units, ...)\n"
                " H  print Hwinfos (-DHH - including hwid and hwr)\n"
                " w  print when performing writes (sending data)\n"
@@ -822,6 +849,7 @@ int main(int argc, char *argv[])
                " @-:              turn on CDA_DATAREF_OPT_PRIVATE flag\n"
                " @.:              turn on CDA_DATAREF_OPT_NO_RD_CONV flag\n"
                " @/:              turn on CDA_DATAREF_OPT_SHY flag\n"
+               " @#:              turn on CDA_DATAREF_OPT_PRIV_SRV flag (quote '#' in shell!)\n"
                " @+:              following integer dtype is unsigned (add CXDTYPE_USGN_MASK)\n"
                " @T[MAX_NELEMS]:  dtype and optional maximum nelems; T is one of:\n"
                "                   b  INT8  (Byte)\n"

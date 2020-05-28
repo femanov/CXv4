@@ -55,6 +55,7 @@ typedef struct
     int            rslv_type;
     int            rslv_state;
     int            on_update;
+    int            rq_lock;
 
     cda_hwcnref_t  next;    // Link to next hwr of sid
     cda_hwcnref_t  prev;    // Link to previous hwr of sid
@@ -157,6 +158,23 @@ static void DestroyCxPrivrec(cda_d_cx_privrec_t *me)
 
     if (me->cd >= 0) cx_close(me->cd); me->cd      = -1;
     sl_deq_tout(me->rcn_tid);          me->rcn_tid = -1;
+}
+
+//--------------------------------------------------------------------
+
+static inline cda_d_cx_privrec_t * get_DATA_IO_server (cda_dataref_t  source_ref,
+                                                       const char    *srvrspec)
+{
+    return cda_dat_p_get_server(source_ref, &CDA_DAT_P_MODREC_NAME(cx),
+                                srvrspec,
+                                SRVTYPE_DATA_IO | CDA_DAT_P_GET_SERVER_OPT_NONE);
+}
+
+static inline cda_d_cx_privrec_t * get_RESOLVER_server(cda_dataref_t  source_ref)
+{
+    return cda_dat_p_get_server(source_ref, &CDA_DAT_P_MODREC_NAME(cx),
+                                "RESOLVER",
+                                SRVTYPE_RESOLVER | CDA_DAT_P_GET_SERVER_OPT_NOLIST);
 }
 
 //////////////////////////////////////////////////////////////////////
@@ -276,13 +294,12 @@ static int  cda_d_cx_new_chan(cda_dataref_t ref, const char *name,
     memcpy(hi->name, channame, channamelen); hi->name[channamelen] = '\0';
     hi->on_update = ((tolower(*params) == 'u')  ||
                      (options & CDA_DATAREF_OPT_ON_UPDATE) != 0);
+    hi->rq_lock   =  (options & CDA_DATAREF_OPT_EXCLUSIVE) != 0;
     cda_dat_p_set_hwr(ref, hwr);
 
     if (w_srv)
     {
-        me = cda_dat_p_get_server(ref, &CDA_DAT_P_MODREC_NAME(cx),
-                                  srvrspec,
-                                  SRVTYPE_DATA_IO | CDA_DAT_P_GET_SERVER_OPT_NONE);
+        me = get_DATA_IO_server(ref, srvrspec);
         if (me == NULL)
         {
             RlsHwrSlot(hwr);
@@ -309,6 +326,8 @@ static int  cda_d_cx_new_chan(cda_dataref_t ref, const char *name,
                 hi->rslv_state = RSLV_STATE_DONE;
                 cx_rd_cur(me->cd, 1, &(hi->hwid), &hwr, NULL);
                 cx_setmon(me->cd, 1, &(hi->hwid), &hwr, NULL, hi->on_update);
+                if (hi->rq_lock)
+                    cx_rq_l_o(me->cd,  hi->hwid,   hwr, 0, CX_LOCK_WR | CX_LOCK_ALLORNOTHING);
                 /*!!! Obtain parameters */
                 cda_dat_p_set_ready(hi->dataref, 1);
             }
@@ -318,9 +337,7 @@ static int  cda_d_cx_new_chan(cda_dataref_t ref, const char *name,
     else
     {
         ////fprintf(stderr, "<%s>\n", hi->name);
-        me = cda_dat_p_get_server(ref, &CDA_DAT_P_MODREC_NAME(cx),
-                                  "RESOLVER",
-                                  SRVTYPE_RESOLVER | CDA_DAT_P_GET_SERVER_OPT_NOLIST);
+        me = get_RESOLVER_server(ref);
         if (me == NULL)
         {
             RlsHwrSlot(hwr);
@@ -352,6 +369,8 @@ static void cda_d_cx_del_chan(void *pdt_privptr, cda_hwcnref_t hwr)
     {
         /* Send "release" */
         cx_begin (me->cd);
+        if (hi->rq_lock) /* Note: we request lock-reset BEFORE delmon() */
+            cx_rq_l_o(me->cd,  hi->hwid,   hwr, 0, CX_LOCK_ALLORNOTHING);
         cx_delmon(me->cd, 1, &(hi->hwid), &hwr, NULL, hi->on_update);
         cx_run   (me->cd);
     }
@@ -390,6 +409,30 @@ static int  cda_d_cx_snd_data(void *pdt_privptr, cda_hwcnref_t hwr,
     return CDA_PROCESS_DONE;
 }
 
+static int  cda_d_cx_lock_op (void *pdt_privptr,
+                              int   count, cda_hwcnref_t *hwrs,
+                              int   operation, int lockset_id)
+{
+  cda_d_cx_privrec_t *me = pdt_privptr;
+  int                 do_lock = (operation & CX_LOCK_WR) != 0;
+  hwrinfo_t          *hi;
+  int                 n;
+
+    if (me->state != CDA_DAT_P_OPERATING) return 0;
+
+    for (n = 0;  n < count;  n++)
+        if (hwrs[n] >= HWR_MIN_VAL  &&  hwrs[n] < hwrs_list_allocd  &&
+            (hi = AccessHwrSlot(hwrs[n]))->in_use  &&
+            hi->rslv_state == RSLV_STATE_DONE)
+        {
+            hi->rq_lock = do_lock;
+            cx_rq_l_o(me->cd, hi->hwid, hwrs[n], 0, operation);
+        }
+    cx_run(me->cd); /*!!! Maybe count number of requests and if ==0 then cancel request? */
+
+    return 0;
+}
+
 //////////////////////////////////////////////////////////////////////
 
 static void MarkAllAsDefunct(cda_d_cx_privrec_t *me)
@@ -406,6 +449,9 @@ static void MarkAllAsDefunct(cda_d_cx_privrec_t *me)
             hi = AccessHwrSlot(hwr);
             next = hi->next;
             cda_dat_p_defunct_dataset(me->sid, 1, &(hi->dataref));
+            cda_dat_p_report_dataset_lockstat (me->sid,
+                                               1, &(hi->dataref),
+                                               0);
         }
         cda_dat_p_update_server_cycle(me->sid);
     }
@@ -448,6 +494,8 @@ static void SuccessProc(cda_d_cx_privrec_t *me)
             hi->rslv_state = RSLV_STATE_DONE;
             cx_rd_cur(me->cd, 1, &(hi->hwid), &hwr, NULL);
             cx_setmon(me->cd, 1, &(hi->hwid), &hwr, NULL, hi->on_update);
+            if (hi->rq_lock)
+                cx_rq_l_o(me->cd,  hi->hwid,   hwr, 0, CX_LOCK_WR | CX_LOCK_ALLORNOTHING);
             /*!!! Obtain parameters */
             cda_dat_p_set_ready(hi->dataref, 1);
         }
@@ -502,9 +550,7 @@ static void FailureProc(cda_d_cx_privrec_t *me, int reason)
         {
             if (rs == NULL)
             {
-                rs = cda_dat_p_get_server(hi->dataref, &CDA_DAT_P_MODREC_NAME(cx),
-                                          "RESOLVER",
-                                          SRVTYPE_RESOLVER | CDA_DAT_P_GET_SERVER_OPT_NOLIST);
+                rs = get_RESOLVER_server(hi->dataref);
                 if (rs == NULL)
                 {
                     /* "Unable to get a resolver" -- probably
@@ -525,6 +571,7 @@ static void FailureProc(cda_d_cx_privrec_t *me, int reason)
         {
             hi->rslv_state = RSLV_STATE_SERVER;
             cda_dat_p_set_ready(hi->dataref, 0);
+
         }
         /* Nothing to do with  == RSLV_TYPE_HWID */
     }
@@ -548,6 +595,8 @@ static void ProcessCxlibEvent(int uniq, void *unsdptr,
   cda_d_cx_privrec_t *me = (cda_d_cx_privrec_t *)privptr;
   int                 ec = errno;
 
+  cda_d_cx_privrec_t *rs;
+
   const cx_newval_info_t    *nvi;
   const cx_rslv_info_t      *rsi;
   const cx_fresh_age_info_t *fai;
@@ -555,6 +604,7 @@ static void ProcessCxlibEvent(int uniq, void *unsdptr,
   const cx_strs_info_t      *sti;
   const cx_quant_info_t     *qui;
   const cx_range_info_t     *rni;
+  const cx_lockstat_info_t  *loi;
 
   cda_hwcnref_t       hwr;
   hwrinfo_t          *hi;
@@ -608,6 +658,8 @@ static void ProcessCxlibEvent(int uniq, void *unsdptr,
                         cx_begin(me->cd);
                         cx_rd_cur(me->cd, 1, &(hi->hwid), &hwr, NULL);
                         cx_setmon(me->cd, 1, &(hi->hwid), &hwr, NULL, hi->on_update);
+                        if (hi->rq_lock)
+                            cx_rq_l_o(me->cd,  hi->hwid,   hwr, 0, CX_LOCK_WR | CX_LOCK_ALLORNOTHING);
                         cx_run(me->cd);
                         /*!!! Obtain parameters */
                         cda_dat_p_set_hwinfo(hi->dataref,
@@ -619,14 +671,40 @@ static void ProcessCxlibEvent(int uniq, void *unsdptr,
                     else
                     {
                         ////fprintf(stderr, "NOTFOUND %s\n", hi->name);
-                        hi->rslv_state = RSLV_STATE_ABSENT;
-                        cda_dat_p_report_rslvstat(hi->dataref, CDA_RSLVSTAT_NOTFOUND);
+                        if (hi->rslv_type == RSLV_TYPE_GLBL)
+                        {
+                            // The following code is a copy from FailureProc()
+                            rs = me->resolver;
+                            if (rs == NULL)
+                            {
+                                rs = get_RESOLVER_server(hi->dataref);
+                                if (rs == NULL)
+                                {
+                                    /* "Unable to get a resolver" -- probably
+                                       an impossible situation, since one MUST exist as
+                                       a prerequisite for GLBL channels */
+                                    return;
+                                }
+                                me->resolver = rs;
+                            }
+
+                            DelHwrFromSrv(me, hwr);
+                            AddHwrToSrv  (rs, hwr);
+                            hi->rslv_state = RSLV_STATE_UNKNOWN;
+                            cda_dat_p_set_ready(hi->dataref, 0);
+                            cda_dat_p_report_rslvstat(hi->dataref, CDA_RSLVSTAT_SEARCHING);
+                        }
+                        else
+                        {
+                            hi->rslv_state = RSLV_STATE_ABSENT;
+                            cda_dat_p_report_rslvstat(hi->dataref, CDA_RSLVSTAT_NOTFOUND);
+                        }
                     }
                 }
                 else
                 {
-                    fprintf(stderr, "RSLV_RESULT: hwr=%d state=%d\n", hwr, hi->rslv_state);
-                    /*??? debug message about an error?*/
+                    //fprintf(stderr, "RSLV_RESULT: hwr=%d state=%d\n", hwr, hi->rslv_state);
+                    cda_ref_p_report(hi->dataref, "duplicate RSLV_RESULT (state=%d, type=%d) for <%s>", hi->rslv_state, hi->rslv_type, hi->name);
                 }
             }
             break;
@@ -695,6 +773,20 @@ static void ProcessCxlibEvent(int uniq, void *unsdptr,
             }
             break;
 
+        case CAR_LOCKSTAT:
+            loi = info;
+            hwr = loi->param1;
+            hi  = AccessHwrSlot(hwr);
+            if (/* "CheckHwr()" */
+                hwr >= HWR_MIN_VAL  &&  hwr < hwrs_list_allocd  &&
+                hi->in_use)
+            {
+                cda_dat_p_report_dataset_lockstat(me->sid,
+                                                  1, &(hi->dataref),
+                                                  loi->lockstat);
+            }
+            break;
+
         case CAR_CONNECT:
             SuccessProc(me);
             break;
@@ -703,6 +795,12 @@ static void ProcessCxlibEvent(int uniq, void *unsdptr,
         case CAR_ERRCLOSE:
         case CAR_KILLED:
             FailureProc(me, reason);
+            break;
+
+        case CAR_EACCESS:
+            // What can we do here?
+            cda_dat_p_report(me->sid, "%s: %s; will NOT reconnect.",
+                             cx_strreason(reason), cx_strerror(ec));
             break;
     }
 
@@ -794,9 +892,7 @@ static void ProcessSrchEvent(int uniq, void *unsdptr,
             /* 1. Obtain a server */
             check_snprintf(srvrspec, sizeof(srvrspec),
                            "%s:%d", sip->srv_addr, sip->srv_n);
-            ts = cda_dat_p_get_server(hi->dataref, &CDA_DAT_P_MODREC_NAME(cx),
-                                      srvrspec,
-                                      SRVTYPE_DATA_IO | CDA_DAT_P_GET_SERVER_OPT_NONE);
+            ts = get_DATA_IO_server(hi->dataref, srvrspec);
 ////fprintf(stderr, "ts=%p\n", ts);
             if (ts == NULL)
             {
@@ -960,5 +1056,7 @@ CDA_DEFINE_DAT_PLUGIN(cx, "CX data-access plugin",
                       '.', ':', '@',
                       cda_d_cx_new_chan, cda_d_cx_del_chan,
                       NULL,
-                      cda_d_cx_snd_data, NULL,
-                      cda_d_cx_new_srv,  cda_d_cx_del_srv);
+                      cda_d_cx_snd_data, cda_d_cx_lock_op,
+                      cda_d_cx_new_srv,  cda_d_cx_del_srv,
+                      NULL, NULL,
+                      NULL, NULL);

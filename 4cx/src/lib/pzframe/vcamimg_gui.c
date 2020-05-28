@@ -180,11 +180,12 @@ static void DoRenew(pzframe_gui_t *inherited_gui,
 
 static pzframe_gui_vmt_t vcamimg_gui_std_pzframe_vmt =
 {
-    .realize  = DoRealize,
-    .evproc   = NULL,
-    .newstate = UpdateBG,
-    .do_renew = DoRenew,
-    .svd_ctl  = NULL,
+    .realize   = DoRealize,
+    .evproc    = NULL,
+    .newstate  = UpdateBG,
+    .do_renew  = DoRenew,
+    .svd_ctl   = NULL,
+    .svd_state = NULL,
 };
 void  VcamimgGuiFillStdDscr(vcamimg_gui_dscr_t *gkd, vcamimg_type_dscr_t *vtd)
 {

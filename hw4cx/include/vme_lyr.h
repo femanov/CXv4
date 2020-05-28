@@ -17,10 +17,19 @@ enum
 };
 
 
+enum
+{
+    VME_LYR_OPTION_NONE = 0,
+};
+
+
 /* Driver-provided callbacks */
 
-typedef void (*vme_irq_proc)(int devid, void *devptr,
-                             int irq_n, int irq_vect);
+typedef void (*vme_irq_proc) (int devid, void *devptr,
+                              int irq_n, int irq_vect);
+
+typedef void (*vme_stat_proc)(int devid, void *devptr,
+                              int reason, void *info);
 
 
 /* Layer API for drivers */
@@ -29,7 +38,8 @@ typedef int  (*VmeAddDevice) (int devid, void *devptr,
                               int    bus_major, int    bus_minor,
                               uint32 base_addr, uint32 space_size,
                               int    addr_size, int    am,
-                              int irq_n, int irq_vect, vme_irq_proc irq_proc);
+                              int irq_n, int irq_vect, vme_irq_proc irq_proc,
+                              vme_stat_proc stat_proc, int options);
 
 typedef int  (*VmeGetDevInfo)(int devid,
                               int    *bus_major_p, int    *bus_minor_p,
