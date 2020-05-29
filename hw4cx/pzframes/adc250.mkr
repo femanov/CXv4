@@ -1,0 +1,1 @@
+adc250: adc250.o adc250_data.o adc250_gui.o 

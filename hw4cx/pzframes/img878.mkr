@@ -1,0 +1,1 @@
+img878: img878.o img878_data.o img878_gui.o 

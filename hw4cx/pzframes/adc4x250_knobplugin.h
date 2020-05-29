@@ -1,0 +1,1 @@
+extern dataknob_pzfr_vmt_t adc4x250_pzfr_vmt;

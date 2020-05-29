@@ -10,3 +10,8 @@ make -C $CXDIR/4cx/src create-exports
 make -C $CXDIR/4cx/src
 # copy what just maked to exports
 make -C $CXDIR/4cx/src exports
+
+make -C $CXDIR/frgn4cx
+
+make -C $CXDIR/hw4cx
+make -C $CXDIR/sw4cx

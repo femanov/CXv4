@@ -1,0 +1,1 @@
+adc333: adc333.o adc333_data.o adc333_gui.o 

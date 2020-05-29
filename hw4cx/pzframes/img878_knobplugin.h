@@ -1,0 +1,1 @@
+extern dataknob_pzfr_vmt_t img878_pzfr_vmt;
