@@ -1,1 +1,0 @@
-extern dataknob_pzfr_vmt_t pxi6363_pzfr_vmt;

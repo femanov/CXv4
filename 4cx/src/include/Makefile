@@ -14,7 +14,7 @@ include $(TOPDIR)/TopRules.mk
 EXPORTSFILES=	misc_types.h misclib.h misc_sepchars.h misc_macros.h fps_counter.h \
 		fix_arpa_inet.h \
 		cx_module.h cx_version.h \
-		paramstr_parser.h fdiolib.h cxscheduler.h \
+		paramstr_parser.h fdiolib.h cxscheduler.h mt_cxscheduler.h \
 		cxlogger.h \
 		cxldr.h main_builtins.h \
 		findfilein.h sendqlib.h ppf4td.h \

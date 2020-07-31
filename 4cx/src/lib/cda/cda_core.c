@@ -125,7 +125,7 @@ typedef struct
 
     int              hwinfo_rw;
     cxdtype_t        hwinfo_dtype;
-    int              hwinfo_nelems;
+    int              hwinfo_max_nelems;
     int              hwinfo_srv_hwid;
 } refinfo_t;
 
@@ -989,10 +989,10 @@ static int ctx_ref_checker(refinfo_t *ri, void *privptr)
 
 static void reset_hwinfo(refinfo_t *ri)
 {
-    ri->hwinfo_rw       = -1;
-    ri->hwinfo_dtype    = CXDTYPE_UNKNOWN;
-    ri->hwinfo_nelems   = -1;
-    ri->hwinfo_srv_hwid = -1;
+    ri->hwinfo_rw         = -1;
+    ri->hwinfo_dtype      = CXDTYPE_UNKNOWN;
+    ri->hwinfo_max_nelems = -1;
+    ri->hwinfo_srv_hwid   = -1;
 }
 
 cda_dataref_t  cda_add_chan   (cda_context_t         cid,
@@ -1118,6 +1118,9 @@ cda_dataref_t  cda_add_chan   (cda_context_t         cid,
         return CDA_DATAREF_ERROR;
     }
 
+    if ((ci->options & CDA_CONTEXT_OPT_IGN_UPDATE) != 0)
+        options |= CDA_DATAREF_OPT_NOMONITOR;
+
     /* Schedule search/registration */
     /* Note: this is a PROVISIONAL evproc registration, so that
        if some event happens from inside of new_chan(), it won't be lost.
@@ -1126,7 +1129,7 @@ cda_dataref_t  cda_add_chan   (cda_context_t         cid,
     new_chan_r = CDA_DAT_P_ERROR;
     if (pdt->new_chan != NULL)
         new_chan_r = pdt->new_chan(ref, target,
-                                   options & (CDA_DATAREF_OPT_ON_UPDATE | CDA_DATAREF_OPT_EXCLUSIVE),
+                                   options & (CDA_DATAREF_OPT_ON_UPDATE | CDA_DATAREF_OPT_EXCLUSIVE | CDA_DATAREF_OPT_NOMONITOR),
                                    dtype, max_nelems);
 #if 1 /* 18.02.2015: return ERROR upon error in channel registration */
     if (new_chan_r < 0)
@@ -1884,7 +1887,7 @@ int            cda_phys_rds_of_ref      (cda_dataref_t  ref,
 int            cda_hwinfo_of_ref        (cda_dataref_t  ref,
                                          int       *rw_p,
                                          cxdtype_t *dtype_p,
-                                         int       *nelems_p,
+                                         int       *max_nelems_p,
                                          int       *srv_hwid_p,
                                          int       *cln_hwr_p)
 {
@@ -1892,11 +1895,11 @@ int            cda_hwinfo_of_ref        (cda_dataref_t  ref,
 
     if (CheckRef(ref) != 0) return -1;
 
-    if (rw_p       != NULL) *rw_p       = ri->hwinfo_rw;
-    if (dtype_p    != NULL) *dtype_p    = ri->hwinfo_dtype;
-    if (nelems_p   != NULL) *nelems_p   = ri->hwinfo_nelems;
-    if (srv_hwid_p != NULL) *srv_hwid_p = ri->hwinfo_srv_hwid;
-    if (cln_hwr_p  != NULL) *cln_hwr_p  = ri->hwr;
+    if (rw_p         != NULL) *rw_p         = ri->hwinfo_rw;
+    if (dtype_p      != NULL) *dtype_p      = ri->hwinfo_dtype;
+    if (max_nelems_p != NULL) *max_nelems_p = ri->hwinfo_max_nelems;
+    if (srv_hwid_p   != NULL) *srv_hwid_p   = ri->hwinfo_srv_hwid;
+    if (cln_hwr_p    != NULL) *cln_hwr_p    = ri->hwr;
 
     return 0;
 }
@@ -2033,6 +2036,45 @@ int                 cda_srvs_of_ref      (cda_dataref_t ref,
                                         conns_u, conns_u_size);
     }
     /* REF_TYPE_REG -- doesn't belong to any sid */
+
+    return 0;
+}
+
+int                 cda_reconnect_srv    (cda_context_t  cid, int nth)
+{
+  ctxinfo_t       *ci = AccessCtxSlot(cid);
+  ctx_nthsidrec_t *p;
+  srvinfo_t       *si;
+
+  int              nth_first, nth_last;
+
+    if (CheckCid(cid) != 0) return -1;
+    if (nth < 0)
+    {
+        nth_first = 0;
+        nth_last  = ci->sids_list_allocd - 1;
+    }
+    else if (nth >= ci->sids_list_allocd)
+    {
+        errno = EINVAL;
+        return -1;
+    }
+    else
+        nth_first = nth_last = nth;
+
+    for (nth = nth_first;  nth <= nth_last;  nth++)
+    {
+        p = AccessNthSidSlot(nth, ci);
+        if (p->sid < SID_MIN_VAL) continue;
+        si = AccessSrvSlot(p->sid);
+////fprintf(stderr, "%s %d: %s\n", __FUNCTION__, nth, si->srvrspec);
+#if CDA_DAT_P_MODREC_VERSION >= CX_ENCODE_VERSION(2,1)
+        if (si->mr.version   >= CX_ENCODE_VERSION(2,1)  &&
+            si->metric->srv_ioctl != NULL)
+            si->metric->srv_ioctl(si->pdt_privptr,
+                                  CDA_DAT_P_SRV_IOCTL_NR_RECONNECT, NULL);
+#endif
+    }
 
     return 0;
 }
@@ -2995,7 +3037,7 @@ void  cda_dat_p_set_hwr            (cda_dataref_t  ref, cda_hwcnref_t hwr)
 }
 
 void  cda_dat_p_set_hwinfo         (cda_dataref_t  ref,
-                                    int rw, cxdtype_t dtype, int nelems,
+                                    int rw, cxdtype_t dtype, int max_nelems,
                                     int srv_hwid)
 {
   refinfo_t     *ri;
@@ -3013,10 +3055,10 @@ void  cda_dat_p_set_hwinfo         (cda_dataref_t  ref,
         return;
     }
 
-    ri->hwinfo_rw       = rw;
-    ri->hwinfo_dtype    = dtype;
-    ri->hwinfo_nelems   = nelems;
-    ri->hwinfo_srv_hwid = srv_hwid;
+    ri->hwinfo_rw         = rw;
+    ri->hwinfo_dtype      = dtype;
+    ri->hwinfo_max_nelems = max_nelems;
+    ri->hwinfo_srv_hwid   = srv_hwid;
 }
 
 void  cda_dat_p_report_rslvstat    (cda_dataref_t  ref, int rslvstat)

@@ -163,6 +163,10 @@ sl_tid_t  sl_enq_tout_at   (int uniq, void *privptr1,
     p->next = next;
     if (next >= 0) tout_list[next].prev = tid; else lst_tid = tid;
 
+#ifdef CXSCHEDULER_HOOK_FDSET_CHANGE
+    CXSCHEDULER_HOOK_FDSET_CHANGE();
+#endif
+
     return tid;
 }
 
@@ -230,7 +234,11 @@ sl_fdh_t  sl_add_fd     (int uniq, void *privptr1,
     fd_uniqs    [fd] = uniq;
     fd_privptr1s[fd] = privptr1;
     fd_privptr2s[fd] = privptr2;
-    
+
+#ifdef CXSCHEDULER_HOOK_FDSET_CHANGE
+    CXSCHEDULER_HOOK_FDSET_CHANGE();
+#endif
+
     return fd;
 }
 
@@ -253,6 +261,10 @@ int       sl_del_fd     (sl_fdh_t fdh)
     RemoveUsed(fd);
     fd_uniqs[fd] = 0; //!!! Note: we employ "==0" as "unused".
 
+#ifdef CXSCHEDULER_HOOK_FDSET_CHANGE
+    CXSCHEDULER_HOOK_FDSET_CHANGE();
+#endif
+
     return 0;
 }
 
@@ -274,6 +286,10 @@ int       sl_set_fd_mask(sl_fdh_t fdh, int mask)
 
     /*!!! Shouldn't we clear bits in sel_NNN? */
     
+#ifdef CXSCHEDULER_HOOK_FDSET_CHANGE
+    CXSCHEDULER_HOOK_FDSET_CHANGE();
+#endif
+
     return 0;
 }
 
@@ -300,6 +316,9 @@ int  sl_main_loop(void)
   int             mask;
 
     CheckInitialized();
+#ifdef CXSCHEDULER_HOOK_MAIN_LOOP
+    if (CXSCHEDULER_HOOK_MAIN_LOOP() < 0) return -1;
+#endif
 
     bzero(&now, sizeof(now));
 
@@ -355,8 +374,14 @@ int  sl_main_loop(void)
 
         /* ...and do a select() */
         if (before_select != NULL) before_select();
+#ifdef CXSCHEDULER_HOOK_BEFORE_SELECT
+        CXSCHEDULER_HOOK_BEFORE_SELECT();
+#endif
         r = select(maxall + 1, &sel_rfds, &sel_wfds, &sel_efds, &timeout);
         saved_errno = errno;
+#ifdef CXSCHEDULER_HOOK_AFTER_SELECT
+        CXSCHEDULER_HOOK_AFTER_SELECT();
+#endif
         if (after_select  != NULL) after_select ();
         errno = saved_errno;
 

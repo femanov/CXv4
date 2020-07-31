@@ -65,6 +65,16 @@ enum
     CDA_FLA_P_FLAG_NONE                       = 0,
 };
 
+enum
+{
+    CDA_DAT_P_CHAN_IOCTL_NR_unused, // Just a placeholder, for CDA_DAT_P_CHAN_IOCTL_NR_* to be here
+};
+
+enum
+{
+    CDA_DAT_P_SRV_IOCTL_NR_RECONNECT = 102, // Reserved: 100 - disconnect, 101 - restart_connect (forcibly disconnect and then connect again)
+};
+
 //////////////////////////////////////////////////////////////////////
 
 #define CDA_DAT_P_MODREC_SUFFIX     _dat_p_rec
@@ -75,7 +85,7 @@ enum
     CDA_DAT_P_MODREC_MAGIC = 0xCDA0DA1A,
 
     CDA_DAT_P_MODREC_VERSION_MAJOR = 2,
-    CDA_DAT_P_MODREC_VERSION_MINOR = 0,
+    CDA_DAT_P_MODREC_VERSION_MINOR = 1,
     CDA_DAT_P_MODREC_VERSION = CX_ENCODE_VERSION(CDA_DAT_P_MODREC_VERSION_MAJOR,
                                                  CDA_DAT_P_MODREC_VERSION_MINOR)
 };
@@ -83,10 +93,10 @@ enum
 
 typedef int  (*cda_dat_p_new_chan_f)(cda_dataref_t ref, const char *name,
                                      int options, // CDA_DATAREF_OPT_ON_UPDATE only
-                                     cxdtype_t dtype, int nelems);
+                                     cxdtype_t dtype, int max_nelems);
 typedef void (*cda_dat_p_del_chan_f)(void *pdt_privptr, cda_hwcnref_t hwr);
 typedef int  (*cda_dat_p_set_type_f)(void *pdt_privptr, cda_hwcnref_t hwr,
-                                     cxdtype_t dtype, int nelems);
+                                     cxdtype_t dtype, int max_nelems);
 typedef int  (*cda_dat_p_snd_data_f)(void *pdt_privptr, cda_hwcnref_t hwr,
                                      cxdtype_t dtype, int nelems, void *value);
 typedef int  (*cda_dat_p_lock_op_f) (void *pdt_privptr,
@@ -129,6 +139,13 @@ typedef struct cda_dat_p_rec_t_struct
 
     struct cda_dat_p_rec_t_struct *next;
     int                            ref_count;
+
+#if CDA_DAT_P_MODREC_VERSION >= CX_ENCODE_VERSION(2,1)
+    cda_dat_p_chan_ioctl_f chan_ioctl;
+    cda_dat_p_srv_ioctl_f  srv_ioctl;
+    void                  *rsrvd_1;
+    void                  *rsrvd_2;
+#endif
 } cda_dat_p_rec_t;
 
 #define CDA_DAT_P_MODREC_NAME(name) \
@@ -137,6 +154,40 @@ typedef struct cda_dat_p_rec_t_struct
 #define CDA_DECLARE_DAT_PLUGIN(name) \
     cda_dat_p_rec_t CDA_DAT_P_MODREC_NAME(name)
     
+#if CDA_DAT_P_MODREC_VERSION >= CX_ENCODE_VERSION(2,1)
+#define CDA_DEFINE_DAT_PLUGIN(name, comment,                         \
+                              init_m, term_m,                        \
+                              privrecsize,                           \
+                              flags,                                 \
+                              sep_ch, upp_ch, opt_ch,                \
+                              new_chan, del_chan,                    \
+                              set_type,                              \
+                              snd_data, do_lock,                     \
+                              new_srv,  del_srv,                     \
+                              chan_ioctl, srv_ioctl,                 \
+                              rsrvd_1, rsrvd_2)                      \
+    cda_dat_p_rec_t CDA_DAT_P_MODREC_NAME(name) =                    \
+    {                                                                \
+        {                                                            \
+            CDA_DAT_P_MODREC_MAGIC, CDA_DAT_P_MODREC_VERSION,        \
+            __CX_STRINGIZE(name), comment,                           \
+            init_m, term_m,                                          \
+        },                                                           \
+        privrecsize,                                                 \
+        flags,                                                       \
+        sep_ch, upp_ch, opt_ch,                                      \
+                                                                     \
+        new_chan, del_chan,                                          \
+        set_type,                                                    \
+        snd_data, do_lock,                                           \
+        new_srv,  del_srv,                                           \
+                                                                     \
+        NULL, 0,                                                     \
+                                                                     \
+        chan_ioctl, srv_ioctl,                                       \
+        rsrvd_1, rsrvd_2                                             \
+    }
+#else
 #define CDA_DEFINE_DAT_PLUGIN(name, comment,                         \
                               init_m, term_m,                        \
                               privrecsize,                           \
@@ -166,6 +217,7 @@ typedef struct cda_dat_p_rec_t_struct
                                                                      \
         NULL, 0                                                      \
     }
+#endif
 
 int cda_register_dat_plugin  (cda_dat_p_rec_t *metric);
 int cda_deregister_dat_plugin(cda_dat_p_rec_t *metric);
@@ -315,7 +367,7 @@ void  cda_fla_p_update_fla_result  (cda_dataref_t  ref,
 
 void  cda_dat_p_set_hwr            (cda_dataref_t  ref, cda_hwcnref_t hwr);
 void  cda_dat_p_set_hwinfo         (cda_dataref_t  ref,
-                                    int rw, cxdtype_t dtype, int nelems,
+                                    int rw, cxdtype_t dtype, int max_nelems,
                                     int srv_hwid);
 void  cda_dat_p_report_rslvstat    (cda_dataref_t  ref, int rslvstat);
 void  cda_dat_p_set_ready          (cda_dataref_t  ref, int is_ready);

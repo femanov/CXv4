@@ -51,6 +51,7 @@ enum
     CDA_DATAREF_OPT_DEBUG      = 1 << 23,
     CDA_DATAREF_OPT_PRIV_SRV   = 1 << 22,  // Create a separate server connection for this channel
     CDA_DATAREF_OPT_EXCLUSIVE  = 1 << 21,  // Try to obtain exclusive write access (write lock)
+    CDA_DATAREF_OPT_NOMONITOR  = 1 << 20,  // Do NOT subscribe to channel's updates (i.e., do NOT monitor it)
 };
 
 /* Processing options - for cda_process_ref() */
@@ -266,7 +267,7 @@ int            cda_phys_rds_of_ref      (cda_dataref_t  ref,
 int            cda_hwinfo_of_ref        (cda_dataref_t  ref,
                                          int       *rw_p,
                                          cxdtype_t *dtype_p,
-                                         int       *nelems_p,
+                                         int       *max_nelems_p,
                                          int       *srv_hwid_p,
                                          int       *cln_hwr_p);
 
@@ -281,6 +282,8 @@ const char         *cda_status_srv_name  (cda_context_t  cid, int nth);
 
 int                 cda_srvs_of_ref      (cda_dataref_t ref,
                                           uint8 *conns_u, int conns_u_size);
+
+int                 cda_reconnect_srv    (cda_context_t  cid, int nth);
 
 int                 cda_add_server_conn  (cda_context_t  cid,
                                           const char    *srvref);

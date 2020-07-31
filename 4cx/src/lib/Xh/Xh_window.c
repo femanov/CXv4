@@ -47,7 +47,7 @@ static void AddMotifCloseCallback(Widget shell, XtCallbackProc closeProc, void *
   Display *display = XtDisplay(shell);
 
     /* deactivate the built in delete response of killing the application */
-    XtVaSetValues(shell, XmNdeleteResponse, XmDO_NOTHING, 0);
+    XtVaSetValues(shell, XmNdeleteResponse, XmDO_NOTHING, NULL);
 
     /* add a delete window protocol callback instead */
     if (dwAtom == 0) {

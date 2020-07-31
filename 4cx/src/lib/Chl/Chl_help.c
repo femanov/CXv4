@@ -19,6 +19,20 @@ typedef struct
 
 static colhelpline_t colhelp_contents[] =
 {
+#if !MAY_USE_RUSSIAN_KOI8
+    {-1, XH_COLOR_BG_NORM_YELLOW, "Yellow",        "Value is out of normal range"},
+    {-1, XH_COLOR_BG_NORM_RED,    "Red",           "Value is out of safe range"},
+    {XH_COLOR_FG_WEIRD,
+         XH_COLOR_BG_WEIRD,       "Weird",         "Value is weird"},
+    {-1, XH_COLOR_BG_DEFUNCT,     "Goose skin",    "Value has not been updated for a long time"},
+    {-1, XH_COLOR_BG_HWERR,       "Maroon",        "Hardware problem (right click on a value - details)"},
+    {-1, XH_COLOR_BG_SFERR,       "Swamp",         "Software problem (right click on a value - details)"},
+    {-1, XH_COLOR_BG_OTHEROP,     "Orange",        "Value is changed by another person"},
+    {-1, XH_COLOR_BG_JUSTCREATED, "Pale blue",     "Data was never read"},
+    {-1, XH_COLOR_JUST_GREEN,     "Green",         "An alarm light had just gone out"},
+    {-1, XH_COLOR_BG_PRGLYCHG,    "Pale green",    "Value was changed programmatically"},
+    {-1, XH_COLOR_BG_NOTFOUND,    "Dark grey",     "Channel not found"},
+#else
     {-1, XH_COLOR_BG_NORM_YELLOW, "Желтый",        "Значение вне нормального диапазона"},
     {-1, XH_COLOR_BG_NORM_RED,    "Красный",       "Значение вне безопасного диапазона"},
     {XH_COLOR_FG_WEIRD,
@@ -31,6 +45,7 @@ static colhelpline_t colhelp_contents[] =
     {-1, XH_COLOR_JUST_GREEN,     "Зеленый",       "Только что погасла лампочка сигнализации"},
     {-1, XH_COLOR_BG_PRGLYCHG,    "Бледнозеленый", "Значение менялось программой"},
     {-1, XH_COLOR_BG_NOTFOUND,    "Темносерый",    "Канал не найден"},
+#endif
 };
 
 typedef struct
@@ -41,6 +56,25 @@ typedef struct
 
 static keyhelpline_t keyhelp_contents[] =
 {
+#if !MAY_USE_RUSSIAN_KOI8
+    {"<Tab>/Shift+<Tab>",
+        "Move between channels"},
+    {"Up/Down arrows\n(in text fields)",
+        "Increase/decrease value by a step\n"
+            "Holding down Ctrl decreases the step by 10 times\n"
+            "Holding down Alt increases the step by 10 times"},
+    {"<Enter>",
+        "Finish input"},
+    {"<Esc>",
+        "Cancel input (BEFORE pressing <Enter>!)"},
+    {"", NULL},
+    {"<Right mouse click>\nAlt+<Enter>\nShift+<F10>",
+        "Get a \"Knob properties\" window"},
+    {"Ctrl+<Right mouse click>\nCtrl+<Space>",
+        "Display a value in large font"},
+    {"Shift+<Right mouse click>\nShift+<Space>",
+        "Put the channel to a history plot"},
+#else
     {"<Tab>/Shift+<Tab>",
         "Перемещение по каналам"},
     {"Стрелки вверх/вниз\n(в текстовом поле)",
@@ -58,6 +92,7 @@ static keyhelpline_t keyhelp_contents[] =
         "Вывод значения крупным шрифтом"},
     {"Shift+<Правая кнопка мыши>\nShift+<Пробел>",
         "Отправка канала на график-самописец"},
+#endif
 };
 
 void   ChlShowHelp      (XhWindow window, int parts)
@@ -75,10 +110,20 @@ void   ChlShowHelp      (XhWindow window, int parts)
   keyhelpline_t *klp;
   int            row;
   int            fg, bg;
+
+#if !MAY_USE_RUSSIAN_KOI8
+  static const char *help_window_title = "Short help";
+  static const char *help_colors_title = "Colors";
+  static const char *help_keys_title   = "Mouse and keyboard shortcuts";
+#else
+  static const char *help_window_title = "Краткая справка";
+  static const char *help_colors_title = "Цвета";
+  static const char *help_keys_title   = "Использование клавиатуры и мыши";
+#endif
   
     if (!(rec->initialized))
     {
-        rec->box = XhCreateStdDlg(window, "help", "Help", NULL, "Краткая справка",
+        rec->box = XhCreateStdDlg(window, "help", "Help", NULL, help_window_title,
                                   XhStdDlgFOk);
 
         form = XtVaCreateManagedWidget("form", xmFormWidgetClass, rec->box,
@@ -96,7 +141,7 @@ void   ChlShowHelp      (XhWindow window, int parts)
             
             XtVaCreateManagedWidget("title", xmLabelWidgetClass, frame,
                                     XmNframeChildType, XmFRAME_TITLE_CHILD,
-                                    XmNlabelString, s = XmStringCreateLtoR("Цвета", xh_charset),
+                                    XmNlabelString, s = XmStringCreateLtoR(help_colors_title, xh_charset),
                                     NULL);
             XmStringFree(s);
             
@@ -149,7 +194,7 @@ void   ChlShowHelp      (XhWindow window, int parts)
             
             XtVaCreateManagedWidget("title", xmLabelWidgetClass, frame,
                                     XmNframeChildType, XmFRAME_TITLE_CHILD,
-                                    XmNlabelString, s = XmStringCreateLtoR("Использование клавиатуры и мыши", xh_charset),
+                                    XmNlabelString, s = XmStringCreateLtoR(help_keys_title, xh_charset),
                                     NULL);
             XmStringFree(s);
             

@@ -489,7 +489,7 @@ if (0)
         if      (option_relative)                        src_p = rp->ur.spec;
         else if (cda_src_of_ref(rp->ur.ref, &src_p) < 0) src_p = "UNKNOWN";
 
-        fprintf(outfile, "# %s lockstat(%s)=%d\n",
+        fprintf(outfile, "# %s lockstat(%s)=%ld\n",
                 print_time?strcurtime():"", src_p, ptr2lint(info_ptr));
 
     }

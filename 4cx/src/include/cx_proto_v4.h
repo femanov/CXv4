@@ -130,13 +130,36 @@ enum
     CXC_FRH_AGE = CXC_REQ_CMD('P', 'f', 'a'),
     CXC_QUANT   = CXC_REQ_CMD('P', 'q', 'a'),
     CXC_RANGE   = CXC_REQ_CMD('P', 'r', 'n'),
+
+    // 'H' - Handle
+    CXC_CH_OPEN    = CXC_REQ_CMD('H', 'o', 'p'),
+    CXC_CH_CLOSE   = CXC_REQ_CMD('H', 'c', 'l'),
+    CXC_CH_LOCK_OP = CXC_REQ_CMD('H', 'l', 'k'),
+    CXC_CH_PEEK    = CXC_REQ_CMD('H', 'p', 'k'),
+    CXC_CH_RQRD    = CXC_REQ_CMD('H', 'r', 'd'),
+    CXC_CH_RQWR    = CXC_REQ_CMD('H', 'w', 'r'),
+
+    // 'N' - Notifiction
+    CXC_NT_NEWVAL  = CXC_RPY_CMD('N', 'v', 'l'),
+    CXC_NT_CURVAL  = CXC_RPY_CMD('N', 'c', 'v'),
+    CXC_NT_LOCKSTAT= CXC_RPY_CMD('N', 'l', 's'),
+    CXC_NT_STRS    = CXC_RPY_CMD('N', 's', 't'),
+    CXC_NT_RDS     = CXC_RPY_CMD('N', 'r', 'd'),
+    CXC_NT_FRH_AGE = CXC_RPY_CMD('N', 'f', 'a'),
+    CXC_NT_QUANT   = CXC_RPY_CMD('N', 'q', 'a'),
+    CXC_NT_RANGE   = CXC_RPY_CMD('N', 'r', 'n'),
+
+    CXC_NT_OPEN_NOTFOUND     = CXC_RPY_CMD('N', 'o', '-'),
+    CXC_NT_OPEN_FOUND_STAGE1 = CXC_RPY_CMD('N', 'o', '1'),
+    CXC_NT_OPEN_FOUND_STAGE2 = CXC_RPY_CMD('N', 'o', '2'),
 };
 
 enum
 {
-    CX_MON_COND_ON_UPDATE = 1,
-    CX_MON_COND_ON_CYCLE  = 2,
-    CX_MON_COND_ON_DELTA  = 3,
+    CX_MON_COND_NEVER     = 0,  // Never send any updates and NEVER request reads
+    CX_MON_COND_ON_UPDATE = 1,  // Send updates immediately
+    CX_MON_COND_ON_CYCLE  = 2,  // Request read on every cycle beginning and send updates at cycle end
+    CX_MON_COND_ON_DELTA  = 3,  // Unimplemented
 };
 
 //--------------------------------------------------------------------
@@ -280,6 +303,41 @@ typedef struct
     uint32  rs2;
     uint8      data[0];
 } CxV4RDsChunk;
+
+typedef struct
+{
+    CxV4Chunk  ck;
+    int32      hwid;       // HWchan ID -- internal channel address (if appropriate)
+    int32      rw;         // 0 -- readonly, 1 -- read/write
+    int32      dtype;      // cxdtype_t, with 3 high bytes of 0s
+    int32      max_nelems; // Max # of units; ==1 for scalar channels
+    uint32     rsrvd1;
+    uint32     rsrvd2;
+    uint32     rsrvd3;
+    uint32     rsrvd4;
+    uint8      name[0];
+} CxV4_NT_OPEN_Chunk;
+
+typedef struct
+{
+    CxV4Chunk  ck;
+    int32      dtype;
+    int32      nelems;
+    uint32     rflags;
+    uint32     timestamp_nsec;
+    uint32     timestamp_sec_lo32;
+    uint32     timestamp_sec_hi32;
+    uint32     Seq;
+    uint32     _padding_;
+    uint8      data[0];
+} CxV4_NT_AVALUE_Chunk;
+
+typedef struct
+{
+    CxV4Chunk  ck;
+    int32      offsets[8];
+    uint8      data[0];
+} CxV4_NT_STRS_Chunk;
 
 
 #ifdef __cplusplus

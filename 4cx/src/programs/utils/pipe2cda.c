@@ -145,7 +145,7 @@ static void ProcessDatarefEvent(int            uniq,
             }
         }
     }
-    else if (reason == CDA_REF_R_UPDATE)
+    else if (reason == CDA_REF_R_UPDATE  ||  reason == CDA_REF_R_CURVAL)
     {
         // Mark "update was received, may send further data immediately upon reading"
         rp->ur.rd_req = 0;
@@ -382,14 +382,16 @@ static void ProcessFdioEvent(int uniq, void *unsdptr,
 ////fprintf(stderr, "spec=<%s>\n", rp->ur.spec);
         rp->ur.ref = cda_add_chan(the_cid,
                                   option_baseref,
-                                  rp->ur.spec, rp->ur.options|CDA_DATAREF_OPT_PRIVATE, rp->ur.dtype, rp->ur.n_items,
+                                  rp->ur.spec,
+                                  rp->ur.options|CDA_DATAREF_OPT_PRIVATE|CDA_DATAREF_OPT_NOMONITOR,
+                                  rp->ur.dtype, rp->ur.n_items,
                                   0, NULL, NULL);
         if (rp->ur.ref == CDA_DATAREF_ERROR)
             fprintf(stderr, "%s %s: cda_add_chan(\"%s\"): %s\n",
                     strcurtime(), global_argv0, rp->ur.spec, cda_last_err());
         else
             cda_add_dataref_evproc(rp->ur.ref,
-                                   CDA_REF_EVMASK_UPDATE | CDA_REF_EVMASK_RSLVSTAT,
+                                   CDA_REF_EVMASK_UPDATE | CDA_REF_EVMASK_CURVAL | CDA_REF_EVMASK_RSLVSTAT,
                                    ProcessDatarefEvent, lint2ptr(rn));
     }
 

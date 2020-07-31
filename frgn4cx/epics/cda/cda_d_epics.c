@@ -371,7 +371,7 @@ static void NewDataCB    (struct event_handler_args      ARGS)
 
 static int  cda_d_epics_new_chan(cda_dataref_t ref, const char *name,
                                  int options,
-                                 cxdtype_t dtype, int nelems)
+                                 cxdtype_t dtype, int max_nelems)
 {
   cda_d_epics_privrec_t *me;
 
@@ -419,7 +419,7 @@ static int  cda_d_epics_new_chan(cda_dataref_t ref, const char *name,
         return CDA_DAT_P_ERROR;
     }
 
-    stat = ca_create_subscription(DBR_type, nelems, hi->ca_chid,
+    stat = ca_create_subscription(DBR_type, max_nelems, hi->ca_chid,
                                   DBE_VALUE | DBE_ALARM,
                                   NewDataCB, lint2ptr(hwr),
                                   NULL);

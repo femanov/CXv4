@@ -9,6 +9,7 @@ CLIENTS=	rfsyn_eng v5rfsyn v5ie v5kls v5cnv \
 		ttv \
 		ist_cdac20 v1k_cdac20 v3h_a40d16 mps20_ceac124 \
 		v5p2camera \
+		modbus_tcp_rb \
 		k500gid25s \
 		v5k500vepp4 \
 		gid25x4 v4gid25s v4k500mag \

@@ -467,7 +467,7 @@ static void VarChgCB(varinfo_t     *vi,
 
 static int  cda_d_dircn_new_chan(cda_dataref_t ref, const char *name,
                                  int options,
-                                 cxdtype_t dtype, int nelems)
+                                 cxdtype_t dtype, int max_nelems)
 {
   cda_d_dircn_privrec_t *me;
 

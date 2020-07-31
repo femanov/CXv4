@@ -64,6 +64,7 @@ endif
 LIBMISC:=       $(call LIB_PREFIX_F,misc,misc)
 LIBUSEFUL:=     $(call LIB_PREFIX_F,useful,useful)
 LIBCXSCHEDULER:=$(call LIB_PREFIX_F,useful,cxscheduler)
+LIBMT_CXSCHEDULER:=$(call LIB_PREFIX_F,useful,mt_cxscheduler)
 
 LIBXH:=		$(call LIB_PREFIX_F,Xh,Xh)
 LIBXH_CXSCHEDULER:=	$(call LIB_PREFIX_F,Xh,Xh_cxscheduler)

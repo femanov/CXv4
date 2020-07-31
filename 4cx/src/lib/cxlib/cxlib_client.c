@@ -1499,7 +1499,7 @@ int  cx_rq_wr (int cd, int count, int *hwids, int *param1s, int *param2s,
                 errno = EINVAL;
                 return -1;
             }
-            
+
             reqcsize = CXV4_CHUNK_CEIL(sizeof(*wrrq) + bytesize * nelems[cn]);
             ////fprintf(stderr, "bytesize=%zd reqcsize=%zd\n", bytesize, reqcsize);
 
@@ -1538,6 +1538,187 @@ int  cx_rq_wr (int cd, int count, int *hwids, int *param1s, int *param2s,
     return 0;
 }
 
+int  cx_ch_open  (int cd, const char *name, int fail_on_err, int upd_cond,
+                  int  param1,  int  param2)
+{
+  v4conn_t       *cp = AccessV4connSlot(cd);
+  int             r;
+  size_t          bytesize;
+  CxV4Chunk      *req;
+
+  int             mon_cond;
+
+    if ((r = CheckCd(cd, CT_DATA, CS_CHUNKING)) != 0) return r;
+
+    bytesize = CXV4_CHUNK_CEIL(sizeof(*req) + strlen(name) + 1);
+    if (GrowSendBuf(cp, cp->sendbuf->DataSize + bytesize) != 0) return -1;
+
+    if      (upd_cond == CX_UPD_COND_ON_UPDATE) mon_cond = CX_MON_COND_ON_UPDATE;
+    else if (upd_cond == CX_UPD_COND_ON_CYCLE)  mon_cond = CX_MON_COND_ON_CYCLE;
+    else                                        mon_cond = CX_MON_COND_NEVER;
+
+    req  = cp->sendbuf->data + cp->sendbuf->DataSize;
+    bzero(req,  bytesize);
+
+    cp->sendbuf->DataSize += bytesize;
+    cp->sendbuf->NumChunks++;
+
+    req->OpCode   = CXC_CH_OPEN;
+    req->ByteSize = bytesize;
+    req->param1   = param1;
+    req->param2   = param2;
+    req->rs1      = fail_on_err;
+    req->rs2      = mon_cond;
+    strcpy(req->data, name);
+
+    return 0;
+}
+
+int  cx_ch_close (int cd, int chnd,
+                  int  param1,  int  param2)
+{
+  v4conn_t       *cp = AccessV4connSlot(cd);
+  int             r;
+  size_t          bytesize;
+  CxV4Chunk      *req;
+
+    if ((r = CheckCd(cd, CT_DATA, CS_CHUNKING)) != 0) return r;
+
+    bytesize = CXV4_CHUNK_CEIL(sizeof(*req));
+    if (GrowSendBuf(cp, cp->sendbuf->DataSize + bytesize) != 0) return -1;
+
+    req  = cp->sendbuf->data + cp->sendbuf->DataSize;
+    bzero(req,  bytesize);
+
+    cp->sendbuf->DataSize += bytesize;
+    cp->sendbuf->NumChunks++;
+
+    req->OpCode   = CXC_CH_CLOSE;
+    req->ByteSize = bytesize;
+    req->param1   = param1;
+    req->param2   = param2;
+    req->rs1      = chnd;
+
+    return 0;
+}
+
+int  cx_ch_rq_l_o(int cd, int chnd, int operation)
+{
+  v4conn_t       *cp = AccessV4connSlot(cd);
+  int             r;
+  size_t          bytesize;
+  CxV4Chunk      *req;
+
+    if ((r = CheckCd(cd, CT_DATA, CS_CHUNKING)) != 0) return r;
+
+    bytesize = CXV4_CHUNK_CEIL(sizeof(*req));
+    if (GrowSendBuf(cp, cp->sendbuf->DataSize + bytesize) != 0) return -1;
+
+    req  = cp->sendbuf->data + cp->sendbuf->DataSize;
+    bzero(req,  bytesize);
+
+    cp->sendbuf->DataSize += bytesize;
+    cp->sendbuf->NumChunks++;
+
+    req->OpCode   = CXC_CH_LOCK_OP;
+    req->ByteSize = bytesize;
+    req->rs1      = chnd;
+    req->rs2      = operation;
+
+    return 0;
+}
+
+int  cx_ch_peek  (int cd, int chnd)
+{
+  v4conn_t       *cp = AccessV4connSlot(cd);
+  int             r;
+  size_t          bytesize;
+  CxV4Chunk      *req;
+
+    if ((r = CheckCd(cd, CT_DATA, CS_CHUNKING)) != 0) return r;
+
+    bytesize = CXV4_CHUNK_CEIL(sizeof(*req));
+    if (GrowSendBuf(cp, cp->sendbuf->DataSize + bytesize) != 0) return -1;
+
+    req  = cp->sendbuf->data + cp->sendbuf->DataSize;
+    bzero(req,  bytesize);
+
+    cp->sendbuf->DataSize += bytesize;
+    cp->sendbuf->NumChunks++;
+
+    req->OpCode   = CXC_CH_PEEK;
+    req->ByteSize = bytesize;
+    req->rs1      = chnd;
+
+    return 0;
+}
+
+int  cx_ch_rq_rd (int cd, int chnd)
+{
+  v4conn_t       *cp = AccessV4connSlot(cd);
+  int             r;
+  size_t          bytesize;
+  CxV4Chunk      *req;
+
+    if ((r = CheckCd(cd, CT_DATA, CS_CHUNKING)) != 0) return r;
+
+    bytesize = CXV4_CHUNK_CEIL(sizeof(*req));
+    if (GrowSendBuf(cp, cp->sendbuf->DataSize + bytesize) != 0) return -1;
+
+    req  = cp->sendbuf->data + cp->sendbuf->DataSize;
+    bzero(req,  bytesize);
+
+    cp->sendbuf->DataSize += bytesize;
+    cp->sendbuf->NumChunks++;
+
+    req->OpCode   = CXC_CH_RQRD;
+    req->ByteSize = bytesize;
+    req->rs1      = chnd;
+
+    return 0;
+}
+
+int  cx_ch_rq_wr (int cd, int chnd,
+                  cxdtype_t dtype, int nelems, void *data)
+{
+  v4conn_t       *cp = AccessV4connSlot(cd);
+  int             r;
+  size_t          unitsize;
+  size_t          datasize;
+  size_t          bytesize;
+  CxV4Chunk      *req;
+
+    if ((r = CheckCd(cd, CT_DATA, CS_CHUNKING)) != 0) return r;
+
+    unitsize = sizeof_cxdtype(dtype);
+    if (unitsize > 8  ||  /*!!! int128/float128 are illegal as for now */
+        nelems > CX_V4_MAX_DATASIZE / unitsize /* This check with '/' also protects from unitsize*nelems overflow */)
+    {
+        errno = EINVAL;
+        return -1;
+    }
+    datasize = unitsize * nelems;
+
+    bytesize = CXV4_CHUNK_CEIL(sizeof(*req) + datasize);
+    if (GrowSendBuf(cp, cp->sendbuf->DataSize + bytesize) != 0) return -1;
+
+    req  = cp->sendbuf->data + cp->sendbuf->DataSize;
+    bzero(req,  bytesize);
+
+    cp->sendbuf->DataSize += bytesize;
+    cp->sendbuf->NumChunks++;
+
+    req->OpCode   = CXC_CH_RQWR;
+    req->ByteSize = bytesize;
+    req->rs1      = chnd;
+    req->rs2      = dtype;
+    req->rs3      = nelems;
+    if (datasize != 0)
+        memcpy(req->data, data, datasize);
+
+    return 0;
+}
+
 static void async_CXT4_DATA_IO    (v4conn_t *cp, CxV4Header *rcvd, size_t rcvdsize)
 {
   int        numcns;          // # of chunks in reply
@@ -1547,16 +1728,23 @@ static void async_CXT4_DATA_IO    (v4conn_t *cp, CxV4Header *rcvd, size_t rcvdsi
   size_t     rpycsize;        // RePlY chunk size in bytes
   size_t     rpylen;          // RePlY *data* LENgth in bytes
 
+  cxdtype_t  dtype;
+  size_t     unitsize;
+
   CxV4ResultChunk      *rslt;
+  CxV4_NT_AVALUE_Chunk *aval;
   cx_newval_info_t      nvi;
 
   CxV4CpointPropsChunk *prps;
   cx_rslv_info_t        rsi;
+  CxV4_NT_OPEN_Chunk   *opnc;
+  cx_ch_open_info_t     opi;
 
   CxV4FreshAgeChunk    *frsh;
   cx_fresh_age_info_t   fai;
 
   CxV4StrsChunk        *strd;
+  CxV4_NT_STRS_Chunk   *strc;
   cx_strs_info_t        sti;
   int                   strcount;
   int                   ns;
@@ -1591,6 +1779,7 @@ static void async_CXT4_DATA_IO    (v4conn_t *cp, CxV4Header *rcvd, size_t rcvdsi
         rpylen   = rpycsize - sizeof(CxV4Chunk);
         /*!!! Any checks? */
 ////fprintf(stderr, "\top=%08x sz=%zd\n", rpy->OpCode, rpycsize);
+        if (rpycsize < sizeof(*rpy)) continue; /*!!!*/
 
         switch (rpy->OpCode)
         {
@@ -1716,6 +1905,130 @@ static void async_CXT4_DATA_IO    (v4conn_t *cp, CxV4Header *rcvd, size_t rcvdsi
                 loi.param2   = rpy->param2;
                 loi.lockstat = lost->lockstat_result;
                 CallNotifier(cp, CAR_LOCKSTAT, &loi);
+                break;
+
+//--------------------------------------------------------------------
+
+            case CXC_NT_NEWVAL:
+            case CXC_NT_CURVAL:
+                if (rpycsize < sizeof(*aval)) {/*fprintf(stderr, "AVAL: %zd<%zd\n", rpycsize, sizeof(*aval));*/ continue;}
+                aval = (void*)rpy;
+                nvi.hwid      = rpy->rs1;
+                nvi.param1    = rpy->param1;
+                nvi.param2    = rpy->param2;
+                nvi.is_update = (rpy->OpCode == CXC_NT_NEWVAL);
+                nvi.dtype     = aval->dtype;
+                nvi.nelems    = aval->nelems;
+                nvi.rflags    = aval->rflags;
+                nvi.timestamp.nsec = aval->timestamp_nsec;
+                nvi.timestamp.sec  = aval->timestamp_sec_lo32; /*!!! +_hi32<<32*/
+                nvi.data      = aval->data;
+                CallNotifier(cp, CAR_NEWDATA, &nvi);
+                break;
+
+            case CXC_NT_OPEN_NOTFOUND:
+            case CXC_NT_OPEN_FOUND_STAGE1:
+            case CXC_NT_OPEN_FOUND_STAGE2:
+                if (rpycsize < sizeof(*opnc)) continue;
+                opnc = (void*)rpy;
+                opi.chnd   = opnc->ck.rs1;
+                opi.param1 = opnc->ck.param1;
+                opi.param2 = opnc->ck.param2;
+                if (rpy->OpCode == CXC_NT_OPEN_NOTFOUND)
+                    opi.status = -1;
+                else
+                    opi.status = (rpy->OpCode == CXC_NT_OPEN_FOUND_STAGE2);
+                opi.hwid       = opnc->hwid;
+                opi.rw         = opnc->rw;
+                opi.dtype      = opnc->dtype;
+                opi.max_nelems = opnc->max_nelems;
+                if (rpylen < 2)
+                    opi.name = NULL;
+                else
+                {
+                    opnc->name[rpylen-1] = '\0';
+                    opi.name = opnc->name;
+                }
+                CallNotifier(cp, CAR_CH_OPEN_RESULT, &opi);
+                break;
+
+            case CXC_NT_LOCKSTAT:
+                loi.hwid     = rpy->rs1;
+                loi.param1   = rpy->param1;
+                loi.param2   = rpy->param2;
+                loi.lockstat = rpy->rs2;
+                CallNotifier(cp, CAR_LOCKSTAT, &loi);
+                break;
+
+            case CXC_NT_STRS:
+                if (rpycsize < sizeof(*strc)) continue;
+                strc = (void*)rpy;
+                strcount = countof(strc->offsets);
+                if (strcount > countof(sti.strings))
+                    strcount = countof(sti.strings);
+                /*!!! Note: MUST check for buffer overflow */
+                bzero(&sti, sizeof(sti));
+                sti.param1 = rpy->param1;
+                sti.param2 = rpy->param2;
+                for (ns = 0;  ns < strcount;  ns++)
+                    sti.strings[ns] = strc->offsets[ns] >= 0? strc->data + strc->offsets[ns]
+                                                            : NULL;
+                CallNotifier(cp, CAR_STRS, &sti);
+                break;
+
+            case CXC_NT_RDS:
+                dtype    = rpy->rs2;
+                if (dtype != CXDTYPE_DOUBLE) continue; // ...
+                phys_count = rpy->rs3;
+                if (phys_count < 0  ||  phys_count > 1000)     continue;
+                if (rpylen < sizeof(float64) * phys_count * 2) continue;
+
+                if (phys_count > RDS_MAX_COUNT) phys_count = RDS_MAX_COUNT;
+                rdi.hwid   = rpy->rs1;
+                rdi.param1 = rpy->param1;
+                rdi.param2 = rpy->param2;
+                rdi.phys_count = phys_count;
+                rdi.rds    = rds_buf;
+                if (phys_count > 0)
+                    memcpy(rds_buf, rpy->data,
+                           sizeof(rds_buf[0]) * 2 * phys_count);
+                CallNotifier(cp, CAR_RDS, &rdi);
+                break;
+
+            case CXC_NT_FRH_AGE:
+                fai.hwid   = rpy->rs1;
+                fai.param1 = rpy->param1;
+                fai.param2 = rpy->param2;
+                fai.fresh_age.nsec = rpy->rs2;
+                fai.fresh_age.sec  = rpy->rs3; /*!!! +_rs4<<32*/
+                CallNotifier(cp, CAR_FRESH_AGE, &fai);
+                break;
+
+            case CXC_NT_QUANT:
+                dtype    = rpy->rs2;
+                unitsize = sizeof_cxdtype(dtype);
+                if (unitsize > sizeof(qui.q))        continue; // BIGTYPE
+                if (rpylen < unitsize)               continue;
+                qui.hwid        = rpy->rs1;
+                qui.param1      = rpy->param1;
+                qui.param2      = rpy->param2;
+                qui.q_dtype     = dtype;
+                memcpy(&(qui.q),    rpy->data,          unitsize);
+                CallNotifier(cp, CAR_QUANT, &qui);
+                break;
+
+            case CXC_NT_RANGE:
+                dtype    = rpy->rs2;
+                unitsize = sizeof_cxdtype(dtype);
+                if (unitsize > sizeof(rni.range[0])) continue; // BIGTYPE
+                if (rpylen < unitsize*2)             continue;
+                rni.hwid        = rpy->rs1;
+                rni.param1      = rpy->param1;
+                rni.param2      = rpy->param2;
+                rni.range_dtype = dtype;
+                memcpy(rni.range+0, rpy->data,          unitsize);
+                memcpy(rni.range+1, rpy->data+unitsize, unitsize);
+                CallNotifier(cp, CAR_RANGE, &rni);
                 break;
         }
     }

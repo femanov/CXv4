@@ -1,0 +1,94 @@
+devtype modbus_tcp_rb r100i {
+	r4x<1-5>	0
+
+	r4x1b<0-15>	10
+	r4x2b<0-15>	26
+	r4x3b<0-15>	42
+	r4x4b<0-15>	58
+	r4x5b<0-15>	74
+
+	DI5		r4x1b0
+	DI6		r4x1b1
+	DI7		r4x1b2
+	DI8		r4x1b3
+	DI9		r4x1b4
+	DI10		r4x1b5
+	DI11		r4x1b6
+	DI12		r4x1b7
+	DI13		r4x1b8
+	DI14		r4x1b9
+	DI15		r4x1b10
+	DI16		r4x1b11
+	DI17		r4x1b12
+	DI18		r4x1b13
+	DI19		r4x1b14
+	DI20		r4x1b15
+
+	DI21		r4x2b0
+	DI22		r4x2b1
+	DI23		r4x2b2
+	DI24		r4x2b3
+	DI25		r4x2b4
+	DI26		r4x2b5
+	DI27		r4x2b6
+	DI28		r4x2b7
+	DI29		r4x2b8
+	DI30		r4x2b9
+	DI31		r4x2b10
+	DI32		r4x2b11
+	DI33		r4x2b12
+	DI34		r4x2b13
+	DI35		r4x2b14
+	DI36		r4x2b15
+
+	DO5		r4x3b0
+	DO6		r4x3b1
+	DO7		r4x3b2
+	DO8		r4x3b3
+	DO9		r4x3b4
+	DO10		r4x3b5
+	DO11		r4x3b6
+	DO12		r4x3b7
+	DO13		r4x3b8
+	DO14		r4x3b9
+	DO15		r4x3b10
+	DO16		r4x3b11
+	DO17		r4x3b12
+	DO18		r4x3b13
+	DO19		r4x3b14
+	DO20		r4x3b15
+
+	DO21 		r4x4b0
+	DO22 		r4x4b1
+	DO23 		r4x4b2
+	DO24 		r4x4b3
+	u4b4 		r4x4b4
+	u4b5 		r4x4b5
+	u4b6 		r4x4b6
+	u4b7 		r4x4b7
+	DI1 		r4x4b8
+	DI2 		r4x4b9
+	DI3 		r4x4b10
+	DI4 		r4x4b11
+	DO1 		r4x4b12
+	DO2 		r4x4b13
+	DO3 		r4x4b14
+	DO4 		r4x4b15
+
+	DIR01		r4x5b0
+	DIR02		r4x5b1
+	DIR03		r4x5b2
+	DIR04		r4x5b3
+	DIR05		r4x5b4
+	DIR06		r4x5b5
+	DIR07		r4x5b6
+	DIR08		r4x5b7
+	DIR09		r4x5b8
+	DIR10		r4x5b9
+	DIR11		r4x5b10
+	DIR12		r4x5b11
+	DIR13		r4x5b12
+	DIR14		r4x5b13
+	DIR15		r4x5b14
+	DIR16		r4x5b15
+}

@@ -5,6 +5,7 @@ TYPES_LIST=	ist_cdac20 vnn_ceac51 v1k_cdac20 v3h_a40d16 mps20_ceac124 \
 		lebedev_subharmonic \
 		lebedev_lincamsel lebedev_linsenctl \
 		lebedev_ringcamsel lebedev_turnmag \
+		modbus_tcp_rb \
 		vepp4_gimn \
 		v5k5045 \
 		v5phaseconv \

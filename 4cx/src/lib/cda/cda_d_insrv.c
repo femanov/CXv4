@@ -448,7 +448,7 @@ static void insrv_fd_p(int uniq, void *privptr1,
 
 static int  cda_d_insrv_new_chan(cda_dataref_t ref, const char *name,
                                  int options,
-                                 cxdtype_t dtype, int nelems)
+                                 cxdtype_t dtype, int max_nelems)
 {
   cda_d_insrv_privrec_t *me;
 

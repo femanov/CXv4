@@ -746,7 +746,7 @@ static void canipp_in(int devid, void *devptr,
                     me->unit_CREG  [unit] = code;
                 }
                 rflags = (me->unit_online [unit]? 0 : CXRF_CAMAC_NO_Q);
-DoDriverLog(devid, 0, "unit=%-02d %c:%-2d M=%d P=%d CREG=%d", unit, me->unit_kind==UNIT_KIND_REPKOV?'r':'c', me->unit_nwires[unit], me->unit_M[unit], me->unit_P[unit], me->unit_CREG[unit]);
+DoDriverLog(devid, 0, "unit=%-2d %c:%-2d M=%d P=%d CREG=%d", unit, me->unit_kind[unit]==UNIT_KIND_REPKOV?'r':'c', me->unit_nwires[unit], me->unit_M[unit], me->unit_P[unit], me->unit_CREG[unit]);
 
                 ReturnInt32Datum(devid,
                                  CANIPP_CHAN_M_n_base      + unit,

@@ -5,7 +5,7 @@ CLNHOSTS=	linac3 worker1 camilla2 io io2 vepp4-pult6 PULT \
 		tower ep1-berezin2 xweld
 ACCESSGROUPS=	vepp5
 
-cxhw_SERVERS=		15 16 17 18 24 25 26
+cxhw_SERVERS=		15 16 17 18 24 25 26 27
 canhw_SERVERS=		11 12 13 14 19 21 22 23
 foxy_SERVERS=		20
 v2k-k500-1_SERVERS=	23

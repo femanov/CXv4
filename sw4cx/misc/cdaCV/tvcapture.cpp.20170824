@@ -1,0 +1,101 @@
+#include <opencv/cv.h>
+#include <opencv/highgui.h>
+#include <stdlib.h>
+#include <stdio.h>
+#include <iostream>
+
+using namespace cv;
+using namespace std;
+
+int quadrant = 0;
+const Rect mainRoi(60,30,580,450);
+const Rect roi[] = {Rect(0,0,580,450),Rect(0,0,290,225),Rect(290,0,290,225),Rect(0,225,290,225),Rect(290,225,290,225)};
+
+const int aftershots=3;
+
+int main(int argc, char* argv[])
+{
+
+	if(argc>1) quadrant = atoi(argv[1]);
+
+	// получаем любую подключённую камеру
+	CvCapture* capture = cvCreateCameraCapture(CV_CAP_ANY); //cvCaptureFromCAM( 0 );
+	assert(capture);
+
+	//      cvSetCaptureProperty(capture, CV_CAP_PROP_FRAME_WIDTH, 720);//1280); 
+	//      cvSetCaptureProperty(capture, CV_CAP_PROP_FRAME_HEIGHT, 576);//960); 
+
+	// узнаем ширину и высоту кадра
+	double width = cvGetCaptureProperty(capture, CV_CAP_PROP_FRAME_WIDTH);
+	double height = cvGetCaptureProperty(capture, CV_CAP_PROP_FRAME_HEIGHT);
+	printf("[i] %.0f x %.0f\n", width, height );
+
+	IplImage* frame=0;
+
+	cvNamedWindow("Live beam", CV_WINDOW_AUTOSIZE);
+	cvNamedWindow("Last beam", CV_WINDOW_AUTOSIZE);
+	
+
+	for (int i=1; i<aftershots; i++)
+	{
+		char _name[50];
+		sprintf(_name,"Last beam %i",i);
+		cvNamedWindow(_name, CV_WINDOW_AUTOSIZE);
+	}
+
+	printf("[i] press Enter for capture image and Esc for quit!\n\n");
+
+	
+	double prev_avg;
+	while(true)
+	{
+		// получаем кадр
+		frame = cvQueryFrame(capture);
+		Mat img = cvarrToMat(frame);
+		Mat img_1 = img(mainRoi);
+		Mat gs = img_1(roi[quadrant]);
+		// показываем
+		imshow("Live beam", img_1);
+
+		Scalar avg(mean(gs));
+//		cout << gs.rows << "\t" << avg.val[0] << "\n";
+
+		if(avg.val[0]/prev_avg>1.10)
+		{
+			printf("%f %f\n", prev_avg, (double)avg.val[0]);
+			imshow("Last beam", gs);
+			
+			//Цикл показа следующих кадров.	
+			for (int i=1;i<aftershots;i++)
+			{
+				usleep(40000);
+				// получаем кадр
+				frame = cvQueryFrame(capture);
+				Mat img = cvarrToMat(frame);
+				Mat img_1 = img(mainRoi);
+				Mat gs = img_1(roi[quadrant]);
+				// показываем
+				char _name[50];
+				sprintf(_name,"Last beam %i",i);
+				imshow(_name, gs);
+			}
+		}
+		prev_avg = avg.val[0];
+
+		char c = cvWaitKey(35);
+		if (c == 10) // нажата Enter
+		{ 
+	   		imshow("Last beam", gs);
+			//cvShowImage("Last beam", gs);
+		}
+		else if (c == 27) // нажата ESC
+		{ 
+			break;
+		}
+	}
+// освобождаем ресурсы
+cvReleaseCapture( &capture );
+cvDestroyWindow("Live beam");
+cvDestroyWindow("Last beam");
+return 0;
+}

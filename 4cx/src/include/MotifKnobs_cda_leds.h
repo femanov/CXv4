@@ -33,6 +33,7 @@ typedef struct
 
 
 int MotifKnobs_oneled_create    (MotifKnobs_oneled_t *led,
+                                 MotifKnobs_leds_t *parent_leds,
                                  Widget  parent, int size,
                                  const char *srvname);
 int MotifKnobs_oneled_set_status(MotifKnobs_oneled_t *led, int status);

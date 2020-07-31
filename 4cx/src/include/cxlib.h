@@ -13,6 +13,15 @@ extern "C"
 #include "cx.h"
 
 
+// Note: as of 17.07.2020, those codes are unified with cx_proto_v4.h's CX_MON_COND_nnn.
+enum
+{
+    CX_UPD_COND_NEVER     = 0,  // Never send any updates and NEVER request reads
+    CX_UPD_COND_ON_UPDATE = 1,  // Send updates immediately
+    CX_UPD_COND_ON_CYCLE  = 2,  // Request read on every cycle beginning and send updates at cycle end
+};
+
+
 /*==== Some additional error codes -- all are negative =============*/
 #define CEINTERNAL     (-1)   /* Internal cxlib problem or data corrupt */
 #define CENOHOST       (-2)   /* Unknown host */
@@ -63,6 +72,7 @@ enum {
          CAR_QUANT,
          CAR_RANGE,
          CAR_LOCKSTAT,
+         CAR_CH_OPEN_RESULT,
 
          CAR_ECHO = 200,      /* Echo packet */
          CAR_KILLED,          /* Connection was killed by server */
@@ -110,6 +120,20 @@ typedef struct
     cxdtype_t  dtype;  // cxdtype_t, with 3 high bytes of 0s
     int        nelems; // Max # of units; ==1 for scalar channels
 } cx_rslv_info_t;
+
+typedef struct
+{
+    int        chnd;
+    int        param1;
+    int        param2;
+    int        status;     // <0 -- fail, ==0 - success, stage 1, >0 - success, stage2
+    // Info props
+    int        hwid;       // HWchan ID -- internal channel address (if appropriate)
+    int        rw;         // 0 -- readonly, 1 -- read/write
+    cxdtype_t  dtype;      // cxdtype_t, with 3 high bytes of 0s
+    int        max_nelems; // Max # of units; ==1 for scalar channels
+    const char*name;
+} cx_ch_open_info_t;
 
 typedef struct
 {
@@ -199,6 +223,16 @@ int  cx_rd_cur(int cd, int count, int *hwids, int *param1s, int *param2s);
 int  cx_rq_rd (int cd, int count, int *hwids, int *param1s, int *param2s);
 int  cx_rq_wr (int cd, int count, int *hwids, int *param1s, int *param2s,
                cxdtype_t *dtypes, int *nelems, void **values);
+
+int  cx_ch_open  (int cd, const char *name, int fail_on_err, int upd_cond,
+                  int  param1,  int  param2);
+int  cx_ch_close (int cd, int chnd,
+                  int  param1,  int  param2);
+int  cx_ch_rq_l_o(int cd, int chnd, int operation);
+int  cx_ch_peek  (int cd, int chnd);
+int  cx_ch_rq_rd (int cd, int chnd);
+int  cx_ch_rq_wr (int cd, int chnd,
+                  cxdtype_t dtype, int nelems, void *data);
 
 
 int  cx_seeker(int            uniq,     void *privptr1,

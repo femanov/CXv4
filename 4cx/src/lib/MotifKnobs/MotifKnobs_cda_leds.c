@@ -11,10 +11,18 @@
 
 
 static void ledCB(Widget     w,
-                  XtPointer  closure    __attribute__((unused)),
+                  XtPointer  closure,
                   XtPointer  call_data  __attribute__((unused)))
 {
+  MotifKnobs_leds_t *parent_leds = (void *)closure;
+  int                n;
+  int                nth;
+
     XtVaSetValues(w, XmNset, False, NULL);
+
+    for (nth = -1, n = 0;  n < parent_leds->count;  n++)
+        if (w == parent_leds->leds[n].w) nth = n;
+            cda_reconnect_srv(parent_leds->cid, nth);
 }
 
 static void BlockButton2Handler(Widget     w        __attribute__((unused)),
@@ -29,6 +37,7 @@ static void BlockButton2Handler(Widget     w        __attribute__((unused)),
 }
 
 int MotifKnobs_oneled_create    (MotifKnobs_oneled_t *led,
+                                 MotifKnobs_leds_t *parent_leds,
                                  Widget  parent, int size,
                                  const char *srvname)
 {
@@ -62,7 +71,7 @@ int MotifKnobs_oneled_create    (MotifKnobs_oneled_t *led,
                       NULL);
 
     XhSetBalloon     (w, srvname);
-    XtAddCallback    (w, XmNvalueChangedCallback, ledCB, NULL);
+    XtAddCallback    (w, XmNvalueChangedCallback, ledCB, parent_leds);
     XtAddEventHandler(w, ButtonPressMask, False, BlockButton2Handler, NULL); // Temporary countermeasure against Motif Bug#1117
 
     led->w      = w;
@@ -146,6 +155,7 @@ int MotifKnobs_leds_grow        (MotifKnobs_leds_t *leds)
     for (n = old_count;  n < new_count;  n++)
     {
         MotifKnobs_oneled_create    (leds->leds + n,
+                                     leds,
                                      leds->parent, leds->size,
                                      cda_status_srv_name(leds->cid, n));
         MotifKnobs_oneled_set_status(leds->leds + n,

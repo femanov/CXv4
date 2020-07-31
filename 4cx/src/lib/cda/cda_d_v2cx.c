@@ -312,7 +312,7 @@ static int  channame2chan_n(const char *channame, int channamelen)
 
 static int  cda_d_v2cx_new_chan(cda_dataref_t ref, const char *name,
                                 int options,
-                                cxdtype_t dtype, int nelems)
+                                cxdtype_t dtype, int max_nelems)
 {
   cda_d_v2cx_privrec_t *me;
 
@@ -512,7 +512,7 @@ static int  cda_d_v2cx_new_chan(cda_dataref_t ref, const char *name,
 
         /* Okay, the vector bigc itself */
         nargs      = number;
-        retbufsize = sizeof_cxdtype(dtype) * nelems;
+        retbufsize = sizeof_cxdtype(dtype) * max_nelems;
 
         /* Allocate a combined buffer for all data */
         bufsize = 0;

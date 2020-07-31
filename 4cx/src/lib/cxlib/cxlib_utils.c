@@ -137,6 +137,7 @@ static reason_descr_t _cx_cardescrs[] = {
     {CAR_QUANT,       "QUANT"},
     {CAR_RANGE,       "RANGE"},
     {CAR_LOCKSTAT,    "LOCKSTAT"},
+    {CAR_CH_OPEN_RESULT,"CH_OPEN result"},
     
     {CAR_ECHO,        "Echo packet"},
     {CAR_KILLED,      "Connection was killed by server"},

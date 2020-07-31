@@ -777,7 +777,7 @@ int main(int argc, char *argv[])
                        "  hist_len=NNNNN  -- history length in points (default=%d)\n"
                        "  mode=TYPE       -- plot mode (line, wide, dots, blot; default=line)\n"
                        "\n"
-                       "CHANNELS_TO_PLOT format: [%DPYFMT:]{CHAN_PARAM:}REFERENCE\n"
+                       "CHANNELS_TO_PLOT format: [%%DPYFMT:]{CHAN_PARAM:}REFERENCE\n"
                        "\n"
                        "  DPYFMT     is a printf format (one of %%f, %%e, %%g)\n"
                        "  CHAN_PARAM is one of:\n"

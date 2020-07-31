@@ -1,1 +1,0 @@
-adc4x250: adc4x250.o adc4x250_data.o adc4x250_gui.o 

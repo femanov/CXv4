@@ -10,7 +10,7 @@
 #include "cda.h"
 #include "cdaP.h"
 
-#include "cda_d_cx.h"
+#include "cda_d_cx4old.h"
 
 
 static int IsATemporaryCxError(void)
@@ -24,35 +24,26 @@ static int IsATemporaryCxError(void)
 
 enum
 {
-//    RSLV_TYPE_HWID = 1,  // server.hwid -- no resolving required
-    RSLV_TYPE_NAME = 2,  // server.name -- resolve name->chnd within server
+    RSLV_TYPE_HWID = 1,  // server.hwid -- no resolving required
+    RSLV_TYPE_NAME = 2,  // server.name -- resolve name->hwid within server
     RSLV_TYPE_GLBL = 3,  // global_name -- first find server-owner, than resolve within server
 };
 
 enum
 {
     RSLV_STATE_UNKNOWN = 0, // _GLBL with no known relation to server
-    RSLV_STATE_SERVER  = 1, // _GLBL with known server or _NAME; chnd unknown
+    RSLV_STATE_SERVER  = 1, // _GLBL with known server or _NAME; hwid unknown
     RSLV_STATE_ABSENT  = 2, // Any type which isn't found
-    RSLV_STATE_FOUND1  = 3, // Any type after CXC_NT_OPEN_FOUND_STAGE1 and before CXC_NT_OPEN_FOUND_STAGE2
-    RSLV_STATE_DONE    = 4, // Any type resolved to known chnd
+    RSLV_STATE_DONE    = 3, // Any type resolved to known hwid
 };
 
 enum
 {
-    MODE_ON_UPDATE = 1 << 0,  // } Note: these 2 flags are INTENTIONALLY set to 2 lower bits,
-    MODE_NOMONITOR = 1 << 1,  // }       for them to be usable as array index
+    MODE_ON_UPDATE = 1 << 0,
+    MODE_NOMONITOR = 1 << 1,
     MODE_RQ_LOCK   = 1 << 2,
 
     MODE_MON_TYPE_mask = MODE_ON_UPDATE | MODE_ON_UPDATE,
-};
-// Usage: mode2upd_cond[hi->mode & MODE_MON_TYPE_mask]
-static int mode2upd_cond[4] =
-{
-    CX_UPD_COND_ON_CYCLE,  // on_update=0 nomonitor=0
-    CX_UPD_COND_ON_UPDATE, // on_update=1 nomonitor=0
-    CX_UPD_COND_NEVER,     // on_update=0 nomonitor=1
-    CX_UPD_COND_NEVER,     // on_update=1 nomonitor=1
 };
 
 enum
@@ -69,7 +60,7 @@ typedef struct
     cda_dataref_t  dataref; // "Backreference" to corr.entry in the global table
     char          *name;
 
-    int            chnd;
+    int            hwid;
     int            rslv_type;
     int            rslv_state;
     int            mode;
@@ -182,14 +173,14 @@ static void DestroyCxPrivrec(cda_d_cx_privrec_t *me)
 static inline cda_d_cx_privrec_t * get_DATA_IO_server (cda_dataref_t  source_ref,
                                                        const char    *srvrspec)
 {
-    return cda_dat_p_get_server(source_ref, &CDA_DAT_P_MODREC_NAME(cx),
+    return cda_dat_p_get_server(source_ref, &CDA_DAT_P_MODREC_NAME(cx4old),
                                 srvrspec,
                                 SRVTYPE_DATA_IO | CDA_DAT_P_GET_SERVER_OPT_NONE);
 }
 
 static inline cda_d_cx_privrec_t * get_RESOLVER_server(cda_dataref_t  source_ref)
 {
-    return cda_dat_p_get_server(source_ref, &CDA_DAT_P_MODREC_NAME(cx),
+    return cda_dat_p_get_server(source_ref, &CDA_DAT_P_MODREC_NAME(cx4old),
                                 "RESOLVER",
                                 SRVTYPE_RESOLVER | CDA_DAT_P_GET_SERVER_OPT_NOLIST);
 }
@@ -247,6 +238,15 @@ static int determine_name_type(const char *name,
     for (vp = srvrspec;  *vp != '\0';  vp++) *vp = tolower(*vp);
 
     return srv_len != 0;
+}
+
+static inline void do_subscribe(cda_d_cx_privrec_t *me, hwrinfo_t *hi, cda_hwcnref_t hwr)
+{
+    cx_rd_cur(me->cd, 1, &(hi->hwid), &hwr, NULL);
+    if ((hi->mode & MODE_NOMONITOR) == 0)
+        cx_setmon(me->cd, 1, &(hi->hwid), &hwr, NULL, (hi->mode & MODE_ON_UPDATE)? 1 : 0);
+    if ((hi->mode & MODE_RQ_LOCK)   != 0)
+        cx_rq_l_o(me->cd,  hi->hwid,   hwr, 0, CX_LOCK_WR | CX_LOCK_ALLORNOTHING);
 }
 
 static int  cda_d_cx_new_chan(cda_dataref_t ref, const char *name,
@@ -317,8 +317,6 @@ static int  cda_d_cx_new_chan(cda_dataref_t ref, const char *name,
 
     if (w_srv)
     {
-        hi->rslv_type = RSLV_TYPE_NAME;
-
         me = get_DATA_IO_server(ref, srvrspec);
         if (me == NULL)
         {
@@ -327,21 +325,33 @@ static int  cda_d_cx_new_chan(cda_dataref_t ref, const char *name,
         }
         AddHwrToSrv(me, hwr);
 
+        hi->hwid = strtol(hi->name, &errp, 10);
+        if (errp == hi->name  ||  *errp != '\0')
+            hi->rslv_type = RSLV_TYPE_NAME;
+        else
+            hi->rslv_type = RSLV_TYPE_HWID;
+
         if (me->state == CDA_DAT_P_OPERATING)
         {
-            cx_begin  (me->cd);
-            hi->rslv_state = RSLV_STATE_SERVER;
-            cx_ch_open(me->cd, hi->name, 0/*fail_on_err*/,
-                       mode2upd_cond[hi->mode & MODE_MON_TYPE_mask], hwr, 0);
-            cx_run    (me->cd);
+            cx_begin(me->cd);
+            if      (hi->rslv_type == RSLV_TYPE_NAME)
+            {
+                hi->rslv_state = RSLV_STATE_SERVER;
+                cx_rslv(me->cd, hi->name, hwr, 0);
+            }
+            else
+            {
+                hi->rslv_state = RSLV_STATE_DONE;
+                do_subscribe(me, hi, hwr);
+                /*!!! Obtain parameters */
+                cda_dat_p_set_ready(hi->dataref, 1);
+            }
+            cx_run(me->cd);
         }
     }
     else
     {
         ////fprintf(stderr, "<%s>\n", hi->name);
-        hi->rslv_type  = RSLV_TYPE_GLBL;
-        hi->rslv_state = RSLV_STATE_UNKNOWN;
-
         me = get_RESOLVER_server(ref);
         if (me == NULL)
         {
@@ -350,6 +360,9 @@ static int  cda_d_cx_new_chan(cda_dataref_t ref, const char *name,
         }
         AddHwrToSrv(me, hwr);
         cda_dat_p_report_rslvstat(hi->dataref, CDA_RSLVSTAT_SEARCHING);
+
+        hi->rslv_type  = RSLV_TYPE_GLBL;
+        hi->rslv_state = RSLV_STATE_UNKNOWN;
     }
 
     return CDA_DAT_P_NOTREADY;
@@ -370,9 +383,11 @@ static void cda_d_cx_del_chan(void *pdt_privptr, cda_hwcnref_t hwr)
     if (me->state == CDA_DAT_P_OPERATING)
     {
         /* Send "release" */
-        cx_begin   (me->cd);
-        cx_ch_close(me->cd, hi->chnd, hwr, 0);
-        cx_run     (me->cd);
+        cx_begin (me->cd);
+        if ((hi->mode & MODE_RQ_LOCK) != 0) /* Note: we request lock-reset BEFORE delmon() */
+            cx_rq_l_o(me->cd,  hi->hwid,   hwr, 0, CX_LOCK_ALLORNOTHING);
+        cx_delmon(me->cd, 1, &(hi->hwid), &hwr, NULL, (hi->mode & MODE_ON_UPDATE)? 1 : 0);
+        cx_run   (me->cd);
     }
 
     DelHwrFromSrv(me, hwr); /*!!! Should check if hwr belongs to me! */
@@ -397,12 +412,12 @@ static int  cda_d_cx_snd_data(void *pdt_privptr, cda_hwcnref_t hwr,
     }
 
     if (me->state      == CDA_DAT_P_OPERATING  &&
-        hi->rslv_state >= RSLV_STATE_FOUND1)
+        hi->rslv_state == RSLV_STATE_DONE)
     {
-        if (cx_begin   (me->cd)               < 0  ||
-            cx_ch_rq_wr(me->cd, hi->chnd,
-                        dtype, nelems, value) < 0  ||
-            cx_run     (me->cd)               < 0)
+        if (cx_begin(me->cd)         < 0  ||
+            cx_rq_wr(me->cd, 1, &(hi->hwid), &hwr, NULL, 
+            &dtype, &nelems, &value) < 0  ||
+            cx_run  (me->cd)         < 0)
             return CDA_PROCESS_ERR;
     }
 
@@ -433,8 +448,8 @@ static int  cda_d_cx_lock_op (void *pdt_privptr,
     for (n = 0;  n < count;  n++)
         if (hwrs[n] >= HWR_MIN_VAL  &&  hwrs[n] < hwrs_list_allocd  &&
             (hi = AccessHwrSlot(hwrs[n]))->in_use  &&
-            hi->rslv_state >= RSLV_STATE_FOUND1)
-            cx_ch_rq_l_o(me->cd, hi->chnd, operation);
+            hi->rslv_state == RSLV_STATE_DONE)
+            cx_rq_l_o(me->cd, hi->hwid, hwrs[n], 0, operation);
     cx_run(me->cd); /*!!! Maybe count number of requests and if ==0 then cancel request? */
 
     return 0;
@@ -498,11 +513,17 @@ static void SuccessProc(cda_d_cx_privrec_t *me)
         hi = AccessHwrSlot(hwr);
         next = hi->next;
         if      (hi->rslv_type == RSLV_TYPE_NAME  ||
-                 hi->rslv_type == RSLV_TYPE_GLBL/*!!! WHAT does "GLBL" do here? */)
+                 hi->rslv_type == RSLV_TYPE_GLBL)
         {
             hi->rslv_state = RSLV_STATE_SERVER;
-            cx_ch_open(me->cd, hi->name, 0/*fail_on_err*/,
-                       mode2upd_cond[hi->mode & MODE_MON_TYPE_mask], hwr, 0);
+            cx_rslv(me->cd, hi->name, hwr, 0);
+        }
+        else if (hi->rslv_type == RSLV_TYPE_HWID)
+        {
+            hi->rslv_state = RSLV_STATE_DONE;
+            do_subscribe(me, hi, hwr);
+            /*!!! Obtain parameters */
+            cda_dat_p_set_ready(hi->dataref, 1);
         }
     }
     if (cx_run(me->cd) < 0) return;
@@ -551,7 +572,6 @@ static void FailureProc(cda_d_cx_privrec_t *me, int reason)
     {
         hi = AccessHwrSlot(hwr);
         next = hi->next;
-        hi->chnd = -1;
         if      (hi->rslv_type == RSLV_TYPE_GLBL)
         {
             if (rs == NULL)
@@ -577,7 +597,9 @@ static void FailureProc(cda_d_cx_privrec_t *me, int reason)
         {
             hi->rslv_state = RSLV_STATE_SERVER;
             cda_dat_p_set_ready(hi->dataref, 0);
+
         }
+        /* Nothing to do with  == RSLV_TYPE_HWID */
     }
     
     /* Forget old connection */
@@ -600,13 +622,13 @@ static void ProcessCxlibEvent(int uniq, void *unsdptr,
   cda_d_cx_privrec_t *rs;
 
   const cx_newval_info_t    *nvi;
+  const cx_rslv_info_t      *rsi;
   const cx_fresh_age_info_t *fai;
   const cx_rds_info_t       *rdi;
   const cx_strs_info_t      *sti;
   const cx_quant_info_t     *qui;
   const cx_range_info_t     *rni;
   const cx_lockstat_info_t  *loi;
-  const cx_ch_open_info_t   *opi;
 
   cda_hwcnref_t       hwr;
   hwrinfo_t          *hi;
@@ -624,10 +646,8 @@ static void ProcessCxlibEvent(int uniq, void *unsdptr,
             hi  = AccessHwrSlot(hwr);
             if (/* "CheckHwr()" */
                 hwr >= HWR_MIN_VAL  &&  hwr < hwrs_list_allocd  &&
-                hi->in_use  &&
-                hi->rslv_state >= RSLV_STATE_FOUND1)
+                hi->in_use)
             {
-                ////fprintf(stderr, "dtype=%d nelems=%d rflags=%d is_update=%d\n", nvi->dtype, nvi->nelems, nvi->rflags, nvi->is_update);
                 cda_dat_p_update_dataset(me->sid,
                                          1, &(hi->dataref),
                                          &(nvi->data),
@@ -643,36 +663,35 @@ static void ProcessCxlibEvent(int uniq, void *unsdptr,
             cda_dat_p_update_server_cycle(me->sid);
             break;
 
-        case CAR_CH_OPEN_RESULT:
-            opi = info;
-            hwr = opi->param1;
+        case CAR_RSLV_RESULT:
+            rsi = info;
+            hwr = rsi->param1;
+            ////fprintf(stderr, "rci:hwr=%d\n", hwr);
             hi  = AccessHwrSlot(hwr);
             if (/* "CheckHwr()" */
                 hwr >= HWR_MIN_VAL  &&  hwr < hwrs_list_allocd  &&
-                hi->in_use  &&
-                // Check if that's an answer to THIS channel
-                opi->name != NULL  &&  strcasecmp(opi->name, hi->name) == 0)
+                hi->in_use)
             {
-                if (hi->rslv_state == RSLV_STATE_SERVER  ||  hi->rslv_state == RSLV_STATE_FOUND1)
+                if (hi->rslv_state == RSLV_STATE_SERVER)
                 {
-                    if      (opi->status == 0)
+                    if (rsi->hwid > 0)
                     {
-                        hi->rslv_state = RSLV_STATE_FOUND1;
-                        hi->chnd = opi->chnd;
-                        cda_dat_p_set_hwinfo(hi->dataref,
-                                             opi->rw, opi->dtype, opi->max_nelems,
-                                             opi->hwid);
-                        cda_dat_p_report_rslvstat(hi->dataref, CDA_RSLVSTAT_FOUND);
-                    }
-                    else if (opi->status > 0)
-                    {
+                        ////fprintf(stderr, "<%s> :%d\n", hi->name, rsi->hwid);
                         hi->rslv_state = RSLV_STATE_DONE;
+                        hi->hwid = rsi->hwid;
+                        cx_begin(me->cd);
+                        do_subscribe(me, hi, hwr);
+                        if (cx_run(me->cd) < 0) return;
+                        /*!!! Obtain parameters */
+                        cda_dat_p_set_hwinfo(hi->dataref,
+                                             rsi->rw, rsi->dtype, rsi->nelems,
+                                             rsi->hwid);
+                        cda_dat_p_report_rslvstat(hi->dataref, CDA_RSLVSTAT_FOUND);
                         cda_dat_p_set_ready (hi->dataref, 1);
                     }
                     else
                     {
-                        ////fprintf(stderr, "NOTFOUND P%s\n", hi->name);
-
+                        ////fprintf(stderr, "NOTFOUND %s\n", hi->name);
                         if (hi->rslv_type == RSLV_TYPE_GLBL)
                         {
                             // The following code is a copy from FailureProc()
@@ -706,7 +725,7 @@ static void ProcessCxlibEvent(int uniq, void *unsdptr,
                 else
                 {
                     //fprintf(stderr, "RSLV_RESULT: hwr=%d state=%d\n", hwr, hi->rslv_state);
-                    cda_ref_p_report(hi->dataref, "duplicate CH_OPEN_RESULT/status=%d (state=%d, type=%d) for <%s>", opi->status, hi->rslv_state, hi->rslv_type, hi->name);
+                    cda_ref_p_report(hi->dataref, "duplicate RSLV_RESULT (state=%d, type=%d) for <%s>", hi->rslv_state, hi->rslv_type, hi->name);
                 }
             }
             break;
@@ -717,8 +736,7 @@ static void ProcessCxlibEvent(int uniq, void *unsdptr,
             hi  = AccessHwrSlot(hwr);
             if (/* "CheckHwr()" */
                 hwr >= HWR_MIN_VAL  &&  hwr < hwrs_list_allocd  &&
-                hi->in_use  &&
-                hi->rslv_state >= RSLV_STATE_FOUND1)
+                hi->in_use)
             {
                 cda_dat_p_set_fresh_age(hi->dataref, fai->fresh_age);
             }
@@ -730,8 +748,7 @@ static void ProcessCxlibEvent(int uniq, void *unsdptr,
             hi  = AccessHwrSlot(hwr);
             if (/* "CheckHwr()" */
                 hwr >= HWR_MIN_VAL  &&  hwr < hwrs_list_allocd  &&
-                hi->in_use  &&
-                hi->rslv_state >= RSLV_STATE_FOUND1)
+                hi->in_use)
             {
                 cda_dat_p_set_phys_rds(hi->dataref, rdi->phys_count, rdi->rds);
             }
@@ -743,8 +760,7 @@ static void ProcessCxlibEvent(int uniq, void *unsdptr,
             hi  = AccessHwrSlot(hwr);
             if (/* "CheckHwr()" */
                 hwr >= HWR_MIN_VAL  &&  hwr < hwrs_list_allocd  &&
-                hi->in_use  &&
-                hi->rslv_state >= RSLV_STATE_FOUND1)
+                hi->in_use)
             {
                 cda_dat_p_set_strings(hi->dataref,
                                       sti->strings[0], sti->strings[1],
@@ -760,8 +776,7 @@ static void ProcessCxlibEvent(int uniq, void *unsdptr,
             hi  = AccessHwrSlot(hwr);
             if (/* "CheckHwr()" */
                 hwr >= HWR_MIN_VAL  &&  hwr < hwrs_list_allocd  &&
-                hi->in_use  &&
-                hi->rslv_state >= RSLV_STATE_FOUND1)
+                hi->in_use)
             {
                 cda_dat_p_set_quant(hi->dataref, qui->q, qui->q_dtype);
             }
@@ -773,8 +788,7 @@ static void ProcessCxlibEvent(int uniq, void *unsdptr,
             hi  = AccessHwrSlot(hwr);
             if (/* "CheckHwr()" */
                 hwr >= HWR_MIN_VAL  &&  hwr < hwrs_list_allocd  &&
-                hi->in_use  &&
-                hi->rslv_state >= RSLV_STATE_FOUND1)
+                hi->in_use)
             {
                 cda_dat_p_set_range(hi->dataref, rni->range, rni->range_dtype);
             }
@@ -786,8 +800,7 @@ static void ProcessCxlibEvent(int uniq, void *unsdptr,
             hi  = AccessHwrSlot(hwr);
             if (/* "CheckHwr()" */
                 hwr >= HWR_MIN_VAL  &&  hwr < hwrs_list_allocd  &&
-                hi->in_use  &&
-                hi->rslv_state >= RSLV_STATE_FOUND1)
+                hi->in_use)
             {
                 cda_dat_p_report_dataset_lockstat(me->sid,
                                                   1, &(hi->dataref),
@@ -918,10 +931,9 @@ static void ProcessSrchEvent(int uniq, void *unsdptr,
 ////fprintf(stderr, "ts->state=%d\n", ts->state);
             if (ts->state == CDA_DAT_P_OPERATING)
             {
-                cx_begin  (ts->cd);
-                cx_ch_open(ts->cd, hi->name, 1/*fail_on_err*/,
-                           mode2upd_cond[hi->mode & MODE_MON_TYPE_mask], hwr, 0);
-                cx_run    (ts->cd);
+                cx_begin(ts->cd);
+                cx_rslv (ts->cd, hi->name, hwr, 0);
+                cx_run  (ts->cd);
             }
         }
         else
@@ -1074,7 +1086,7 @@ static int  cda_d_cx_srv_ioctl(void *pdt_privptr,
 
 //////////////////////////////////////////////////////////////////////
 
-CDA_DEFINE_DAT_PLUGIN(cx, "CX data-access plugin",
+CDA_DEFINE_DAT_PLUGIN(cx4old, "CX (v4 old) data-access plugin",
                       NULL, NULL,
                       sizeof(cda_d_cx_privrec_t),
                       CDA_DAT_P_FLAG_CHAN_TYPE_CHANGE_SUPPORTED,

@@ -269,7 +269,7 @@ static void ReadDriverName(int devid, void *unsdptr,
                     if (dltable[dlref].name == NULL) break;
                 if (dlref >= countof(dltable))
                 {
-                    DOUBLE_REPORT("[%d] driver \"%s\" was successfully loaded but dltable[] is overflown",
+                    DOUBLE_REPORT("[%d] driver \"%s\" was loaded but dltable[] is overflown",
                                   devid, dev->drvname);
                     dlclose(handle);
                     goto LOAD_FAILURE;
@@ -282,7 +282,7 @@ static void ReadDriverName(int devid, void *unsdptr,
                 if (modrec->mr.magicnumber != CXSD_DRIVER_MODREC_MAGIC)
                 {
                     DOUBLE_REPORT("[%d] driver \"%s\" magicnumber=0x%x, mismatch with 0x%x",
-                                  devid, modrec->mr.magicnumber, CXSD_DRIVER_MODREC_MAGIC);
+                                  devid, dev->drvname, modrec->mr.magicnumber, CXSD_DRIVER_MODREC_MAGIC);
                     dlclose(handle);
                     goto LOAD_FAILURE;
                 }
@@ -290,7 +290,7 @@ static void ReadDriverName(int devid, void *unsdptr,
                 if (!CX_VERSION_IS_COMPATIBLE(modrec->mr.version, CXSD_DRIVER_MODREC_VERSION))
                 {
                     DOUBLE_REPORT("[%d] driver \"%s\" version=%d.%d.%d.%d, incompatible with %d.%d.%d.%d",
-                                  devid,
+                                  devid, dev->drvname, 
                                   CX_MAJOR_OF(modrec->mr.version),
                                   CX_MINOR_OF(modrec->mr.version),
                                   CX_PATCH_OF(modrec->mr.version),

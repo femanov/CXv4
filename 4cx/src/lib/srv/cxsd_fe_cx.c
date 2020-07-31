@@ -77,7 +77,18 @@ enum
     CS_READY,           // Is ready for I/O
 };
 
+enum
+{
+    MON_TYPE_UNS = 0,
+    MON_TYPE_OLD = 1,
+    MON_TYPE_CHN = 2,
+};
 enum {CXSD_FE_CX_MON_COND_MON_NOT_ADDED = -1}; // A special value for moninfo_t.cond, meaning "per_cycle_monitors_count++" is NOT done yet, so do NOT do "per_cycle_monitors_count--"
+enum
+{
+    MONMODE_RQ_LOCK     = 1 << 2,
+    MONMODE_SEND_UPDATE = 1 << 3,
+};
 enum
 {
     MONITOR_EVMASK =
@@ -102,6 +113,8 @@ typedef struct
     {
         int zzz;
     } info;
+
+    int            mode;
 
     int            modified;
     int            being_reqd; // Counting semaphore
@@ -178,6 +191,11 @@ static inline int cp2cd(v4clnt_t *cp)
     return cp - cx4clnts_list;
 }
 
+static inline int mp2chnd(v4clnt_t *cp, moninfo_t *mp)
+{
+    return mp - cp->monitors_list;
+}
+
 //////////////////////////////////////////////////////////////////////
 
 static void MonEvproc(int            uniq,
@@ -185,11 +203,16 @@ static void MonEvproc(int            uniq,
                       cxsd_gchnid_t  gcid,
                       int            reason,
                       void          *privptr2);
+static void CHNEvproc(int            uniq,
+                      void          *privptr1,
+                      cxsd_gchnid_t  gcid,
+                      int            reason,
+                      void          *privptr2);
 
 // GetMonSlot()
 GENERIC_SLOTARRAY_DEFINE_GROWING(static, Mon, moninfo_t,
-                                 monitors, in_use, 0, 1,
-                                 0, 100, 0,
+                                 monitors, in_use, MON_TYPE_UNS, MON_TYPE_OLD,
+                                 1, 100, 0,
                                  cp->, cp,
                                  v4clnt_t *cp, v4clnt_t *cp)
 
@@ -197,17 +220,27 @@ static void RlsMonSlot(int id, v4clnt_t *cp)
 {
   moninfo_t *mp = AccessMonSlot(id, cp);
 
-    CxsdHwDelChanEvproc(cp->ID, lint2ptr(cp2cd(cp)),
-                        mp->gcid, MONITOR_EVMASK,
-                        MonEvproc, lint2ptr(id));
+    if      (mp->in_use == MON_TYPE_OLD)
+        CxsdHwDelChanEvproc(cp->ID, lint2ptr(cp2cd(cp)),
+                            mp->gcid, MONITOR_EVMASK,
+                            MonEvproc, lint2ptr(id));
+    else if (mp->in_use == MON_TYPE_CHN)
+        CxsdHwDelChanEvproc(cp->ID, lint2ptr(cp2cd(cp)),
+                            mp->gcid, MONITOR_EVMASK,
+                            CHNEvproc, lint2ptr(id));
+    if ((mp->mode & MONMODE_RQ_LOCK) != 0)
+        CxsdHwLockChannels(cp->ID,
+                           1, &(mp->gcid),
+                           CX_LOCK_ALLORNOTHING);
     if (mp->cond != CXSD_FE_CX_MON_COND_MON_NOT_ADDED  &&
-        (REQ_ALL_MONITORS  ||  mp->cond == CX_MON_COND_ON_CYCLE))
+        ((REQ_ALL_MONITORS  &&  mp->cond != CX_MON_COND_NEVER)  ||
+         mp->cond == CX_MON_COND_ON_CYCLE))
     {
         cp->per_cycle_monitors_count--;
         cp->per_cycle_monitors_needs_rebuild = 1;
     }
 
-    mp->in_use = 0;
+    mp->in_use = MON_TYPE_UNS;
 }
 
 //--------------------------------------------------------------------
@@ -1506,7 +1539,7 @@ static cxsd_gchnid_t cpid2gcid(cxsd_cpntid_t  cpid)
     do {                                                           \
         rpycsize = CXV4_CHUNK_CEIL(sizeof(CxV4Chunk));             \
         if (GrowReplyPacket(cp, replydatasize + rpycsize) != 0)    \
-            {/*!!!*/}                                              \
+            {break;/*!!!*/}                                        \
         rpy = (void*)(cp->replybuf->data + replydatasize);         \
         bzero(rpy, sizeof(*rpy));                                  \
         rpy->OpCode   = clnt_u32(cp, CXC_CVT_TO_RPY(OpCode));      \
@@ -1779,7 +1812,7 @@ static size_t PutQuantChunkReply(v4clnt_t *cp, size_t replydatasize,
 
     qunt = (void*)(cp->replybuf->data + replydatasize);
     bzero(qunt, sizeof(*qunt));
-    qunt->ck.OpCode   = clnt_u32(cp, CXC_CVT_TO_RPY(CXC_QUANT));
+    qunt->ck.OpCode   = clnt_u32(cp, CXC_CVT_TO_RPY(CXC_NT_QUANT));
     qunt->ck.ByteSize = clnt_u32(cp, rpycsize);
     qunt->ck.param1   = param1;
     qunt->ck.param2   = param2;
@@ -1864,6 +1897,396 @@ static size_t PutLkStChunkReply(v4clnt_t *cp, size_t replydatasize,
     return rpycsize;
 }
 
+
+typedef size_t (*put_nt_chunk_t)(v4clnt_t  *cp, size_t replydatasize,
+                                 moninfo_t *mp,
+                                 int info_int);
+
+static int  SendNotification(v4clnt_t *cp, moninfo_t *mp,
+                             put_nt_chunk_t  chunk_maker,
+                             int info_int)
+{
+  int        rpycn;           // RePlY chunk # (total # at end)
+  size_t     rpycsize;        // RePlY chunk size in bytes
+  size_t     replydatasize;
+
+    InitReplyPacket(cp, CXT4_DATA_MONITOR, mp->Seq);
+    rpycn         = 0;
+    replydatasize = 0;
+
+    rpycsize = chunk_maker(cp, replydatasize, mp, info_int);
+    if (rpycsize == 0)
+#if 1
+        return -1;
+#else
+        PUT_ERROR_CHUNK_REPLY(0);
+#endif
+    else
+    {
+        replydatasize += rpycsize;
+        rpycn++;
+    }
+    cp->replybuf->DataSize  = clnt_u32(cp, replydatasize);
+    cp->replybuf->NumChunks = clnt_u32(cp, rpycn);
+    
+    if (fdio_send(cp->fhandle, cp->replybuf, sizeof(CxV4Header) + replydatasize) != 0)
+    {
+        DisconnectClient(cp, errno, 0);
+        return -1;
+    }
+
+    return 0;
+}
+
+static size_t Put_NT_AVALUE_Chunk  (v4clnt_t *cp, size_t replydatasize,
+                                    moninfo_t *mp,
+                                    int info_int)
+{
+  size_t     rpycsize;        // RePlY chunk size in bytes
+
+  cxsd_gchnid_t          gcid;
+  cxsd_hw_chan_t        *chn_p;
+  cx_time_t             *tp;
+  CxV4_NT_AVALUE_Chunk  *aval;
+  size_t     datasize;
+
+    gcid = mp->gcid;
+    if (gcid <= 0  ||  gcid >= cxsd_hw_numchans) return 0;
+    chn_p = cxsd_hw_channels + gcid;
+    tp    = &(chn_p->timestamp);
+
+#if CXSD_HW_SUPPORTS_CXDTYPE_UNKNOWN
+    datasize = chn_p->current_usize * chn_p->current_nelems;
+#else
+    datasize = chn_p->usize * chn_p->current_nelems;
+#endif
+    rpycsize = CXV4_CHUNK_CEIL(sizeof(*aval) + datasize);
+    if (GrowReplyPacket(cp, replydatasize + rpycsize) != 0)
+        {/*!!!*/}
+
+    aval = (void*)(cp->replybuf->data + replydatasize);
+    bzero(aval, sizeof(*aval));
+    aval->ck.OpCode   = clnt_u32(cp, info_int);
+    aval->ck.ByteSize = clnt_u32(cp, rpycsize);
+    aval->ck.param1   = mp->param1;
+    aval->ck.param2   = mp->param2;
+    aval->ck.rs1      = mp2chnd(cp, mp);
+#if CXSD_HW_SUPPORTS_CXDTYPE_UNKNOWN
+    aval->dtype              = clnt_u32(cp, chn_p->current_dtype);
+#else
+    aval->dtype              = clnt_u32(cp, chn_p->dtype);
+#endif
+    aval->nelems             = clnt_u32(cp, chn_p->current_nelems);
+    aval->rflags             = clnt_u32(cp, chn_p->rflags);
+    aval->timestamp_nsec     = clnt_u32(cp, tp->nsec);
+    aval->timestamp_sec_lo32 = clnt_u32(cp, tp->sec);
+    aval->timestamp_sec_hi32 = clnt_u32(cp, 0); /*!!!*/
+    aval->Seq                = mp->Seq;
+
+    /*!!! ENDIAN!!! do conversion */
+    if (datasize != 0) memcpy(aval->data, chn_p->current_val, datasize);
+////fprintf(stderr, "%s() gcid=%d code=%08x (CUR=%08x,NEW=%08x) ts=%ld\n", __FUNCTION__, gcid, info_int, CXC_CURVAL, CXC_NEWVAL, cxsd_hw_channels[gcid].timestamp.sec);
+
+    return rpycsize;
+}
+
+static size_t Put_NT_STRS_Chunk    (v4clnt_t *cp, size_t replydatasize,
+                                    moninfo_t *mp,
+                                    int info_int)
+{
+  size_t                 rpycsize;        // RePlY chunk size in bytes
+  CxV4_NT_STRS_Chunk    *strc;
+
+  cxsd_gchnid_t          dummy_gcid;
+  char                  *strings[8];
+  int                    n;
+  size_t                 strsize;
+  size_t                 ofs;
+  size_t                 size1;
+
+    if (CxsdHwGetCpnProps(mp->cpid, &dummy_gcid,
+                          NULL, NULL, 0,
+                          strings + 0, strings + 1,
+                          strings + 2, strings + 3,
+                          strings + 4, strings + 5,
+                          strings + 6, strings + 7) < 0) return 0;
+
+    /* Count size */
+    for (n = 0, strsize = 0;
+         n < countof(strings);
+         n++)
+        if (strings[n] != NULL) strsize += strlen(strings[n]) + 1;
+
+    rpycsize = CXV4_CHUNK_CEIL(sizeof(*strc) + strsize);
+    if (GrowReplyPacket(cp, replydatasize + rpycsize) != 0)
+        /*!!!*/return 0;
+
+    strc = (void*)(cp->replybuf->data + replydatasize);
+    bzero(strc, sizeof(*strc));
+    strc->ck.OpCode   = clnt_u32(cp, CXC_NT_STRS);
+    strc->ck.ByteSize = clnt_u32(cp, rpycsize);
+    strc->ck.param1   = mp->param1;
+    strc->ck.param2   = mp->param2;
+    strc->ck.rs1      = mp2chnd(cp, mp);;
+    for (n = 0, ofs = 0;
+         n < countof(strings);
+         n++)
+    {
+        if (strings[n] != NULL)
+        {
+            strc->offsets[n] = clnt_i32(cp, ofs);
+            size1 = strlen(strings[n]) + 1;
+            memcpy(strc->data + ofs, strings[n], size1);
+            ofs += size1;
+        }
+        else
+            strc->offsets[n] = clnt_i32(cp, -1);
+    }
+
+    return rpycsize;
+}
+
+static size_t Put_NT_RDS_Chunk     (v4clnt_t *cp, size_t replydatasize,
+                                    moninfo_t *mp,
+                                    int info_int)
+{
+  size_t                 rpycsize;        // RePlY chunk size in bytes
+  CxV4Chunk             *rpy;
+
+  cxsd_gchnid_t          dummy_gcid;
+  int                    phys_count;
+  double                 rds_buf[RDS_MAX_COUNT*2];
+  int                    x;
+  float64               *f64p;
+
+    if (CxsdHwGetCpnProps(mp->cpid, &dummy_gcid,
+                          &phys_count, rds_buf, RDS_MAX_COUNT,
+                          NULL, NULL, NULL, NULL,
+                          NULL, NULL, NULL, NULL) < 0) return 0;
+    rpycsize = CXV4_CHUNK_CEIL(sizeof(*rpy) + sizeof(float64) * phys_count * 2);
+    if (GrowReplyPacket(cp, replydatasize + rpycsize) != 0)
+        /*!!!*/return 0;
+
+    rpy = (void*)(cp->replybuf->data + replydatasize);
+    bzero(rpy, sizeof(*rpy));
+    rpy->OpCode   = clnt_u32(cp, CXC_NT_RDS);
+    rpy->ByteSize = clnt_u32(cp, rpycsize);
+    rpy->param1   = mp->param1;
+    rpy->param2   = mp->param2;
+    rpy->rs1      = mp2chnd(cp, mp);
+    rpy->rs2      = clnt_u32(cp, CXDTYPE_DOUBLE);
+    rpy->rs3      = clnt_i32(cp, phys_count);
+
+    for (x = 0, f64p = rpy->data;  x < phys_count * 2;  x++, f64p++)
+    {
+        /*!!! ENDIAN!!! do conversion */
+        *f64p = rds_buf[x];
+    }
+
+    return rpycsize;
+}
+
+static size_t Put_NT_FRH_AGE_Chunk (v4clnt_t *cp, size_t replydatasize,
+                                    moninfo_t *mp,
+                                    int info_int)
+{
+  size_t                 rpycsize;        // RePlY chunk size in bytes
+  CxV4Chunk             *rpy;
+  cxsd_hw_chan_t        *chn_p;
+  cxsd_gchnid_t          gcid;
+
+    gcid = mp->gcid;
+    if (gcid <= 0  ||  gcid >= cxsd_hw_numchans) return 0;
+    chn_p = cxsd_hw_channels + gcid;
+
+    rpycsize = CXV4_CHUNK_CEIL(sizeof(*rpy));
+    if (GrowReplyPacket(cp, replydatasize + rpycsize) != 0)
+        {/*!!!*/}
+
+    rpy = (void*)(cp->replybuf->data + replydatasize);
+    bzero(rpy, sizeof(*rpy));
+    rpy->OpCode   = clnt_u32(cp, CXC_NT_FRH_AGE);
+    rpy->ByteSize = clnt_u32(cp, rpycsize);
+    rpy->param1   = mp->param1;
+    rpy->param2   = mp->param2;
+    rpy->rs1      = mp2chnd(cp, mp);
+    rpy->rs2      = clnt_u32(cp, chn_p->fresh_age.nsec);
+    rpy->rs3      = clnt_u32(cp, chn_p->fresh_age.sec);
+    rpy->rs4      = clnt_u32(cp, 0); /*!!!*/
+
+    return rpycsize;
+}
+
+static size_t Put_NT_QUANT_Chunk   (v4clnt_t *cp, size_t replydatasize,
+                                    moninfo_t *mp,
+                                    int info_int)
+{
+  size_t                 rpycsize;        // RePlY chunk size in bytes
+  CxV4Chunk             *rpy;
+  cxsd_hw_chan_t        *chn_p;
+  cxsd_gchnid_t          gcid;
+
+  size_t                 q_dsize;
+
+    gcid = mp->gcid;
+    if (gcid <= 0  ||  gcid >= cxsd_hw_numchans) return 0;
+    chn_p = cxsd_hw_channels + gcid;
+
+    q_dsize = sizeof_cxdtype(chn_p->q_dtype);
+
+    rpycsize = CXV4_CHUNK_CEIL(sizeof(*rpy) + q_dsize);
+    if (GrowReplyPacket(cp, replydatasize + rpycsize) != 0)
+        {/*!!!*/}
+
+    rpy = (void*)(cp->replybuf->data + replydatasize);
+    bzero(rpy, sizeof(*rpy));
+    rpy->OpCode   = clnt_u32(cp, CXC_NT_QUANT);
+    rpy->ByteSize = clnt_u32(cp, rpycsize);
+    rpy->param1   = mp->param1;
+    rpy->param2   = mp->param2;
+    rpy->rs1      = mp2chnd(cp, mp);
+    rpy->rs2      = clnt_u32(cp, chn_p->q_dtype);
+    /*!!! ENDIAN!!! do conversion, in a CORRECT way (q_dsize bytes) */
+    memcpy(rpy->data, &(chn_p->q), q_dsize);
+
+    return rpycsize;
+}
+
+static size_t Put_NT_RANGE_Chunk   (v4clnt_t *cp, size_t replydatasize,
+                                    moninfo_t *mp,
+                                    int info_int)
+{
+  size_t                 rpycsize;        // RePlY chunk size in bytes
+  CxV4Chunk             *rpy;
+  cxsd_hw_chan_t        *chn_p;
+  cxsd_gchnid_t          gcid;
+
+  size_t                 r_dsize;
+
+    gcid = mp->gcid;
+    if (gcid <= 0  ||  gcid >= cxsd_hw_numchans) return 0;
+    chn_p = cxsd_hw_channels + gcid;
+
+    r_dsize = sizeof_cxdtype(chn_p->range_dtype);
+
+    rpycsize = CXV4_CHUNK_CEIL(sizeof(*rpy) + r_dsize);
+    if (GrowReplyPacket(cp, replydatasize + rpycsize) != 0)
+        {/*!!!*/}
+
+    rpy = (void*)(cp->replybuf->data + replydatasize);
+    bzero(rpy, sizeof(*rpy));
+    rpy->OpCode   = clnt_u32(cp, CXC_NT_RANGE);
+    rpy->ByteSize = clnt_u32(cp, rpycsize);
+    rpy->param1   = mp->param1;
+    rpy->param2   = mp->param2;
+    rpy->rs1      = mp2chnd(cp, mp);
+    rpy->rs2      = clnt_u32(cp, chn_p->q_dtype);
+    /*!!! ENDIAN!!! do conversion, in a CORRECT way (r_dsize bytes) */
+    memcpy(rpy->data,           &(chn_p->range[0]), r_dsize);
+    memcpy(rpy->data + r_dsize, &(chn_p->range[1]), r_dsize);
+
+    return rpycsize;
+}
+
+static size_t Put_NT_LOCKSTAT_Chunk(v4clnt_t *cp, size_t replydatasize,
+                                    moninfo_t *mp,
+                                    int info_int)
+{
+  size_t                 rpycsize;        // RePlY chunk size in bytes
+  CxV4Chunk             *rpy;
+  cxsd_hw_chan_t        *chn_p;
+  cxsd_gchnid_t          gcid;
+
+    gcid = mp->gcid;
+    if (gcid <= 0  ||  gcid >= cxsd_hw_numchans) return 0;
+    chn_p = cxsd_hw_channels + gcid;
+
+    rpycsize = CXV4_CHUNK_CEIL(sizeof(*rpy));
+    if (GrowReplyPacket(cp, replydatasize + rpycsize) != 0)
+        {/*!!!*/}
+
+    rpy = (void*)(cp->replybuf->data + replydatasize);
+    bzero(rpy, sizeof(*rpy));
+    rpy->OpCode   = clnt_u32(cp, CXC_NT_LOCKSTAT);
+    rpy->ByteSize = clnt_u32(cp, rpycsize);
+    rpy->param1   = mp->param1;
+    rpy->param2   = mp->param2;
+    rpy->rs1      = mp2chnd(cp, mp);
+    rpy->rs2      = clnt_u32(cp, chn_p->locker == cp->ID);
+
+    return rpycsize;
+}
+
+typedef struct
+{
+    CxV4Chunk *req;
+    size_t     reqlen;
+} hack_req_info_t;
+static hack_req_info_t *hack_req_info_ptr = NULL;
+static size_t Put_NT_OPEN_nnn_Chunk(v4clnt_t *cp, size_t replydatasize,
+                                    moninfo_t *mp,
+                                    int info_int)
+{
+  size_t                 rpycsize;        // RePlY chunk size in bytes
+  CxV4_NT_OPEN_Chunk    *opnc;
+  cxsd_hw_chan_t        *chn_p;
+  cxsd_gchnid_t          gcid;
+  int32                  chnd;
+  int32                  v_rw;
+  int32                  v_dtype;
+  int32                  v_max_nelems;
+  CxV4Chunk             *req;
+  size_t                 reqlen;
+
+    if (mp == NULL)
+    {
+        chnd         = -1;
+        v_rw         = 0;
+        v_dtype      = 0;
+        v_max_nelems = 0;
+    }
+    else
+    {
+        gcid = mp->gcid;
+        if (gcid <= 0  ||  gcid >= cxsd_hw_numchans) return 0;
+        chn_p = cxsd_hw_channels + gcid;
+        chnd         = mp2chnd(cp, mp);
+        v_rw         = chn_p->rw;
+        v_dtype      = chn_p->dtype;
+        v_max_nelems = chn_p->max_nelems;
+    }
+
+    if (hack_req_info_ptr == NULL)
+    {
+        req    = NULL;
+        reqlen = 0;
+    }
+    else
+    {
+        req    = hack_req_info_ptr->req;
+        reqlen = hack_req_info_ptr->reqlen;
+    }
+
+    rpycsize = CXV4_CHUNK_CEIL(sizeof(*opnc) + reqlen);
+    if (GrowReplyPacket(cp, replydatasize + rpycsize) != 0)
+        {/*!!!*/return 0;}
+
+    opnc = (void*)(cp->replybuf->data + replydatasize);
+    bzero(opnc, sizeof(*opnc));
+    opnc->ck.OpCode   = clnt_u32(cp, info_int);
+    opnc->ck.ByteSize = clnt_u32(cp, rpycsize);
+    opnc->ck.param1   = mp->param1;
+    opnc->ck.param2   = mp->param2;
+    opnc->ck.rs1      = clnt_i32(cp, chnd);
+    opnc->hwid        = clnt_i32(cp, gcid);
+    opnc->rw          = clnt_i32(cp, v_rw);
+    opnc->dtype       = clnt_i32(cp, v_dtype);
+    opnc->max_nelems  = clnt_i32(cp, v_max_nelems);
+    if (reqlen != 0) memcpy(opnc->name, req->data, reqlen);
+
+    return rpycsize;
+}
+
 static void MonEvproc(int            uniq,
                       void          *privptr1,
                       cxsd_gchnid_t  gcid,
@@ -1924,6 +2347,72 @@ static void MonEvproc(int            uniq,
         SendAReply(cp, mp, PutRangeChunkReply, 0);
     }
 }
+static void CHNEvproc(int            uniq,
+                      void          *privptr1,
+                      cxsd_gchnid_t  gcid,
+                      int            reason,
+                      void          *privptr2)
+{
+  int        cd = ptr2lint(privptr1);
+  int        id = ptr2lint(privptr2);
+  v4clnt_t  *cp = AccessV4connSlot(cd);
+  moninfo_t *mp = AccessMonSlot(id, cp);
+
+  int        rpycn;           // RePlY chunk # (total # at end)
+  size_t     rpycsize;        // RePlY chunk size in bytes
+  size_t     replydatasize;
+
+    if      (reason == CXSD_HW_CHAN_R_UPDATE)
+    {
+        if      (mp->cond == CX_MON_COND_ON_UPDATE)
+        {
+            if (SendNotification(cp, mp, Put_NT_AVALUE_Chunk, CXC_NT_NEWVAL) != 0) return;
+            if (mp->being_reqd == 0)
+            {
+                mp->being_reqd++;
+                CxsdHwDoIO(cp->ID, DRVA_READ | CXSD_HW_DRVA_IGNORE_UPD_CYCLE_FLAG,
+                           1, &(mp->gcid),
+                           NULL, NULL, NULL);
+                mp->being_reqd--;
+            }
+        }
+        else if (mp->cond == CX_MON_COND_ON_CYCLE)
+        {
+            mp->modified = 1;
+            cp->per_cycle_monitors_some_modified = 1;
+        }
+        else if (mp->cond == CX_MON_COND_NEVER)
+        {
+            if ((mp->mode & MONMODE_SEND_UPDATE) == 0) return;
+            mp->mode &=~ MONMODE_SEND_UPDATE;
+            if (SendNotification(cp, mp, Put_NT_AVALUE_Chunk, CXC_NT_NEWVAL) != 0) return;
+        }
+    }
+    else if (reason == CXSD_HW_CHAN_R_STATCHG)
+    {
+        SendNotification(cp, mp, Put_NT_AVALUE_Chunk, CXC_NT_CURVAL);
+    }
+    else if (reason == CXSD_HW_CHAN_R_STRSCHG)
+    {
+        SendNotification(cp, mp, Put_NT_STRS_Chunk, 0);
+    }
+    else if (reason == CXSD_HW_CHAN_R_RDSCHG)
+    {
+        SendNotification(cp, mp, Put_NT_RDS_Chunk, 0);
+    }
+    else if (reason == CXSD_HW_CHAN_R_FRESHCHG)
+    {
+        SendNotification(cp, mp, Put_NT_FRH_AGE_Chunk, 0);
+    }
+    else if (reason == CXSD_HW_CHAN_R_QUANTCHG)
+    {
+        SendNotification(cp, mp, Put_NT_QUANT_Chunk, 0);
+    }
+    else if (reason == CXSD_HW_CHAN_R_RANGECHG)
+    {
+        SendNotification(cp, mp, Put_NT_RANGE_Chunk, 0);
+    }
+}
 
 static int mon_eq_checker(moninfo_t *mp, void *privptr)
 {
@@ -1964,7 +2453,8 @@ static int SetMonitor(v4clnt_t *cp, CxV4MonitorChunk *monr, uint32 Seq)
     mp->cond = CXSD_FE_CX_MON_COND_MON_NOT_ADDED; // Guard against RlsMonSlot() doing "per_cycle_monitors_count--" if called before actual "per_cycle_monitors_count++" below
 
     /*  */
-    if (REQ_ALL_MONITORS  ||  info.cond == CX_MON_COND_ON_CYCLE)
+    if ((REQ_ALL_MONITORS  &&  info.cond != CX_MON_COND_NEVER)  ||
+        info.cond == CX_MON_COND_ON_CYCLE)
     {
         if (cp->per_cycle_monitors_allocd <= cp->per_cycle_monitors_count  &&
             GrowUnitsBuf(&(cp->per_cycle_monitors),
@@ -2034,6 +2524,143 @@ static int DelMonitor(v4clnt_t *cp, CxV4MonitorChunk *monr, uint32 Seq)
     return 0;
 }
 
+static int chnd_mon_eq_checker(moninfo_t *mp, void *privptr)
+{
+  moninfo_t *model = privptr;
+
+    // Note: we check only the type (in_use) and (param1,param2); all the others (cpid, cond, ...) are DEPENDANT fields, not primary
+    return
+        mp->in_use == model->in_use/*  &&
+        mp->cpid   == model->cpid*/    &&
+        mp->param1 == model->param1  &&
+        mp->param2 == model->param2/*  &&
+        mp->cond   == model->cond*/;
+}
+
+static int GetChnd(v4clnt_t *cp, CxV4Chunk *req, uint32 Seq, cxsd_cpntid_t cpid, cxsd_gchnid_t gcid)
+{
+  moninfo_t       info;
+  int             chnd;
+  moninfo_t      *mp;
+
+    info.in_use = MON_TYPE_CHN;
+    info.cpid   = cpid;
+    info.gcid   = gcid;
+    info.param1 = req->param1;
+    info.param2 = req->param2;
+    info.cond   = host_u32(cp, req->rs2);
+
+    /* a. Check validity of parameters */
+    if (info.cond != CX_MON_COND_ON_UPDATE  &&
+        info.cond != CX_MON_COND_ON_CYCLE   &&
+        info.cond != CX_MON_COND_NEVER)
+        return -CXT4_EINVAL;
+
+    /* b. Than check if it is already monitored */
+    if (ForeachMonSlot(chnd_mon_eq_checker, &info, cp) >= 0)
+        return -1;
+
+    chnd = GetMonSlot(cp);
+    if (chnd <= 0) return -CXT4_ENOMEM;
+    mp = AccessMonSlot(chnd, cp);
+    mp->cond = CXSD_FE_CX_MON_COND_MON_NOT_ADDED; // Guard against RlsMonSlot() doing "per_cycle_monitors_count--" if called before actual "per_cycle_monitors_count++" below
+
+    /*  */
+    if ((REQ_ALL_MONITORS  &&  info.cond != CX_MON_COND_NEVER)  ||
+        info.cond == CX_MON_COND_ON_CYCLE)
+    {
+        if (cp->per_cycle_monitors_allocd <= cp->per_cycle_monitors_count  &&
+            GrowUnitsBuf(&(cp->per_cycle_monitors),
+                         &(cp->per_cycle_monitors_allocd),
+                         cp->per_cycle_monitors_allocd + 100,
+                         sizeof(*(cp->per_cycle_monitors))) < 0)
+            goto DO_CLEANUP;
+        cp->per_cycle_monitors_count++;
+        cp->per_cycle_monitors_needs_rebuild = 1;
+    }
+
+    /* Fill */
+    mp->Seq    = Seq;
+    mp->cpid   = info.cpid;
+    mp->gcid   = info.gcid;
+    mp->param1 = info.param1;
+    mp->param2 = info.param2;
+    mp->cond   = info.cond;
+
+    /*  */
+    if (CxsdHwAddChanEvproc(cp->ID, lint2ptr(cp2cd(cp)),
+                            mp->gcid, MONITOR_EVMASK,
+                            CHNEvproc, lint2ptr(chnd)) < 0)
+    {
+        goto DO_CLEANUP;
+    }
+
+    /* Request initial read IMMEDIATELY, not delaying to "on cycle" */
+    if (mp->cond == CX_MON_COND_ON_UPDATE)
+    {
+        mp->being_reqd++;
+        CxsdHwDoIO(cp->ID, DRVA_READ | CXSD_HW_DRVA_IGNORE_UPD_CYCLE_FLAG,
+                   1, &(mp->gcid),
+                   NULL, NULL, NULL);
+        mp->being_reqd--;
+    }
+
+    return chnd;
+
+ DO_CLEANUP:
+    RlsMonSlot(chnd, cp);
+    return -CXT4_ENOMEM;
+}
+
+static int DelChnd(v4clnt_t *cp, CxV4Chunk *req)
+{
+  moninfo_t       info;
+  int             chnd;
+  moninfo_t      *mp;
+
+    chnd = host_i32(cp, req->rs1);
+    /* Case A: chnd is NOT specified (close()'ing not-completely-open()'ed channel):
+               OK, try to find it by (param1,param2) tuple */
+    if (chnd <= 0)
+    {
+        info.in_use = MON_TYPE_CHN;
+        info.param1 = req->param1;
+        info.param2 = req->param2;
+        chnd = ForeachMonSlot(chnd_mon_eq_checker, &info, cp);
+        if (chnd < 0) return -1;
+        mp = AccessMonSlot(chnd, cp);
+    }
+    else
+    /* Case B: chnd IS specified (close()'ing a fully functioning channel):
+               check if this chnd is valid */
+    {
+        if (chnd <= 0  ||  chnd >= cp->monitors_list_allocd) return -1;
+        mp = AccessMonSlot(chnd, cp);
+        if (mp->in_use != MON_TYPE_CHN) return -1; /*!!! Future: check for ==UNS||==OLD; all other variants are OK */
+    }
+
+    /* Free any resources (such as lock) */
+    /*!!!*/ // Now is released in RlsMonSlot()
+
+    /* Okay, stop monitoring */
+    RlsMonSlot(chnd, cp);
+
+    return 0;
+}
+
+static inline int IsAnUpdate(cxsd_hw_chan_t *chn_p)
+{
+    return
+        chn_p->is_internal  ||
+        (chn_p->timestamp.sec != CX_TIME_SEC_NEVER_READ
+         &&
+         (chn_p->rw  ||
+          (chn_p->is_autoupdated       &&
+           chn_p->fresh_age.sec  == 0  &&
+           chn_p->fresh_age.nsec == 0)
+         ));
+}
+
 static void ServeIORequest(v4clnt_t *cp, CxV4Header *hdr, size_t inpktsize)
 {
   int        numrqs;          // # of chunks in request
@@ -2063,6 +2690,25 @@ static void ServeIORequest(v4clnt_t *cp, CxV4Header *hdr, size_t inpktsize)
   CxV4CpointPropsChunk  *prps;
   CxV4MonitorChunk      *monr;
   CxV4LockOpChunk       *lkop;
+
+  int             chnd;
+  moninfo_t      *mp;
+
+  int             rcn;
+  put_nt_chunk_t  chunk_maker;
+  int             info_int;
+  hack_req_info_t req_info;
+  static struct {put_nt_chunk_t chunk_maker; int info_int;} OPEN_reply_seq[] =
+  {
+      {Put_NT_OPEN_nnn_Chunk, CXC_NT_OPEN_FOUND_STAGE1},
+      {Put_NT_STRS_Chunk,     0}, 
+      {Put_NT_RDS_Chunk,      0}, 
+      {Put_NT_FRH_AGE_Chunk,  0}, 
+      {Put_NT_QUANT_Chunk,    0}, 
+      {Put_NT_RANGE_Chunk,    0}, 
+      {Put_NT_OPEN_nnn_Chunk, CXC_NT_OPEN_FOUND_STAGE2},
+      {Put_NT_AVALUE_Chunk,   0}, 
+  };
 
     InitReplyPacket(cp, CXT4_DATA_IO, hdr->Seq);
     numrqs = host_u32(cp, hdr->NumChunks);
@@ -2337,6 +2983,157 @@ static void ServeIORequest(v4clnt_t *cp, CxV4Header *hdr, size_t inpktsize)
                     replydatasize += rpycsize;
                     rpycn++;
                 }
+                break;
+
+//--------------------------------------------------------------------
+
+            case CXC_CH_OPEN:
+                if (reqlen < 2  ||  req->data[reqlen - 1] != '\0')
+                {
+                    /*!!!*/goto NEXT_CHUNK; // Put some error reply
+                }
+                req_info.req    = req;
+                req_info.reqlen = reqlen;
+                if ((cpid = CxsdHwResolveChan(req->data, &gcid,
+                                              NULL, NULL, 0,
+                                              NULL, NULL, NULL, NULL,
+                                              NULL, NULL, NULL, NULL)) < 0)
+                {
+                    hack_req_info_ptr = &req_info;
+                    rpycsize = Put_NT_OPEN_nnn_Chunk(cp, replydatasize, NULL, CXC_NT_OPEN_NOTFOUND);
+                    hack_req_info_ptr = NULL;
+                    if (rpycsize != 0)
+                    {
+                        replydatasize += rpycsize;
+                        rpycn++;
+                    }
+                    goto NEXT_CHUNK;
+                }
+
+                /* Note: as for now, we ignore value of rs1 (fail_on_err) */
+
+                // Obtain a new chnd
+                chnd = GetChnd(cp, req, hdr->Seq, cpid, gcid);
+                if (chnd < 0)
+                    {/*!!!*/goto NEXT_CHUNK;}
+                mp = AccessMonSlot(chnd, cp);
+
+                // Send all info according to OPEN_reply_seq[] list
+                for (rcn = 0;  rcn < countof(OPEN_reply_seq);  rcn++)
+                {
+                    chunk_maker = OPEN_reply_seq[rcn].chunk_maker;
+                    info_int    = OPEN_reply_seq[rcn].info_int;
+                    if (chunk_maker == Put_NT_AVALUE_Chunk)
+                        info_int = gcid >= 0  &&  gcid < cxsd_hw_numchans  &&
+                                   IsAnUpdate(cxsd_hw_channels + gcid) ? CXC_NT_NEWVAL
+                                                                       : CXC_NT_CURVAL;
+
+                    hack_req_info_ptr = &req_info;
+                    rpycsize = chunk_maker(cp, replydatasize, mp, info_int);
+                    hack_req_info_ptr = NULL;
+                    if (rpycsize == 0) goto NEXT_CHUNK;
+
+                    replydatasize += rpycsize;
+                    rpycn++;
+                }
+
+                break;
+
+            case CXC_CH_CLOSE:
+                DelChnd(cp, req);
+                break;
+
+            case CXC_CH_LOCK_OP:
+                chnd = host_i32(cp, req->rs1);
+                if (chnd <= 0  ||  chnd >= cp->monitors_list_allocd) {/*!!!*/goto NEXT_CHUNK;}
+                mp = AccessMonSlot(chnd, cp);
+                if (mp->in_use != MON_TYPE_CHN) {/*!!!*/goto NEXT_CHUNK;} /*!!! Future: check for ==UNS||==OLD; all other variants are OK */
+                gcid = mp->gcid;
+
+                operation = host_i32(cp, req->rs2);
+                do_lock   = (operation & CX_LOCK_WR) != 0;
+
+                /* Forbid locking by readonly clients */
+                if ((cp->perms & CXSD_ACCESS_PERM_LOCK) == 0)
+                {
+                    //PUT_ERROR_CHUNK_REPLY(CXT4_EPERM);
+                    goto NEXT_CHUNK;
+                }
+
+                // Perform locking attempt
+                CxsdHwLockChannels(cp->ID,
+                                   1, &gcid,
+                                   operation);
+                // ...and record the state in a monitor
+                if (do_lock) mp->mode |=  MONMODE_RQ_LOCK;
+                else         mp->mode &=~ MONMODE_RQ_LOCK;
+
+                rpycsize = Put_NT_LOCKSTAT_Chunk(cp, replydatasize, mp, 0);
+                if (rpycsize == 0) goto NEXT_CHUNK;
+
+                replydatasize += rpycsize;
+                rpycn++;
+                break;
+
+            case CXC_CH_PEEK:
+                chnd = host_i32(cp, req->rs1);
+                if (chnd <= 0  ||  chnd >= cp->monitors_list_allocd) {/*!!!*/goto NEXT_CHUNK;}
+                mp = AccessMonSlot(chnd, cp);
+                if (mp->in_use != MON_TYPE_CHN) {/*!!!*/goto NEXT_CHUNK;} /*!!! Future: check for ==UNS||==OLD; all other variants are OK */
+                gcid = mp->gcid;
+
+                info_int = gcid >= 0  &&  gcid < cxsd_hw_numchans  &&
+                           IsAnUpdate(cxsd_hw_channels + gcid) ? CXC_NEWVAL
+                                                               : CXC_CURVAL;
+
+                rpycsize = Put_NT_AVALUE_Chunk(cp, replydatasize, mp, info_int);
+                if (rpycsize == 0) goto NEXT_CHUNK;
+
+                replydatasize += rpycsize;
+                rpycn++;
+                break;
+
+            case CXC_CH_RQRD:
+                chnd = host_i32(cp, req->rs1);
+                if (chnd <= 0  ||  chnd >= cp->monitors_list_allocd) {/*!!!*/goto NEXT_CHUNK;}
+                mp = AccessMonSlot(chnd, cp);
+                if (mp->in_use != MON_TYPE_CHN) {/*!!!*/goto NEXT_CHUNK;} /*!!! Future: check for ==UNS||==OLD; all other variants are OK */
+                gcid = mp->gcid;
+
+                if (mp->cond == CX_MON_COND_NEVER) mp->mode |= MONMODE_SEND_UPDATE;
+                CxsdHwDoIO(cp->ID, DRVA_READ, 1, &gcid, NULL, NULL, NULL);
+                break;
+
+            case CXC_CH_RQWR:
+                chnd = host_i32(cp, req->rs1);
+                if (chnd <= 0  ||  chnd >= cp->monitors_list_allocd) {/*!!!*/goto NEXT_CHUNK;}
+                mp = AccessMonSlot(chnd, cp);
+                if (mp->in_use != MON_TYPE_CHN) {/*!!!*/goto NEXT_CHUNK;} /*!!! Future: check for ==UNS||==OLD; all other variants are OK */
+                gcid = mp->gcid;
+
+                dtype  = host_i32(cp, req->rs2);
+                nelems = host_i32(cp, req->rs3);
+                values = req->data;
+
+                /* At this point we can perform access control */
+                if ((cp->perms & CXSD_ACCESS_PERM_WRITE) == 0)
+                {
+                    //PUT_ERROR_CHUNK_REPLY(CXT4_EPERM);
+                    goto NEXT_CHUNK;
+                }
+
+                /* Perform checks */
+                /*!!!dtype*/
+                if (nelems < 0  ||  nelems > 10000000/*!!!arbitrary value*/)
+                {
+                    PUT_ERROR_CHUNK_REPLY(CXT4_EINVAL);
+                    goto NEXT_CHUNK;
+                }
+
+                /* Convert data */
+                /*!!! "if (cp->endianness != MY_ENDIANNESS  &&  nelems > 0) {do_convert at wrrq->data}"  */
+
+                CxsdHwDoIO(cp->ID, DRVA_WRITE, 1, &gcid, &dtype, &nelems, &values);
                 break;
 
             default:
@@ -2798,7 +3595,8 @@ static int IfIsPerCycleMonRecordIt(moninfo_t *mp, void *privptr)
 {
   cxsd_gchnid_t **wp_p = privptr;
 
-    if (REQ_ALL_MONITORS  ||  mp->cond == CX_MON_COND_ON_CYCLE)
+    if ((REQ_ALL_MONITORS  &&  mp->cond != CX_MON_COND_NEVER)  ||
+        mp->cond == CX_MON_COND_ON_CYCLE)
     {
         **wp_p = mp->gcid;
         (*wp_p)++;

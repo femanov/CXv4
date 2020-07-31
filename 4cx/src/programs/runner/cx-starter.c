@@ -144,8 +144,30 @@ static void HelpCB(Widget     w          __attribute__((unused)),
                    XtPointer  closure,
                    XtPointer  call_data  __attribute__((unused)))
 {
-  static CxWidget  help_box = NULL;
-  static char     *help_text =
+  static CxWidget    help_box   = NULL;
+#if !MAY_USE_RUSSIAN_KOI8
+  static const char *help_title = "CX-starter - help";
+  static const char *help_text  =
+      "CX-starter is a control room's control center: it serves "
+      "to run application programs and servers, "
+      "and to track their state.\n"
+      "    The \"Name\" column contains applications' start buttons; "
+      "the \"?\" column displays applications' current state "
+      "(exceeding the limits of acceptable ranges, software of "
+      "hardware errors, etc.), "
+      "and the \"Srv\" column shows states of servers, "
+      "used by that application (green: everything is OK, "
+      "red: server isn't run, blue: server had hanged).\n"
+      "    <Right Mouse Button> on application's button or on a server's LED "
+      "calls a Start/Stop menu.  To launch an application, "
+      "just click on its button (its servers will be started automatically).  "
+      "If the application is already launched on this screen "
+      "(but, for example, is hidden below other windows or iconified/minimized), "
+      "it will be pulled up."
+      ;
+#else
+  static const char *help_title = "CX-starter - справка";
+  static const char *help_text  =
       "CX-starter является центром управления пульта\xA0- он служит "
       "для запуска прикладных программ и серверов, "
       "а также для слежения за их состоянием.\n"
@@ -158,15 +180,17 @@ static void HelpCB(Widget     w          __attribute__((unused)),
       "красный\xA0- сервер не запущен, синий\xA0- сервер завис).\n"
       "    <Правая кнопка мыши> на кнопке приложения или лампочке сервера "
       "вызывает меню для запуска либо останова.  Для запуска приложения "
-      "достаточно нажать на его кнопку.  Если приложение уже запущено на экране "
+      "достаточно нажать на его кнопку (его сервера будут запущены автоматически).  "
+      "Если приложение уже запущено на экране "
       "(но, например, скрыто под другими окнами или свернуто в пиктограмму), "
       "то оно будет вытянуто наверх."
       ;
+#endif
 
     if (help_box == NULL)
     {
         help_box = XhCreateStdDlg(onewin, "help", "CX-starter help",
-                                  NULL, "CX-starter - справка",
+                                  NULL, help_title,
                                   XhStdDlgFOk | XhStdDlgFResizable);
 
         XtVaCreateManagedWidget("helpMessage", xmTextWidgetClass, help_box,

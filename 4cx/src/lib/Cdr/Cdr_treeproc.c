@@ -941,7 +941,7 @@ int   CdrRealizeKnobs    (DataSubsys  subsys,
     if (count == 0) return 0;
     if (list == NULL)
     {
-        CdrSetErr("%s(): list=%d", __FUNCTION__);
+        CdrSetErr("%s(): list=NULL", __FUNCTION__);
         return -1;
     }
 

@@ -12,6 +12,7 @@
 #include "cda_plugmgr.h"
 
 #include "cda_d_cx.h"
+#include "cda_d_cx4old.h"
 #include "cda_d_dircn.h"
 #include "cda_d_local.h"
 #include "cda_d_vcas.h"
@@ -134,14 +135,15 @@ static int DoRegisterFla_p(cda_fla_p_rec_t *metric)
 
 static int initialize_cda_plugmgr(void)
 {
-    if (DoRegisterDat_p(&CDA_DAT_P_MODREC_NAME(cx))    < 0  ||
-        DoRegisterDat_p(&CDA_DAT_P_MODREC_NAME(dircn)) < 0  ||
-        DoRegisterDat_p(&CDA_DAT_P_MODREC_NAME(local)) < 0  ||
-        DoRegisterDat_p(&CDA_DAT_P_MODREC_NAME(vcas))  < 0  ||
+    if (DoRegisterDat_p(&CDA_DAT_P_MODREC_NAME(cx))     < 0  ||
+        DoRegisterDat_p(&CDA_DAT_P_MODREC_NAME(dircn))  < 0  ||
+        DoRegisterDat_p(&CDA_DAT_P_MODREC_NAME(cx4old)) < 0  ||
+        DoRegisterDat_p(&CDA_DAT_P_MODREC_NAME(local))  < 0  ||
+        DoRegisterDat_p(&CDA_DAT_P_MODREC_NAME(vcas))   < 0  ||
 #ifndef NOV2CX
-        DoRegisterDat_p(&CDA_DAT_P_MODREC_NAME(v2cx))  < 0  ||
+        DoRegisterDat_p(&CDA_DAT_P_MODREC_NAME(v2cx))   < 0  ||
 #endif
-        DoRegisterFla_p(&CDA_FLA_P_MODREC_NAME(fla))   < 0) return -1;
+        DoRegisterFla_p(&CDA_FLA_P_MODREC_NAME(fla))    < 0) return -1;
 
     cda_plugmgr_initialized = 1;
 

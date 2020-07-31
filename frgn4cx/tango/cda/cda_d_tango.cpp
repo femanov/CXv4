@@ -392,7 +392,7 @@ static int  create_dpx_dev(dpx_id_t dpx, dpxinfo_t *di, int is_suffering)
     catch (...)
     {
         if (cda_d_tango_debug)
-            fprintf(stderr, "%s: DeviceProxy creation raised an exception; dev=%d\n", __FUNCTION__, di->dev);
+            fprintf(stderr, "%s: DeviceProxy creation raised an exception; dev=%p\n", __FUNCTION__, di->dev);
         errno = EIO;
     }
 #endif
@@ -456,7 +456,7 @@ static int create_hwr_subscription(cda_hwcnref_t hwr)
 
 static int  cda_d_tango_new_chan(cda_dataref_t ref, const char *name,
                                  int options,
-                                 cxdtype_t dtype, int nelems)
+                                 cxdtype_t dtype, int max_nelems)
 {
   cda_d_tango_privrec_t *me;
 
@@ -488,10 +488,10 @@ static int  cda_d_tango_new_chan(cda_dataref_t ref, const char *name,
 fprintf(stderr, "name=<%s>\n", name);
     /* Check/filter the dtype first */
     // As of 02.08.2019 -- we support scalars only
-    if (nelems != 1)
+    if (max_nelems != 1)
     {
-        cda_dat_p_report(-1, "%s(\"%s\"):nelems=%d requested while only ==1 (scalars) is supported",
-                         __FUNCTION__, name, nelems);
+        cda_dat_p_report(-1, "%s(\"%s\"):max_nelems=%d requested while only ==1 (scalars) is supported",
+                         __FUNCTION__, name, max_nelems);
         errno = EINVAL;
         return CDA_DAT_P_ERROR;
     }
@@ -503,7 +503,7 @@ fprintf(stderr, "name=<%s>\n", name);
         dtype != CXDTYPE_SINGLE  &&
         dtype != CXDTYPE_DOUBLE)
     {
-        cda_dat_p_report(-1, "%s(\"%s\"):dtype=%d (repr=%d, size=%d) is unsupported",
+        cda_dat_p_report(-1, "%s(\"%s\"):dtype=%d (repr=%d, size=%zd) is unsupported",
                          __FUNCTION__, name, dtype, reprof_cxdtype(dtype), sizeof_cxdtype(dtype));
         errno = EINVAL;
         return CDA_DAT_P_ERROR;

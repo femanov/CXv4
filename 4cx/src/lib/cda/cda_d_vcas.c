@@ -36,7 +36,7 @@ typedef struct
 
     cda_dataref_t  dataref; // "Backreference" to corr.entry in the global table
     cxdtype_t      dtype;
-    int            nelems;
+    int            max_nelems;
 
     char          *name;
 } hwrinfo_t;
@@ -326,7 +326,7 @@ static int determine_name_type(const char *name,
 
 static int  cda_d_vcas_new_chan(cda_dataref_t ref, const char *name,
                                 int options,
-                                cxdtype_t dtype, int nelems)
+                                cxdtype_t dtype, int max_nelems)
 {
   cda_d_vcas_privrec_t *me;
 
@@ -362,9 +362,9 @@ static int  cda_d_vcas_new_chan(cda_dataref_t ref, const char *name,
     for (p = hi->name; *p != '\0';  p++)
         if (*p == '.') *p = '/';
     // Other data
-    hi->dataref = ref;
-    hi->dtype   = dtype;
-    hi->nelems  = nelems;
+    hi->dataref    = ref;
+    hi->dtype      = dtype;
+    hi->max_nelems = max_nelems;
     cda_dat_p_set_hwr  (ref, hwr);
     cda_dat_p_set_ready(ref, 1);
 
@@ -408,7 +408,7 @@ static void cda_d_vcas_del_chan(void *pdt_privptr, cda_hwcnref_t hwr)
 }
 
 static int  cda_d_vcas_set_type(void *pdt_privptr, cda_hwcnref_t hwr,
-                                cxdtype_t dtype, int nelems)
+                                cxdtype_t dtype, int max_nelems)
 {
   cda_d_vcas_privrec_t *me = pdt_privptr;
   hwrinfo_t            *hi = AccessHwrSlot(hwr, me);
@@ -420,8 +420,8 @@ static int  cda_d_vcas_set_type(void *pdt_privptr, cda_hwcnref_t hwr,
         return -1;
     }
 
-    hi->dtype   = dtype;
-    hi->nelems  = nelems;
+    hi->dtype      = dtype;
+    hi->max_nelems = max_nelems;
 
     return 0;
 }
