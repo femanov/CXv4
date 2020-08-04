@@ -2235,15 +2235,20 @@ static size_t Put_NT_OPEN_nnn_Chunk(v4clnt_t *cp, size_t replydatasize,
   int32                  v_rw;
   int32                  v_dtype;
   int32                  v_max_nelems;
+  int32                  param1;
+  int32                  param2;
   CxV4Chunk             *req;
   size_t                 reqlen;
 
     if (mp == NULL)
     {
+        gcid         = -1;
         chnd         = -1;
         v_rw         = 0;
         v_dtype      = 0;
         v_max_nelems = 0;
+        param1       = 0;
+        param2       = 0;
     }
     else
     {
@@ -2254,6 +2259,8 @@ static size_t Put_NT_OPEN_nnn_Chunk(v4clnt_t *cp, size_t replydatasize,
         v_rw         = chn_p->rw;
         v_dtype      = chn_p->dtype;
         v_max_nelems = chn_p->max_nelems;
+        param1       = mp->param1;
+        param2       = mp->param2;
     }
 
     if (hack_req_info_ptr == NULL)
@@ -2265,6 +2272,8 @@ static size_t Put_NT_OPEN_nnn_Chunk(v4clnt_t *cp, size_t replydatasize,
     {
         req    = hack_req_info_ptr->req;
         reqlen = hack_req_info_ptr->reqlen;
+        param1 = req->param1;
+        param2 = req->param2;
     }
 
     rpycsize = CXV4_CHUNK_CEIL(sizeof(*opnc) + reqlen);
@@ -2275,8 +2284,8 @@ static size_t Put_NT_OPEN_nnn_Chunk(v4clnt_t *cp, size_t replydatasize,
     bzero(opnc, sizeof(*opnc));
     opnc->ck.OpCode   = clnt_u32(cp, info_int);
     opnc->ck.ByteSize = clnt_u32(cp, rpycsize);
-    opnc->ck.param1   = mp->param1;
-    opnc->ck.param2   = mp->param2;
+    opnc->ck.param1   = param1;
+    opnc->ck.param2   = param2;
     opnc->ck.rs1      = clnt_i32(cp, chnd);
     opnc->hwid        = clnt_i32(cp, gcid);
     opnc->rw          = clnt_i32(cp, v_rw);
