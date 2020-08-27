@@ -5,10 +5,10 @@ grouping main v5adc200_kls1 "Klystron 1 RF measurements" \
             layinfo:"left=0,right=0,top=0,bottom=0@selector"
     container selector "" grid nodecor 3 layinfo:left=0,bottom=0 content:3 {
         knob ch1 "Ch A" choicebs r:l0403_kls1.out0 \
-                items:"#T7с пад\b\bcolor=blue\t8с пад\t9с пад\t10с пад"
+                items:"#Ts7 in\b\bcolor=blue\ts8 in\ts9 in\ts10 in"
         noop - "    " hlabel
         knob ch2 "Ch B" choicebs r:l0403_kls1.out1 \
-                items:"#T7с нагр\b\bcolor=red\t8с нагр\t9с нагр\t10с нагр"
+                items:"#Ts7 out\b\bcolor=red\ts8 out\ts9 out\ts10 out"
     }
 }
 

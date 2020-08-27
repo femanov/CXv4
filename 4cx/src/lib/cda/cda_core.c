@@ -1904,6 +1904,15 @@ int            cda_hwinfo_of_ref        (cda_dataref_t  ref,
     return 0;
 }
 
+int            cda_lock_stat_of_ref     (cda_dataref_t  ref)
+{
+  refinfo_t      *ri = AccessRefSlot(ref);
+
+    if (CheckRef(ref) != 0) return -1;
+
+    return ri->lockstat;
+}
+
 
 int                 cda_status_of_ref_sid(cda_dataref_t ref)
 {
@@ -4154,8 +4163,9 @@ int cda_get_ref_dval(cda_dataref_t ref,
     else
     {
         /* Note: here we suppose that scalar values ALWAYS
-           go from valbuf (because of guard "ri->nelems != 1" above).
-           If this changes someday, data should be obtained via pointer. */
+           go from valbuf (because of guard "ri->max_nelems != 1" above).
+           If this changes someday, data should be obtained via pointer.
+           11.08.2020: note: cda_set_type(). cda_get_ref_ival() below too. */ /*!!!*/
         if      (ri->current_dtype == CXDTYPE_DOUBLE) v = ri->valbuf.f64;
         else if (ri->current_dtype == CXDTYPE_SINGLE) v = ri->valbuf.f32;
         else if (ri->current_dtype == CXDTYPE_INT32)  v = ri->valbuf.i32;

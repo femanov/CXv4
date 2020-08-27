@@ -2572,7 +2572,8 @@ static int GetChnd(v4clnt_t *cp, CxV4Chunk *req, uint32 Seq, cxsd_cpntid_t cpid,
     chnd = GetMonSlot(cp);
     if (chnd <= 0) return -CXT4_ENOMEM;
     mp = AccessMonSlot(chnd, cp);
-    mp->cond = CXSD_FE_CX_MON_COND_MON_NOT_ADDED; // Guard against RlsMonSlot() doing "per_cycle_monitors_count--" if called before actual "per_cycle_monitors_count++" below
+    mp->in_use = MON_TYPE_CHN; // Convert from default "MON_TYPE_OLD"
+    mp->cond   = CXSD_FE_CX_MON_COND_MON_NOT_ADDED; // Guard against RlsMonSlot() doing "per_cycle_monitors_count--" if called before actual "per_cycle_monitors_count++" below
 
     /*  */
     if ((REQ_ALL_MONITORS  &&  info.cond != CX_MON_COND_NEVER)  ||

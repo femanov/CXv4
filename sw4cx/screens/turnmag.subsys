@@ -8,34 +8,34 @@ defserver canhw:21.turnmag
 grouping  main TurnMag "Turning Magnet" lrtb content:2 {
     container control "Control" grid notitle,noshadow,nocoltitles \
             content:4 {
-        disp loc "Положение" selector "nolabel" r:cur_direction \
+        disp loc "Position" selector "nolabel" r:cur_direction \
                 items:"00?!\b\blit=blue\t"\
-                      "В кольцо\b\blit=green\t"\
-                      "В могильник\b\blit=red\t"\
-                      "Между\b\blit=yellow"
-        disp Imot "Ток мотора" text r:i_motor \
+                      "-> Ring\b\blit=green\t"\
+                      "-> Mogilnik\b\blit=red\t"\
+                      "..between..\b\blit=yellow"
+        disp Imot "Imotor" text r:i_motor \
                 units:A dpyfmt:%6.3f normrange:0-70 yelwrange:0-100 \
                 layinfo:horz=right
-        knob Ilim "Предел (A)" text "noincdec" r:i_lim      dpyfmt:%6.3f \
+        knob Ilim "Limit (A)" text "noincdec" r:i_lim      dpyfmt:%6.3f \
                 layinfo:horz=right
-        container timelimits "Пред. время" grid nodecor ncols:2 content:2 {
+        container timelimits "Time limit" grid nodecor ncols:2 content:2 {
             disp Tcur ""  text ""              r:i_exc_time dpyfmt:%3.1f
             knob Tlim "/" text "withlabel"     r:i_lim_time dpyfmt:%3.1f
         } \
                 layinfo:horz=right
     }
 
-    container move "Ехать" grid noshadow,fold_h,nocoltitles \
-            rowtitles:"До упора\t0.1s\tN s" \
+    container move "Move" grid noshadow,fold_h,nocoltitles \
+            rowtitles:"Till stop\t0.1s\tN s" \
             ncols:3 content:12 {
-        button - "Могил." button r:go_bury_max
-        button - "Кольцо" button r:go_ring_max
+        button - "Mogil." button r:go_bury_max
+        button - "Ring"   button r:go_ring_max
         button - "STOP"   button r:stop
-        button - "Могил." button r:go_bury_100ms
-        button - "Кольцо" button r:go_ring_100ms
+        button - "Mogil." button r:go_bury_100ms
+        button - "Ring"   button r:go_ring_100ms
         noop
-        button - "Могил." button r:go_bury_n_s
-        button - "Кольцо" button r:go_ring_n_s
+        button - "Mogil." button r:go_bury_n_s
+        button - "Ring"   button r:go_ring_n_s
         knob   - "N="     text   r:n_s \
                 options:"withlabel,noincdec" dpyfmt:%4.1f
         disp   - "" selector items:"<-\t\t" \

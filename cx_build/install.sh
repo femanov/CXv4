@@ -5,7 +5,7 @@ set -e
 
 CXDIR=$HOME/cx
 
-CXINSTDIR=$HOME/cx_inst
+CXINSTDIR=$HOME/4pult
 
 make -C $CXDIR/4cx/src install PREFIX=$CXINSTDIR
 

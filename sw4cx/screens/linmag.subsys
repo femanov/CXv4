@@ -38,11 +38,11 @@ define(`EMPTY_LINE',
         noop - " " hlabel
         noop - " " hlabel')
 
-grouping main LINMAGX_grouping "Управление Магнитной Системой Линака" lrtb \
+grouping main LINMAGX_grouping "Linac Magnetic System Control" lrtb \
         content:3 {
 
-    container magsys "Магнитная система" grid \
-            str1:"Задано, A\tИзм., A\td/dT\t \t \t " \
+    container magsys "Magnetic System" grid \
+            str1:"Set, A\tMes., A\td/dT\t \t \t " \
             param1:6 param2:24 param3:1 content:eval(1+24*6*2) {
 
         define(`RINGS_TARGET', `Rings.Iset')
@@ -82,16 +82,16 @@ grouping main LINMAGX_grouping "Управление Магнитной Системой Линака" lrtb \
             }
         }
 
-        MAGX_IST_CDAC20_LINE(Rings,     "Rings", "\nк.6-11: ВЧ-1000\nот ШУИ-2 QF-1", 1500, 1, icd_rings, 1, 0, 1)
+        MAGX_IST_CDAC20_LINE(Rings,     "Rings", "\nroom 6-11: VCh-1000\nfrom ShUI-2 QF-1", 1500, 1, icd_rings, 1, 0, 1)
        #OLD_V1000_LINE(Rings)
-        MAGX_IST_CDAC20_LINE(esol,      "eSol",  "\nИП2: ИСТ-3",     1800, 1, icd_esol,  1, 0)
-        MAGSYS_LINE(QL1,     "\nИП2: ВЧ300-1")
-        MAGSYS_LINE(QL2,     "\nИП2: ВЧ300-2")
-        MAGSYS_LINE(QL3,     "\nИП2: ВЧ300-3")
-        MAGSYS_LINE(QL4,     "\nИП2: УМ-15-1")
+        MAGX_IST_CDAC20_LINE(esol,      "eSol",  "\nIP2: IST-3",     1800, 1, icd_esol,  1, 0)
+        MAGSYS_LINE(QL1,     "\nIP2: VCh300-1")
+        MAGSYS_LINE(QL2,     "\nIP2: VCh300-2")
+        MAGSYS_LINE(QL3,     "\nIP2: VCh300-3")
+        MAGSYS_LINE(QL4,     "\nIP2: UM-15-1")
 
         knob/groupable Spectr_set "Spectr" text dpyfmt:"%6.1f" r:Spectr.Iset \
-                alwdrange:-2600-2600 options:nounits tip:"\nВ1000: ВЧ1300, 2шт"
+                alwdrange:-2600-2600 options:nounits tip:"\nV1000: VCh1300, 2x"
         disp           Spectr_mes Spectr_m text dpyfmt:"%6.1f" \
                 r:"_all_code; getchan Spectr1.dcct1; getchan Spectr2.dcct1; add; ret;"
         noop - " " hlabel
@@ -101,67 +101,67 @@ grouping main LINMAGX_grouping "Управление Магнитной Системой Линака" lrtb \
                  `"_all_code; getchan Spectr1.is_on; getchan Spectr2.is_on; mul; ret;"', 
                 Spectr.switch_off, Spectr.switch_on)
         noop - " " hlabel
-        MAGX_IST_CDAC20_LINE(Spectr1,   "Spectr1",  "\nк.6-11: ВЧ-1300-1\nот ШУИ-2 QF-2", 1000, 1, icd_spectr1, 1, 0, 1, 1)
-        MAGX_IST_CDAC20_LINE(Spectr2,   "Spectr2",  "\nк.6-11: ВЧ-1300-2\nот ШУИ-2 QF-3", 1000, 1, icd_spectr2, 1, 0, 1, 1)
+        MAGX_IST_CDAC20_LINE(Spectr1,   "Spectr1",  "\nroom 6-11: VCh-1300-1\nfrom ShUI-2 QF-2", 1000, 1, icd_spectr1, 1, 0, 1, 1)
+        MAGX_IST_CDAC20_LINE(Spectr2,   "Spectr2",  "\nroom 6-11: VCh-1300-2\nfrom ShUI-2 QF-3", 1000, 1, icd_spectr2, 1, 0, 1, 1)
        #OLD_V1000_LINE(Spectr)
 
-        MAGSYS_LINE(   QL5,    "\nИП2: УМ-15-2")
-        MAGSYS_LINE(   QL6n7,  "\nИП2: ВЧ300-4")
-        MAGSYS_LINE(   QL8n9,  "\nИП2: ВЧ300-5")
-        MAGSYS_LINE(   QL10,   "\nИП2: ВЧ300-6")
-        MAGSYS_LINE(   QL11,   "\nИП2: ВЧ300-7")
-###        MAGSYS_LINE(   QL12,   "\nИП2: В300-1 (Великанов)")
-###        MAGSYS_LINE(   QL13,   "\nИП2: В300-2 (Великанов)")
-###        MAGSYS_LINE(   QL14,   "\nИП2: В300-3 (Великанов)")
+        MAGSYS_LINE(   QL5,    "\nIP2: UM-15-2")
+        MAGSYS_LINE(   QL6n7,  "\nIP2: VCh300-4")
+        MAGSYS_LINE(   QL8n9,  "\nIP2: VCh300-5")
+        MAGSYS_LINE(   QL10,   "\nIP2: VCh300-6")
+        MAGSYS_LINE(   QL11,   "\nIP2: VCh300-7")
+###        MAGSYS_LINE(   QL12,   "\nIP2: V300-1 (Velikanov)")
+###        MAGSYS_LINE(   QL13,   "\nIP2: V300-2 (Velikanov)")
+###        MAGSYS_LINE(   QL14,   "\nIP2: V300-3 (Velikanov)")
         MAGX_IST_CDAC20_LINE(QL12, "QL12", "\n???", 500, 1.0, icd_QL12, 1, 0, 1)
         MAGX_IST_CDAC20_LINE(QL13, "QL13", "\n???", 500, 1.0, icd_QL13, 1, 0, 1)
         MAGX_IST_CDAC20_LINE(QL14, "QL14", "\n???", 500, 1.0, icd_QL14, 1, 0, 1)
-        MAGSYS_LINE(   QLB1,   "\nИП2: А300-1")
-###        MAGSYS_LINE(   QLB3n4, "\nИП2: А300-2")
-###        MAGSYS_LINE(   QLB2n5, "\nИП2: А300-3")
+        MAGSYS_LINE(   QLB1,   "\nIP2: A300-1")
+###        MAGSYS_LINE(   QLB3n4, "\nIP2: A300-2")
+###        MAGSYS_LINE(   QLB2n5, "\nIP2: A300-3")
         MAGX_IST_CDAC20_LINE(QLB3n4, "QLB3n4", "\n???", 500, 1.0, icd_QLB3n4, 1, 0, 1)
         MAGX_IST_CDAC20_LINE(QLB2n5, "QLB2n5", "\n???", 500, 1.0, icd_QLB2n5, 1, 0, 1)
-        MAGX_IST_CDAC20_LINE(bend,      "Bend",  "\nИСТР: ИСТ-1",    1800, 1, icd_bend,  1, 0)
-##        OLD_V1000_LINE(QLTr1,  `"\nВ1000: В300-1, Триплет"')
-##        OLD_V1000_LINE(QLTr2,  `"\nВ1000: В300-2, Триплет"')
-##        OLD_V1000_LINE(QLTr3,  `"\nВ1000: В300-3, Триплет"')
-        MAGX_IST_CDAC20_LINE(qltr1,     "QLTr1", "\nк.7-11а: ВЧ500-1",  500,  1, icd_qltr1, 1, 0, 1)
-        MAGX_IST_CDAC20_LINE(qltr2,     "QLTr2", "\nк.7-11а: ВЧ500-2",  500,  1, icd_qltr2, 1, 0, 1)
-        MAGX_IST_CDAC20_LINE(qltr3,     "QLTr3", "\nк.7-11а: ВЧ500-3",  500,  1, icd_qltr3, 1, 0, 1)
-        MAGX_IST_CDAC20_LINE(coil1,     "Coil1", "\nк.7-11а: ВЧ1000-1", 1500, 1, icd_coil1, 1, 0, 1)
-        MAGX_IST_CDAC20_LINE(coil2,     "Coil2", "\nк.7-11а: ВЧ1000-2", 1500, 1, icd_coil2, 1, 0, 1)
+        MAGX_IST_CDAC20_LINE(bend,      "Bend",  "\nISTR: IST-1",    1800, 1, icd_bend,  1, 0)
+##        OLD_V1000_LINE(QLTr1,  `"\nV1000: V300-1, Triplet"')
+##        OLD_V1000_LINE(QLTr2,  `"\nV1000: V300-2, Triplet"')
+##        OLD_V1000_LINE(QLTr3,  `"\nV1000: V300-3, Triplet"')
+        MAGX_IST_CDAC20_LINE(qltr1,     "QLTr1", "\nroom 7-11a: VCh500-1",  500,  1, icd_qltr1, 1, 0, 1)
+        MAGX_IST_CDAC20_LINE(qltr2,     "QLTr2", "\nroom 7-11a: VCh500-2",  500,  1, icd_qltr2, 1, 0, 1)
+        MAGX_IST_CDAC20_LINE(qltr3,     "QLTr3", "\nroom 7-11a: VCh500-3",  500,  1, icd_qltr3, 1, 0, 1)
+        MAGX_IST_CDAC20_LINE(coil1,     "Coil1", "\nroom 7-11a: VCh1000-1", 1500, 1, icd_coil1, 1, 0, 1)
+        MAGX_IST_CDAC20_LINE(coil2,     "Coil2", "\nroom 7-11a: VCh1000-2", 1500, 1, icd_coil2, 1, 0, 1)
        #OLD_V1000_LINE(Coil2)
-        MAGX_IST_CDAC20_LINE(psol,      "pSol",  "\nИСТР: ИСТ-2",    1800, 1, icd_psol,  1, 0)
-       #OLD_V1000_LINE(QL15, `"\nВ1000: В300-4"')
-        MAGX_IST_CDAC20_LINE(ql15,      "QL15", "\nВ1000: В500-4",   300,  1, icd_ql15,  1, 0, 1)
+        MAGX_IST_CDAC20_LINE(psol,      "pSol",  "\nISTR: IST-2",    1800, 1, icd_psol,  1, 0)
+       #OLD_V1000_LINE(QL15, `"\nV1000: V300-4"')
+        MAGX_IST_CDAC20_LINE(ql15,      "QL15", "\nV1000: V500-4",   300,  1, icd_ql15,  1, 0, 1)
 
-        MAGX_VCH300_LINE(QL16, "QL16", "\nИП2: IIIрСТ ВЧ300", 1000, 1, v3h0, 0)
-        MAGX_VCH300_LINE(QL17, "QL17", "\nИП2: IIIрСТ ВЧ300", 1000, 1, v3h0, 1)
-        MAGX_VCH300_LINE(QL18, "QL18", "\nИП2: IIIрСТ ВЧ300", 1000, 1, v3h0, 2)
-        MAGX_VCH300_LINE(QL19, "QL19", "\nИП2: IIIрСТ ВЧ300", 1000, 1, v3h0, 3)
-        MAGX_VCH300_LINE(QL20, "QL20", "\nИП2: IIIрСТ ВЧ300", 1000, 1, v3h0, 4)
-        MAGX_VCH300_LINE(QL21, "QL21", "\nИП2: IIIрСТ ВЧ300", 1000, 1, v3h0, 5)
-        MAGX_VCH300_LINE(QL22, "QL22", "\nИП2: IIIрСТ ВЧ300", 1000, 1, v3h0, 6)
-        MAGX_VCH300_LINE(QL23, "QL23", "\nИП2: IIIрСТ ВЧ300", 1000, 1, v3h0, 7)
-        MAGX_VCH300_LINE(QL24, "QL24", "\nИП2: VрСТ ВЧ300",   1000, 1, v3h1, 0)
-        MAGX_VCH300_LINE(QL25, "QL25", "\nИП2: VрСТ ВЧ300",   1000, 1, v3h1, 1)
-        MAGX_VCH300_LINE(QL26, "QL26", "\nИП2: VрСТ ВЧ300",   1000, 1, v3h1, 2)
-        MAGX_VCH300_LINE(QL27, "QL27", "\nИП2: VрСТ ВЧ300",   1000, 1, v3h1, 3)
-        MAGX_VCH300_LINE(QL28, "QL28", "\nИП2: VрСТ ВЧ300",   1000, 1, v3h1, 4)
-        MAGX_VCH300_LINE(QL29, "QL29", "\nИП2: VрСТ ВЧ300",   1000, 1, v3h1, 5)
-        MAGX_VCH300_LINE(QL30, "QL30", "\nИП2: VрСТ ВЧ300",   1000, 1, v3h1, 6)
-        MAGX_VCH300_LINE(QL31, "QL31", "\nИП2: VрСТ ВЧ300",   1000, 1, v3h1, 7)
+        MAGX_VCH300_LINE(QL16, "QL16", "\nIP2: IIIrST VCh300", 1000, 1, v3h0, 0)
+        MAGX_VCH300_LINE(QL17, "QL17", "\nIP2: IIIrST VCh300", 1000, 1, v3h0, 1)
+        MAGX_VCH300_LINE(QL18, "QL18", "\nIP2: IIIrST VCh300", 1000, 1, v3h0, 2)
+        MAGX_VCH300_LINE(QL19, "QL19", "\nIP2: IIIrST VCh300", 1000, 1, v3h0, 3)
+        MAGX_VCH300_LINE(QL20, "QL20", "\nIP2: IIIrST VCh300", 1000, 1, v3h0, 4)
+        MAGX_VCH300_LINE(QL21, "QL21", "\nIP2: IIIrST VCh300", 1000, 1, v3h0, 5)
+        MAGX_VCH300_LINE(QL22, "QL22", "\nIP2: IIIrST VCh300", 1000, 1, v3h0, 6)
+        MAGX_VCH300_LINE(QL23, "QL23", "\nIP2: IIIrST VCh300", 1000, 1, v3h0, 7)
+        MAGX_VCH300_LINE(QL24, "QL24", "\nIP2: VrST VCh300",   1000, 1, v3h1, 0)
+        MAGX_VCH300_LINE(QL25, "QL25", "\nIP2: VrST VCh300",   1000, 1, v3h1, 1)
+        MAGX_VCH300_LINE(QL26, "QL26", "\nIP2: VrST VCh300",   1000, 1, v3h1, 2)
+        MAGX_VCH300_LINE(QL27, "QL27", "\nIP2: VrST VCh300",   1000, 1, v3h1, 3)
+        MAGX_VCH300_LINE(QL28, "QL28", "\nIP2: VrST VCh300",   1000, 1, v3h1, 4)
+        MAGX_VCH300_LINE(QL29, "QL29", "\nIP2: VrST VCh300",   1000, 1, v3h1, 5)
+        MAGX_VCH300_LINE(QL30, "QL30", "\nIP2: VrST VCh300",   1000, 1, v3h1, 6)
+        MAGX_VCH300_LINE(QL31, "QL31", "\nIP2: VrST VCh300",   1000, 1, v3h1, 7)
 
-        MAGSYS_LINE(   Cor1,   "\nИП2: А300-0")
-        MAGSYS_LINE(   Cor2n3, "\nИП2: ВЧ300-8")
+        MAGSYS_LINE(   Cor1,   "\nIP2: A300-0")
+        MAGSYS_LINE(   Cor2n3, "\nIP2: VCh300-8")
 
         EMPTY_LINE()
 
-        MAGX_IST_CDAC20_LINE(d1m,      "1M:1-4", "\nИП2: ИСТ-?",    1800, 1, icd_d1m, 1, 0)
+        MAGX_IST_CDAC20_LINE(d1m,      "1M:1-4", "\nIP2: IST-?",    1800, 1, icd_d1m, 1, 0)
     }
 
-    container magcor "Магнитная коррекция" grid \
-            str1:"Задано, mA\tИзм.\tU, V" \
+    container magcor "Magnetic Correction" grid \
+            str1:"Set, mA\tMes.\tU, V" \
             base:rst1 param1:3 param2:24 content:eval(24*3*2) {
         MAGX_COR4016_LINE(LENS1,  "LENS1")
         MAGX_COR4016_LINE(LENS2,  "LENS2")
@@ -215,7 +215,7 @@ grouping main LINMAGX_grouping "Управление Магнитной Системой Линака" lrtb \
         MAGX_COR4016_LINE(S14_H,  "S14_H")
     }
 
-    container mc-c208 "Кор208" grid \
+    container mc-c208 "Corr208" grid \
             str1:"Iset, mA\tImes\tUmes, V" \
             base:fedcor param1:3 param3:2 content:eval(2+6*3) {
         knob/ign_otherop -switch "" choicebs nolabel \

@@ -10,7 +10,7 @@ grouping main RINGCOR45_grouping "Damping Ring Magnetic Correction - RST2/3" lrt
         content:2 {
 
     container rst2 "RST2" grid \
-            str1:"Задано, mA\tИзм.\tU, V" \
+            str1:"Set, mA\tMes.\tU, V" \
             base:rst2 param1:3 param2:24 content:eval(3*24*2) {
         MAGX_COR4016_LINE(c2L1_z,  "2L1-z")
         MAGX_COR4016_LINE(c2L2_x,  "2L2-x")
@@ -64,7 +64,7 @@ grouping main RINGCOR45_grouping "Damping Ring Magnetic Correction - RST2/3" lrt
     }
 
     container rst3 "RST3" grid \
-            str1:"Задано, mA\tИзм.\tU, V" \
+            str1:"Set, mA\tMes.\tU, V" \
             base:rst3 param1:3 param2:24 content:eval(3*24*2) {
         MAGX_COR4016_LINE(c1D1_Q,   "1D1-Q")
         MAGX_COR4016_LINE(c1F1_Q,   "1F1-Q")

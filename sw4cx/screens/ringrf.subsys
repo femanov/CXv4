@@ -28,7 +28,7 @@ winname  main ringrf
 winclass main RingRF
 winopts  main with_tbar_loggia
 
-grouping main RINGRF_grouping "ВЧ-система" lrtb "" \
+grouping main RINGRF_grouping "Ring RF System" lrtb "" \
         content:2 {
     container kurkin "Rezonator" grid "nocoltitles" base:rezonator \
             ncols:2 nattl:4 content:eval(4+10*2) {

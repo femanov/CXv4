@@ -13,6 +13,9 @@ extern "C"
 #include "misc_macros.h"
 #include "misc_sepchars.h"
 
+#include "misc_iso8601.h"
+#include "misc_sleepbyselect.h"
+
 
 /* printf-style format parsing */
 enum
@@ -121,17 +124,6 @@ static inline ssize_t uintr_write(int s, const void *buf, size_t count)
 
 /* Portable replacement for signal() with a clearly-defined semantics */
 int set_signal(int signum, void (*handler)(int));
-
-
-/* ISO 8601 time presentation */
-char *stroftime     (time_t when, char *dts);
-char *stroftime_msc (struct timeval *when, char *dts);
-char *strcurtime    (void);
-char *strcurtime_msc(void);
-
-
-/* Portable sleep() with microsecond precision */
-void SleepBySelect(int usecs);
 
 
 /* Buffer management */

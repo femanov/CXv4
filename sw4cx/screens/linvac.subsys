@@ -57,7 +57,7 @@ wintitle main "Vacuum Control"
 winname  main linvac
 winclass main LinVac
 
-grouping main LINVAC_grouping "Контроль вакуума" lrtb content:2 {
+grouping main LINVAC_grouping "Vacuum Control" lrtb content:2 {
 
     container ivas "" grid noshadow,notitle \
             str1:"I, uA\tU, kV\tIl, uA\tUl, kV\tI!\tU!" \
@@ -189,64 +189,64 @@ grouping main LINVAC_grouping "Контроль вакуума" lrtb content:2 {
             str1:"I, uA\tU, kV\t+\t5/7\tIl, uA\tUl, kV\tI!\tU!" \
             param1:8 param2:32 content:eval(8*(12*4)) {
 
-        LIN124_LINE(vK1,  `ВИП 1-1 - кольцо, nнасос 1,\nПВИГ')
-        LIN124_LINE(vK2,  `ВИП 1-2 - кольцо, насос  2,\nПВИГ')
-        LIN124_LINE(vK3,  `ВИП 1-3 - кольцо, насос  3,\nПВИГ')
-        LIN124_LINE(vK4,  `ВИП 1-4 - кольцо, насос  4,\nПВИГ')
+        LIN124_LINE(vK1,  `VIP 1-1 - ring, pump 1,\nPVIG')
+        LIN124_LINE(vK2,  `VIP 1-2 - ring, pump 2,\nPVIG')
+        LIN124_LINE(vK3,  `VIP 1-3 - ring, pump 3,\nPVIG')
+        LIN124_LINE(vK4,  `VIP 1-4 - ring, pump 4,\nPVIG')
 
-        LIN124_LINE(vK5,  `ВИП 2-1 - кольцо, насос  5,\nПВИГ')
-        LIN124_LINE(vK6,  `ВИП 2-2 - кольцо, насос  6,\nПВИГ')
-        LIN124_LINE(vK7,  `ВИП 2-3 - кольцо, насос  7,\nПВИГ')
-        LIN124_LINE(vK8,  `ВИП 2-4 - кольцо, насос  8,\nНМД-0,025')
+        LIN124_LINE(vK5,  `VIP 2-1 - ring, pump 5,\nPVIG')
+        LIN124_LINE(vK6,  `VIP 2-2 - ring, pump 6,\nPVIG')
+        LIN124_LINE(vK7,  `VIP 2-3 - ring, pump 7,\nPVIG')
+        LIN124_LINE(vK8,  `VIP 2-4 - ring, pump 8,\nNMD-0,025')
 
-        LIN124_LINE(vK9,  `ВИП 3-1 - кольцо, насос  9,\nПВИГ')
-        LIN124_LINE(vK10, `ВИП 3-2 - кольцо, насос  10,\nПВИГ')
-        LIN124_LINE(vK11, `ВИП 3-3 - кольцо, насос  11,\nПВИГ')
-        LIN124_LINE(vK12, `ВИП 3-4 - кольцо, насос  12,\nПВИГ')
+        LIN124_LINE(vK9,  `VIP 3-1 - ring, pump 9,\nPVIG')
+        LIN124_LINE(vK10, `VIP 3-2 - ring, pump 10,\nPVIG')
+        LIN124_LINE(vK11, `VIP 3-3 - ring, pump 11,\nPVIG')
+        LIN124_LINE(vK12, `VIP 3-4 - ring, pump 12,\nPVIG')
 
-        LIN124_LINE(vK13, `ВИП 4-1 - кольцо, насос  13,\nПВИГ')
-        LIN124_LINE(vK14, `ВИП 4-2 - кольцо, насос  14,\nПВИГ')
-        LIN124_LINE(vR43, `ВИП 4-3 - резерв', ---)
-        LIN124_LINE(vE1,  `ВИП 4-4 - электронный канал 1,\nНМД-0,025')
+        LIN124_LINE(vK13, `VIP 4-1 - ring, pump 13,\nPVIG')
+        LIN124_LINE(vK14, `VIP 4-2 - ring, pump 14,\nPVIG')
+        LIN124_LINE(vR43, `VIP 4-3 - reserve', ---)
+        LIN124_LINE(vE1,  `VIP 4-4 - electron channel 1,\nNMD-0,025')
 
-        LIN124_LINE(vE2,  `ВИП 5-1 - электронный канал 2,\nНМД-0,025')
-        LIN124_LINE(vE3,  `ВИП 5-2 - электронный канал 3,\nПВИГ')
-        LIN124_LINE(vE4,  `ВИП 5-3 - электронный канал 4,\nПВИГ')
-        LIN124_LINE(vE5,  `ВИП 5-4 - электронный канал 5,\n???')
+        LIN124_LINE(vE2,  `VIP 5-1 - electron channel 2,\nNMD-0,025')
+        LIN124_LINE(vE3,  `VIP 5-2 - electron channel 3,\nPVIG')
+        LIN124_LINE(vE4,  `VIP 5-3 - electron channel 4,\nPVIG')
+        LIN124_LINE(vE5,  `VIP 5-4 - electron channel 5,\n???')
 
-        LIN124_LINE(vR61, `ВИП 6-1 - резерв', ---)
-        LIN124_LINE(vR62, `ВИП 6-2 - резерв', ---)
-        LIN124_LINE(vR63, `ВИП 6-3 - резерв', ---)
-        LIN124_LINE(vR64, `ВИП 6-4 - резерв', ---)
+        LIN124_LINE(vR61, `VIP 6-1 - reserve', ---)
+        LIN124_LINE(vR62, `VIP 6-2 - reserve', ---)
+        LIN124_LINE(vR63, `VIP 6-3 - reserve', ---)
+        LIN124_LINE(vR64, `VIP 6-4 - reserve', ---)
 
-        LIN124_LINE(vP1,  `ВИП 7-1 - позитронный канал 1,\nНМД-0,025')
-        LIN124_LINE(vP2,  `ВИП 7-2 - позитронный канал 2,\nНМД-0,025')
-        LIN124_LINE(vP3,  `ВИП 7-3 - позитронный канал 3,\nПВИГ')
-        LIN124_LINE(vP4,  `ВИП 7-4 - позитронный канал 4,\nПВИГ')
+        LIN124_LINE(vP1,  `VIP 7-1 - positron channel 1,\nNMD-0,025')
+        LIN124_LINE(vP2,  `VIP 7-2 - positron channel 2,\nNMD-0,025')
+        LIN124_LINE(vP3,  `VIP 7-3 - positron channel 3,\nPVIG')
+        LIN124_LINE(vP4,  `VIP 7-4 - positron channel 4,\nPVIG')
 
-        LIN124_LINE(vP5,  `ВИП 8-1 - позитронный канал 5,\n???')
-        LIN124_LINE(vP6,  `ВИП 8-2 - позитронный канал 6,\n???')
-        LIN124_LINE(vP7,  `ВИП 8-3 - позитронный канал 7,\n???')
-        LIN124_LINE(vT1,  `ВИП 8-4 - Тоннель,\nВЭПП-4, спуск, насос  1, НМД-0,16')
+        LIN124_LINE(vP5,  `VIP 8-1 - positron channel 5,\n???')
+        LIN124_LINE(vP6,  `VIP 8-2 - positron channel 6,\n???')
+        LIN124_LINE(vP7,  `VIP 8-3 - positron channel 7,\n???')
+        LIN124_LINE(vT1,  `VIP 8-4 - Tunnel,\nVEPP-4, descent, pump 1, NMD-0,16')
 
-        LIN124_LINE(v5T2, `ВИП 9-1 - Тоннель,\nВЭПП-4, ось 40, насос  2, НМД-0,16')
-        LIN124_LINE(v5T3, `ВИП 9-2 - Тоннель,\nВЭПП-4, ось 43-44, насос  3, НМД-0,016')
-        LIN124_LINE(v5T4, `ВИП 9-3 - Тоннель,\nВЭПП-4, ось 47, насос  4, НМД-0,16')
-        LIN124_LINE(v5T5, `ВИП 9-4 - Тоннель,\nВЭПП-4, ось 52, насос  5, НМД-0,16')
+        LIN124_LINE(v5T2, `VIP 9-1 - Tunnel,\nVEPP-4, axis 40, pump 2, NMD-0,16')
+        LIN124_LINE(v5T3, `VIP 9-2 - Tunnel,\nVEPP-4, axis 43-44, pump 3, NMD-0,016')
+        LIN124_LINE(v5T4, `VIP 9-3 - Tunnel,\nVEPP-4, axis 47, pump 4, NMD-0,16')
+        LIN124_LINE(v5T5, `VIP 9-4 - Tunnel,\nVEPP-4, axis 52, pump 5, NMD-0,16')
 
-        LIN124_LINE(v6T6, `ВИП 10-1 - Тоннель,\nВЭПП-2000, ось 35-36, насос  6, НМД-0,016')
-        LIN124_LINE(v6T7, `ВИП 10-2 - Тоннель,\nВЭПП-2000, ось 32, насос  7, НМД-0,16')
-        LIN124_LINE(v6T8, `ВИП 10-3 - Тоннель,\nВЭПП-2000, ось 28, насос  8, НМД-0,16')
-        LIN124_LINE(v6T9, `ВИП 10-4 - Тоннель,\nВЭПП-2000, ось 23-24, насос  9, НМД-0,16')
+        LIN124_LINE(v6T6, `VIP 10-1 - Tunnel,\nVEPP-2000, axis 35-36, pump 6, NMD-0,016')
+        LIN124_LINE(v6T7, `VIP 10-2 - Tunnel,\nVEPP-2000, axis 32, pump 7, NMD-0,16')
+        LIN124_LINE(v6T8, `VIP 10-3 - Tunnel,\nVEPP-2000, axis 28, pump 8, NMD-0,16')
+        LIN124_LINE(v6T9, `VIP 10-4 - Tunnel,\nVEPP-2000, axis 23-24, pump 9, NMD-0,16')
 
-        LIN124_LINE(v6T10, `ВИП 11-1 - Тоннель,\nВЭПП-2000, ось 19, насос  10, НМД-0,16')
-        LIN124_LINE(v6T11, `ВИП 11-2 - Тоннель,\nВЭПП-2000, ось 14, насос  11, НМД-0,16')
-        LIN124_LINE(v6T12, `ВИП 11-3 - Тоннель,\nВЭПП-2000, ось 9-10, насос  12, НМД-0,16')
-        LIN124_LINE(v6T13, `ВИП 11-4 - Тоннель,\nВЭПП-2000, ось 4-5, насос  13, НМД-0,16')
+        LIN124_LINE(v6T10, `VIP 11-1 - Tunnel,\nVEPP-2000, axis 19, pump 10, NMD-0,16')
+        LIN124_LINE(v6T11, `VIP 11-2 - Tunnel,\nVEPP-2000, axis 14, pump 11, NMD-0,16')
+        LIN124_LINE(v6T12, `VIP 11-3 - Tunnel,\nVEPP-2000, axis 9-10, pump 12, NMD-0,16')
+        LIN124_LINE(v6T13, `VIP 11-4 - Tunnel,\nVEPP-2000, axis 4-5, pump 13, NMD-0,16')
 
-        LIN124_LINE(vR120, `ВИП 12-1 - резерв', ---)
-        LIN124_LINE(vR121, `ВИП 12-2 - резерв', ---)
-        LIN124_LINE(vR122, `ВИП 12-3 - резерв', ---)
-        LIN124_LINE(vR123, `ВИП 12-4 - резерв', ---)
+        LIN124_LINE(vR120, `VIP 12-1 - reserve', ---)
+        LIN124_LINE(vR121, `VIP 12-2 - reserve', ---)
+        LIN124_LINE(vR122, `VIP 12-3 - reserve', ---)
+        LIN124_LINE(vR123, `VIP 12-4 - reserve', ---)
     }
 }

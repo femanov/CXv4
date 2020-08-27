@@ -11,14 +11,15 @@ include $(TOPDIR)/TopRules.mk
 
 # ==== Regular .h-files ==============================================
 
-EXPORTSFILES=	misc_types.h misclib.h misc_sepchars.h misc_macros.h fps_counter.h \
+EXPORTSFILES=	misc_types.h misc_macros.h misclib.h \
+			misc_iso8601.h misc_sleepbyselect.h misc_sepchars.h \
+			memcasecmp.h timeval_utils.h fps_counter.h \
 		fix_arpa_inet.h \
 		cx_module.h cx_version.h \
 		paramstr_parser.h fdiolib.h cxscheduler.h mt_cxscheduler.h \
 		cxlogger.h \
 		cxldr.h main_builtins.h \
 		findfilein.h sendqlib.h ppf4td.h \
-		memcasecmp.h timeval_utils.h \
 		\
 		cx_sysdeps.h endianconv.h \
 		\

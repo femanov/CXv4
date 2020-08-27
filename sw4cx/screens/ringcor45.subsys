@@ -10,7 +10,7 @@ grouping main RINGCOR45_grouping "Damping Ring Magnetic Correction - RST4/5" lrt
         content:2 {
 
     container rst4 "RST4" grid \
-            str1:"úÁÄÁÎÏ, mA\téÚÍ.\tU, V" \
+            str1:"Set, mA\tMes.\tU, V" \
             base:rst4 param1:3 param2:24 content:eval(3*24*2) {
         MAGX_COR208_LINE(q4L1,     "4L1")
         MAGX_COR208_LINE(c1F3_x,   "1F3-x")
@@ -64,7 +64,7 @@ grouping main RINGCOR45_grouping "Damping Ring Magnetic Correction - RST4/5" lrt
     }
 
     container rst5 "RST5" grid \
-            str1:"úÁÄÁÎÏ, mA\téÚÍ.\tU, V" \
+            str1:"Set, mA\tMes.\tU, V" \
             base:rst5 param1:3 param2:24 content:eval(3*24*2 + 3*16 + 3*5) {
         MAGX_COR208_LINE(c5KX3,  "5KX3")
         MAGX_COR208_LINE(c5KZ4,  "5KZ4")
@@ -136,9 +136,9 @@ grouping main RINGCOR45_grouping "Damping Ring Magnetic Correction - RST4/5" lrt
         noop
         noop
         noop
-        MAGX_COR20_CEAC124_LINE(.r6mps5, `"Rst6:5"',   `"éð1, òóô6, Ë5"',   25,   1, .rst6_mps5, 1, 1)
-        MAGX_COR20_CEAC124_LINE(.r6mps4, `"Rst6:4"',   `"éð1, òóô6, Ë4"',   16,   1, .rst6_mps4, 1)
-        MAGX_COR20_CEAC124_LINE(.r6mps3, `"Rst6:3"',   `"éð1, òóô6, Ë3+2"', 12.5, 1, .rst6_mps3, 1)
-        MAGX_COR20_CEAC124_LINE(.r6mps1, `"Rst6:1"',   `"éð1, òóô6, Ë1"',   9.5,  1, .rst6_mps1, 1)
+        MAGX_COR20_CEAC124_LINE(.r6mps5, `"Rst6:5"',   `"IP1, RST6, k5"',   25,   1, .rst6_mps5, 1, 1)
+        MAGX_COR20_CEAC124_LINE(.r6mps4, `"Rst6:4"',   `"IP1, RST6, k4"',   16,   1, .rst6_mps4, 1)
+        MAGX_COR20_CEAC124_LINE(.r6mps3, `"Rst6:3"',   `"IP1, RST6, k3+2"', 12.5, 1, .rst6_mps3, 1)
+        MAGX_COR20_CEAC124_LINE(.r6mps1, `"Rst6:1"',   `"IP1, RST6, k1"',   9.5,  1, .rst6_mps1, 1)
     }
 }

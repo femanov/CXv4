@@ -54,28 +54,28 @@ define(`AVGCELL',
        `disp $1    $2 text     ""        "╟C" "%5.2f" \
                 r:"_all_code; CALC_AN_AVG($3) ret';" disprange:+20-+40)
 
-grouping main LINTHERMCAN_grouping "Термостабилизация" grid \
-        str1:"Вход\tЗадано, ╟C\tВыход\tAlarm\tGoodVal" \
+grouping main LINTHERMCAN_grouping "Thermostabilization" grid \
+        str1:"Input\tSet, ╟C\tOutput\tAlarm\tGoodVal" \
         at_init:"_all_code; push 0; putchan %silent;" \
         param1:5 param3:5 content:eval(5+5*19+5) {
 
     container -plot1 "~1" subwin "resizable,compact,noclsbtn" \
-        str3:"Термостабилизацийные самописцы 1" content:1 {
+        str3:"Thermostabilization plots 1" content:1 {
         noop plot "" histplot \
                 "width=500 height=400 \
                  foreach(`x', `(group,sled1,sled2,sled3,sled4,s1,s2,s3,s4,s5)', ` add=.x`'_out') \
                  fixed"
     }
     container -plot2 "~2" subwin "resizable,compact,noclsbtn" \
-        str3:"Термостабилизацийные самописцы 2" content:1 {
+        str3:"Thermostabilization plots 2" content:1 {
         noop plot "" histplot \
                 "width=500 height=400 \
                  foreach(`x', `(s6,s7,s8,s9,s10,s11,s12,s13,s14)', ` add=.x`'_out') add=.inA \
                  fixed"
     }
 
-    container -setlim "..." subwin str3:"Tвход_max" content:1 {
-        knob -limit "Tвход_max" text "withlabel" "╟C" "%5.2f" -setlim.-limit \
+    container -setlim "..." subwin str3:"Tinput_max" content:1 {
+        knob -limit "Tinput_max" text "withlabel" "╟C" "%5.2f" -setlim.-limit \
                 r:t_in_lim \
                 alwdrange:25-40
     }
@@ -87,7 +87,7 @@ grouping main LINTHERMCAN_grouping "Термостабилизация" grid \
                ret;"
 
     knob/ign_otherop -silence "" choicebs nolabel \
-            items:"(!)\bСизнализировать звуком\blit=green\tЗтк\bОфедеть и отключить сигнализацию\blit=red" \
+            items:"(!)\bAudible beep alarm\blit=green\tZtk\bSwitch beep off\blit=red" \
             r:%silent
 
     THERMLINE(group, "GROUP")
@@ -122,7 +122,7 @@ grouping main LINTHERMCAN_grouping "Термостабилизация" grid \
             getchan t_in_lim; push 0;           cmp_if_le; ret 0;
             CALC_AN_AVG(in);  getchan t_in_lim; cmp_if_gt; ret 1;
             ret 0;"
-    disp -limit "Tвход_max" text ""        "╟C" "%5.2f" -limit \
+    disp -limit "Tinput_max" text ""        "╟C" "%5.2f" -limit \
             r:t_in_lim \
-            tip:"При передудонивании Tвход_cредн>Tвход_max бокр штеко трямкает"
+            tip:"Alarm when Tinput_avg>Tinput_max"
 }

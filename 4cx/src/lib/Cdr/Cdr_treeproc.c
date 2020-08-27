@@ -783,7 +783,7 @@ static cda_dataref_t pzf2ref(DataKnob k,
     baseptr = cda_combine_base_and_spec(subsys->cid,
                                         curbase, k->u.z.src,
                                         pzfr_base, sizeof(pzfr_base));
-    return cda_add_chan(subsys->cid, pzfr_base,
+    return cda_add_chan(subsys->cid, baseptr,
                         "_devstate", 0, CXDTYPE_INT32, 1,
                         0, NULL, NULL);
 }
