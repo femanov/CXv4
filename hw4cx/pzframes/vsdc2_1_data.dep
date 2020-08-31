@@ -1,0 +1,12 @@
+vsdc2_1_data.o: vsdc2_1_data.c \
+ ../../4cx/src/../exports/include/fastadc_data.h \
+ ../../4cx/src/../exports/include/pzframe_data.h \
+ ../../4cx/src/../exports/include/misc_types.h \
+ ../../4cx/src/../exports/include/misc_macros.h \
+ ../../4cx/src/../exports/include/paramstr_parser.h \
+ ../../4cx/src/../exports/include/cx.h \
+ ../../4cx/src/../exports/include/cda.h \
+ ../../4cx/src/../exports/include/cx_common_types.h \
+ ../../4cx/src/../exports/include/plotdata.h vsdc2_1_data.h \
+ ../../4cx/src/../exports/include/pzframe_data.h \
+ ../include/drv_i/vsdc2_drv_i.h

@@ -1,0 +1,1 @@
+ottcam: ottcam.o ottcam_data.o ottcam_gui.o 

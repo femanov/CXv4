@@ -1,0 +1,12 @@
+pxi6363_data.o: pxi6363_data.c \
+ ../../4cx/src/../exports/include/fastadc_data.h \
+ ../../4cx/src/../exports/include/pzframe_data.h \
+ ../../4cx/src/../exports/include/misc_types.h \
+ ../../4cx/src/../exports/include/misc_macros.h \
+ ../../4cx/src/../exports/include/paramstr_parser.h \
+ ../../4cx/src/../exports/include/cx.h \
+ ../../4cx/src/../exports/include/cda.h \
+ ../../4cx/src/../exports/include/cx_common_types.h \
+ ../../4cx/src/../exports/include/plotdata.h pxi6363_data.h \
+ ../../4cx/src/../exports/include/pzframe_data.h \
+ ../include/drv_i/pxi6363_drv_i.h

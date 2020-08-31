@@ -663,6 +663,15 @@ static void ProcessCxlibEvent(int uniq, void *unsdptr,
                                              opi->rw, opi->dtype, opi->max_nelems,
                                              opi->hwid);
                         cda_dat_p_report_rslvstat(hi->dataref, CDA_RSLVSTAT_FOUND);
+                        /* Try to put a lock, if required */
+                        /* Note: this must be the LAST action,
+                           otherwise all threee calls should be checked for "< 0" */
+                        if ((hi->mode & MODE_RQ_LOCK) != 0)
+                        {
+                            cx_begin(me->cd);
+                            cx_ch_rq_l_o(me->cd, hi->chnd, CX_LOCK_WR | CX_LOCK_ALLORNOTHING);
+                            cx_run(me->cd);
+                        }
                     }
                     else if (opi->status > 0)
                     {

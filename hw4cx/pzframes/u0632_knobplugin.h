@@ -1,0 +1,1 @@
+extern dataknob_pzfr_vmt_t u0632_pzfr_vmt;

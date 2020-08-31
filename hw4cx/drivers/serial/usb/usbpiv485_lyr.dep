@@ -1,0 +1,18 @@
+usbpiv485_lyr.o: usbpiv485_lyr.c \
+ ../../../../4cx/src/../exports/include/misclib.h \
+ ../../../../4cx/src/../exports/include/misc_macros.h \
+ ../../../../4cx/src/../exports/include/misc_types.h \
+ ../../../../4cx/src/../exports/include/misc_sepchars.h \
+ ../../../../4cx/src/../exports/include/misc_iso8601.h \
+ ../../../../4cx/src/../exports/include/misc_sleepbyselect.h \
+ ../../../../4cx/src/../exports/include/cxsd_driver.h \
+ ../../../../4cx/src/../exports/include/cx.h \
+ ../../../../4cx/src/../exports/include/cx_version.h \
+ ../../../../4cx/src/../exports/include/cx_module.h \
+ ../../../../4cx/src/../exports/include/misclib.h \
+ ../../../../4cx/src/../exports/include/paramstr_parser.h \
+ ../../../../4cx/src/../exports/include/cxscheduler.h \
+ ../../../../4cx/src/../exports/include/fdiolib.h \
+ ../../../include/piv485_lyr.h \
+ ../../../../4cx/src/../exports/include/sendqlib.h usbserial_hal.h \
+ ../src/serial_hal.h

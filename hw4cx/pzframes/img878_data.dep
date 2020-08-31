@@ -1,0 +1,11 @@
+img878_data.o: img878_data.c \
+ ../../4cx/src/../exports/include/vcamimg_data.h \
+ ../../4cx/src/../exports/include/pzframe_data.h \
+ ../../4cx/src/../exports/include/misc_types.h \
+ ../../4cx/src/../exports/include/misc_macros.h \
+ ../../4cx/src/../exports/include/paramstr_parser.h \
+ ../../4cx/src/../exports/include/cx.h \
+ ../../4cx/src/../exports/include/cda.h \
+ ../../4cx/src/../exports/include/cx_common_types.h img878_data.h \
+ ../../4cx/src/../exports/include/pzframe_data.h \
+ ../include/drv_i/img878_drv_i.h

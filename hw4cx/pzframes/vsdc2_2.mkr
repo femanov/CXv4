@@ -1,0 +1,1 @@
+vsdc2_2: vsdc2_2.o vsdc2_2_data.o vsdc2_2_gui.o 

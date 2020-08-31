@@ -1,0 +1,10 @@
+usbdumpserial.o: usbdumpserial.c \
+ ../../../../4cx/src/../exports/include/misc_types.h \
+ ../../../../4cx/src/../exports/include/misc_macros.h \
+ ../../../../4cx/src/../exports/include/misc_types.h \
+ ../../../../4cx/src/../exports/include/misclib.h \
+ ../../../../4cx/src/../exports/include/misc_macros.h \
+ ../../../../4cx/src/../exports/include/misc_sepchars.h \
+ ../../../../4cx/src/../exports/include/misc_iso8601.h \
+ ../../../../4cx/src/../exports/include/misc_sleepbyselect.h \
+ usbserial_hal.h ../src/serial_hal.h
