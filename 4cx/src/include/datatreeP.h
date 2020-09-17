@@ -418,6 +418,7 @@ typedef struct _data_knob_t_struct
 
     time_t      usertime;        // time() of the last user activity
     int         wasjustset;      // Was just set by user, so that one update should be skipped
+    int         force_next_update; // wasjustset was just dropped, so the next ONE opdate should be forced regardless of current/next value (in)equality
     int         being_modified;
 
     /* Existence */

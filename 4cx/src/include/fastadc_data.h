@@ -24,6 +24,11 @@ enum
     FASTADC_DATA_IS_ON_ALWAYS = -2,
 };
 
+enum
+{
+    FASTADC_LINE_OPTION_NO_SYMM = 1 << 0,
+};
+
 /********************************************************************/
 struct _fastadc_data_t_struct;
 struct _fastadc_mes_t_struct;
@@ -46,6 +51,10 @@ typedef struct
     plotdata_range_t  range;
     int               range_min_cn;
     int               range_max_cn;
+    int               options;
+    int               rsrvd1;
+    int               rsrvd2;
+    int               rsrvd3;
 } fastadc_line_dscr_t;
 
 typedef struct

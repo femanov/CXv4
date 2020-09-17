@@ -44,7 +44,7 @@ enum
     MODE_NOMONITOR = 1 << 1,  // }       for them to be usable as array index
     MODE_RQ_LOCK   = 1 << 2,
 
-    MODE_MON_TYPE_mask = MODE_ON_UPDATE | MODE_ON_UPDATE,
+    MODE_MON_TYPE_mask = MODE_ON_UPDATE | MODE_NOMONITOR,
 };
 // Usage: mode2upd_cond[hi->mode & MODE_MON_TYPE_mask]
 static int mode2upd_cond[4] =

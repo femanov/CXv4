@@ -10,6 +10,8 @@ extern "C"
 
 #include <unistd.h>
 
+#include <stdarg.h>
+
 #include "cx.h"
 
 
@@ -79,6 +81,10 @@ enum {
 
          CAR_SRCH_RESULT = 500 /* Result of broadcast search for channel by name */
      };
+
+typedef void (*cxlib_report_logger_t)(int uniq, int cd, const char *format, va_list ap);
+
+cxlib_report_logger_t cxlib_set_report_logger(cxlib_report_logger_t logger_hook);
 
 
 char *cx_strerror(int errnum);

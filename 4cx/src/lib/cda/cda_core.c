@@ -3547,12 +3547,34 @@ char *cda_dat_p_argv0_of_ref(cda_dataref_t  ref)
     return ci->argv0;
 }
 
+static cda_dat_p_report_logger_t cda_dat_p_report_logger_hook = NULL;
+cda_dat_p_report_logger_t cda_set_dat_p_report_logger(cda_dat_p_report_logger_t logger_hook)
+{
+  cda_dat_p_report_logger_t ret = cda_dat_p_report_logger_hook;
+
+    cda_dat_p_report_logger_hook = logger_hook;
+
+    return ret;
+}
+static cda_ref_p_report_logger_t cda_ref_p_report_logger_hook = NULL;
+cda_ref_p_report_logger_t cda_set_ref_p_report_logger(cda_ref_p_report_logger_t logger_hook)
+{
+  cda_ref_p_report_logger_t ret = cda_ref_p_report_logger_hook;
+
+  cda_ref_p_report_logger_hook = logger_hook;
+
+  return ret;
+}
+
 void cda_dat_p_report(cda_srvconn_t  sid, const char *format, ...)
 {
   va_list     ap;
   const char *pn;
   const char *sr;
-  char        sid_buf[20];
+
+  srvinfo_t     *si;
+  ctxinfo_t     *ci;
+  int            uniq;
   
     va_start(ap, format);
 #if 1
@@ -3561,25 +3583,39 @@ void cda_dat_p_report(cda_srvconn_t  sid, const char *format, ...)
     {
         pn = cda_dat_p_argv0_of_sid(sid);
         sr = cda_dat_p_srvrn_of_sid(sid);
-        sprintf(sid_buf, "%d", sid);
     }
     if (pn == NULL) pn = "";
     if (sr == NULL) sr = "";
 
-    fprintf (stderr, "%s ", strcurtime());
-    if (*pn != '\0')
-        fprintf(stderr, "%s: ", pn);
-    fprintf (stderr, "cda");
-    if (sid >= 0)
+    if (cda_dat_p_report_logger_hook != NULL)
     {
-        fprintf (stderr, "[%d", sid);
-        if (*sr != '\0')
-            fprintf (stderr, ":\"%s\"", sr);
-        fprintf (stderr, "]");
+        uniq = 0;
+        if (CheckSid(sid) == 0)
+        {
+            si = AccessSrvSlot(sid);
+            ci = AccessCtxSlot(si->cid);
+            uniq = ci->uniq;
+        }
+        cda_dat_p_report_logger_hook(uniq,
+                                     (int)sid, sr, format, ap);
     }
-    fprintf (stderr, ": ");
-    vfprintf(stderr, format, ap);
-    fprintf (stderr, "\n");
+    else
+    {
+        fprintf (stderr, "%s ", strcurtime());
+        if (*pn != '\0')
+            fprintf(stderr, "%s: ", pn);
+        fprintf (stderr, "cda");
+        if (sid >= 0)
+        {
+            fprintf (stderr, "[%d", sid);
+            if (*sr != '\0')
+                fprintf (stderr, ":\"%s\"", sr);
+            fprintf (stderr, "]");
+        }
+        fprintf (stderr, ": ");
+        vfprintf(stderr, format, ap);
+        fprintf (stderr, "\n");
+    }
 #endif
     va_end(ap);
 }
@@ -3592,10 +3628,13 @@ void cda_ref_p_report(cda_dataref_t  ref, const char *format, ...)
   const char *pn;
   const char *rn;
   char        ref_buf[20];
-  
+
+  int         uniq;
+
     va_start(ap, format);
 #if 1
     pn = rn = NULL;
+    ci = NULL;
     if (CheckRef(ref) == 0)
     {
         snprintf(ref_buf, sizeof(ref_buf), "%d", ref);
@@ -3612,15 +3651,24 @@ void cda_ref_p_report(cda_dataref_t  ref, const char *format, ...)
     if (pn == NULL) pn = "";
     if (rn == NULL) rn = "";
 
-    fprintf (stderr, "%s ", strcurtime());
-    if (*pn != '\0')
-        fprintf(stderr, "%s: ", pn);
-    fprintf (stderr, "cda");
-    if (*rn != '\0')
-        fprintf (stderr, "[ref=%s]", rn);
-    fprintf (stderr, ": ");
-    vfprintf(stderr, format, ap);
-    fprintf (stderr, "\n");
+    if (cda_ref_p_report_logger_hook != NULL)
+    {
+        uniq = (ci != NULL)? ci->uniq : 0;
+        cda_ref_p_report_logger_hook(uniq,
+                                     ref, format, ap);
+    }
+    else
+    {
+        fprintf (stderr, "%s ", strcurtime());
+        if (*pn != '\0')
+            fprintf(stderr, "%s: ", pn);
+        fprintf (stderr, "cda");
+        if (*rn != '\0')
+            fprintf (stderr, "[ref=%s]", rn);
+        fprintf (stderr, ": ");
+        vfprintf(stderr, format, ap);
+        fprintf (stderr, "\n");
+    }
 #endif
     va_end(ap);
 }

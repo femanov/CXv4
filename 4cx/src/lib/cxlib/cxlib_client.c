@@ -274,6 +274,15 @@ static int SendDataRequest(v4conn_t *cp)
 
 static char cxlib_progname[40] = "";
 
+static cxlib_report_logger_t cxlib_report_logger_hook = NULL;
+cxlib_report_logger_t cxlib_set_report_logger(cxlib_report_logger_t logger_hook)
+{
+  cxlib_report_logger_t ret = cxlib_report_logger_hook;
+
+    cxlib_report_logger_hook = logger_hook;
+
+    return ret;
+}
 static void cxlib_report(v4conn_t *cp, const char *format, ...)
     __attribute__ ((format (printf, 2, 3)));
 static void cxlib_report(v4conn_t *cp, const char *format, ...)
@@ -290,16 +299,23 @@ static void cxlib_report(v4conn_t *cp, const char *format, ...)
     sr = NULL;
     if (cp != NULL  &&  cp->srvrspec[0] != '\0') sr = cp->srvrspec;
     cd = (cp == NULL)? -1 : cp2cd(cp);
-    fprintf (stderr, "%s %s%scxlib",
-             strcurtime(), pn, pn[0] != '\0'? ": " : "");
-    if (cp != NULL)
-        fprintf(stderr, "[%d%s%s%s]", cd,
-                sr != NULL? ":\"" : "",
-                sr != NULL? sr    : "",
-                sr != NULL? "\""  : "");
-    fprintf (stderr, ": ");
-    vfprintf(stderr, format, ap);
-    fprintf (stderr, "\n");
+    if (cxlib_report_logger_hook != NULL)
+    {
+        cxlib_report_logger_hook(cp == NULL? 0 : cp->uniq, cd, format, ap);
+    }
+    else
+    {
+        fprintf (stderr, "%s %s%scxlib",
+                 strcurtime(), pn, pn[0] != '\0'? ": " : "");
+        if (cp != NULL)
+            fprintf(stderr, "[%d%s%s%s]", cd,
+                    sr != NULL? ":\"" : "",
+                    sr != NULL? sr    : "",
+                    sr != NULL? "\""  : "");
+        fprintf (stderr, ": ");
+        vfprintf(stderr, format, ap);
+        fprintf (stderr, "\n");
+    }
 #endif
     va_end(ap);
 }

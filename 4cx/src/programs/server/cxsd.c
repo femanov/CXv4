@@ -246,6 +246,26 @@ static void on_timeback(void)
     ///fprintf(stderr, "Time-back-change!!!\n");
 }
 
+static void dat_p_report_logger(int uniq,
+                                int sid,           const char *srvrspec,
+                                const char *format, va_list ap)
+{
+    DoDriverLog (uniq, 0, "cda_dat_p_report[%d:\"%s\"]:", sid, srvrspec == NULL? "" : srvrspec);
+    vDoDriverLog(uniq, 0, format, ap);
+}
+static void ref_p_report_logger(int uniq,
+                                cda_dataref_t ref,
+                                const char *format, va_list ap)
+{
+    DoDriverLog (uniq, 0, "cda_ref_p_report[%d]:", ref);
+    vDoDriverLog(uniq, 0, format, ap);
+}
+static void cxlib_report_logger(int uniq, int cd, const char *format, va_list ap)
+{
+    DoDriverLog (uniq, 0, "cxlib_report[%d]:", cd);
+    vDoDriverLog(uniq, 0, format, ap);
+}
+
 static void cleanuper(int uniq)
 {
     cda_do_cleanup(uniq);
@@ -255,6 +275,9 @@ static void cleanuper(int uniq)
 static void ActivateHW  (const char *argv0)
 {
     /*!!! Should check return values! */
+    cda_set_dat_p_report_logger(dat_p_report_logger);
+    cda_set_ref_p_report_logger(ref_p_report_logger);
+    cxlib_set_report_logger    (cxlib_report_logger);
     CxsdHwSetCleanup(cleanuper);
     CxsdHwSetDb(db);
     CxsdHwActivate(argv0);

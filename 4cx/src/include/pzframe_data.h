@@ -23,7 +23,7 @@ enum // pzframe_type_dscr_t.behaviour flags
     PZFRAME_B_NO_ALLOC   = 1 << 2,
 };
 
-enum // pzframe_chand_scr_t.chan_type
+enum // pzframe_chan_dscr_t.chan_type
 {
     PZFRAME_CHAN_IS_PARAM = 0,  // Is a parameter
     PZFRAME_CHAN_IS_FRAME = 1,  // Is a "main" frame channel

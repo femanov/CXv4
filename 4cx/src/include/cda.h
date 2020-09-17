@@ -10,6 +10,8 @@ extern "C"
 
 #include <unistd.h>
 
+#include <stdarg.h>
+
 #include "cx.h"
 #include "cx_common_types.h"
 
@@ -317,6 +319,20 @@ int cda_acc_ref_data(cda_dataref_t ref,
 
 int cda_stop_formula(cda_dataref_t ref);
 
+
+//////////////////////////////////////////////////////////////////////
+
+// cda_dat_p_report()-redirection API for Yu.Rogovsky
+
+typedef void (*cda_dat_p_report_logger_t)(int uniq,
+                                          int sid,           const char *srvrspec,
+                                          const char *format, va_list ap);
+typedef void (*cda_ref_p_report_logger_t)(int uniq,
+                                          cda_dataref_t ref,
+                                          const char *format, va_list ap);
+
+cda_dat_p_report_logger_t cda_set_dat_p_report_logger(cda_dat_p_report_logger_t logger_hook);
+cda_ref_p_report_logger_t cda_set_ref_p_report_logger(cda_ref_p_report_logger_t logger_hook);
 
 //////////////////////////////////////////////////////////////////////
 

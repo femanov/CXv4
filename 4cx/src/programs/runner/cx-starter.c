@@ -115,7 +115,7 @@ static void ParseCommandLine(int argc, char *argv[])
                  strcmp(argv[x], "-help")   == 0  ||
                  strcmp(argv[x], "--help")  == 0)
         {
-            printf("Usage: %s [-passive] [-readonly] [CONFIG_FILE]...\n", argv[0]);
+            printf("Usage: %s [-passive] [-noprocess] [CONFIG_FILE]...\n", argv[0]);
             exit(1);
         }
 /* "List of systems to display" -- not implemented in v4

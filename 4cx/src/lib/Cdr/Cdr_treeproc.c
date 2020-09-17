@@ -1143,7 +1143,7 @@ void  CdrProcessKnobs    (DataSubsys subsys, int cause_conn_n, int options,
   cxdtype_t   raw_dtype;
   time_t      timenow = time(NULL);
 
-  int         v_ne_curv_flag; // "V is NotEqual to CURV, an FLAG value for passing to set_knob_controlvalue()"
+  int         v_eq_curv_flag; // "V is EQual to CURV, a FLAG value for passing to set_knob_controlvalue()"
 
   int         rn;
   
@@ -1327,9 +1327,14 @@ void  CdrProcessKnobs    (DataSubsys subsys, int cause_conn_n, int options,
                 }
 
                 /* Note: NaN!=NaN */
-                v_ne_curv_flag = ((v != k->u.k.curv) ||
+                v_eq_curv_flag = ((v != k->u.k.curv) ||
                                   k->curstate == KNOBSTATE_JUSTCREATED)?
                                  0 : DATATREE_FROMLOCAL_FLAG_NOVALUECHANGE;
+                if (k->force_next_update)
+                {
+                    k->force_next_update = 0;
+                    v_eq_curv_flag = 0;
+                }
 
                 /* Store new values... */
                 k->u.k.curv           = v;
@@ -1364,11 +1369,15 @@ void  CdrProcessKnobs    (DataSubsys subsys, int cause_conn_n, int options,
                      !k->wasjustset
                     )
                    )
-                    set_knob_controlvalue(k, v, v_ne_curv_flag);
+                    set_knob_controlvalue(k, v, v_eq_curv_flag);
                 if (_Cdr_show_changed_knobs)
-                    set_knob_otherop(k, !v_ne_curv_flag); // This is a diagnostic: shows changed knobs in orange for 1 cycle
+                    set_knob_otherop(k, !v_eq_curv_flag); // This is a diagnostic: shows changed knobs in orange for 1 cycle
                 
-                if ((options & CDR_OPT_SYNTHETIC) == 0) k->wasjustset = 0;
+                if ((options & CDR_OPT_SYNTHETIC) == 0  &&  k->wasjustset)
+                {
+                    k->wasjustset        = 0;
+                    k->force_next_update = 1;
+                }
                 
                 break;
                 

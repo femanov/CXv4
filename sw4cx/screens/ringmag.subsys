@@ -45,8 +45,8 @@ grouping main RINGMAG_grouping "Magnetic System" grid "noshadow,notitle" \
     MAGX_IST_CDAC20_LINE(qd3,    `"D3"',     "IP1: IST-7",         1000, 1, icd_d3,  0, 0)
     MAGX_IST_CDAC20_LINE(qf3,    `"F3"',     "IP1: IST-10",        1000, 1, icd_f3,  0, 0)
     RINGMAG_SECTION("Extrct")
-    MAGX_IST_CDAC20_LINE(d3m4n5, `"3M4,5"',  "IP1: I-V-1000-10",   1000, 1, icd_3m4, 0, 0)
-    MAGX_IST_CDAC20_LINE(d4m4n5, `"4M4,5"',  "IP1: I-V-1000-11",   1000, 1, icd_4m4, 0, 0)
+    MAGX_IST_CDAC20_LINE(d3m4n5, `"3M4,5"',  "IP1: I-V-1000-10",   1000, 1, icd_3m4, 0, 0, 0, 0, 1)
+    MAGX_IST_CDAC20_LINE(d4m4n5, `"4M4,5"',  "IP1: I-V-1000-11",   1000, 1, icd_4m4, 0, 0, 0, 0, 1)
     MAGX_IST_CDAC20_LINE(d3m1t3, `"3M1-3"',  "IP1: I-V-1000-12",   1000, 1, icd_3m1, 0, 0)
     MAGX_IST_CDAC20_LINE(d4m1t3, `"4M1-3"',  "IP1: I-V-1000-13",   1000, 1, icd_4m1, 0, 0)
     MAGX_IST_CDAC20_LINE(d5m1t4, `"5M1-4"',  "IP1: IST-13",        1000, 1, icd_i13, 0, 1) # rev

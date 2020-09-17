@@ -220,7 +220,7 @@ define(`MAGX_IST_CDAC20_ILK_LINE',
        `disp $1 $2 led "shape=circle,color=red"   r:ilk_$1  yelwrange:-0.1-+0.1
         disp -  "" led "shape=circle,color=amber" r:c_ilk_$1')
 
-# 1:id&r 2:label 3:tip 4:max 5:step 6:c20_base 7:weird_dcct2 8:reversable 9/opt:1=>veremeenko 10/opt:1=>bipolar
+# 1:id&r 2:label 3:tip 4:max 5:step 6:c20_base 7:weird_dcct2 8:reversable 9/opt:1=>veremeenko 10/opt:1=>bipolar 11/opt:1=>"Out Prot"=>"OutPr+RB"
 define(`MAGX_IST_CDAC20_LINE',
        `knob/groupable $1_set $2   text dpyfmt:"%6.1f" r:"$1.Iset" \
                 alwdrange:ifelse(index($8$10,1),-1,0,-$4)-$4 \
@@ -282,7 +282,7 @@ define(`MAGX_IST_CDAC20_LINE',
                             MAGX_IST_CDAC20_ILK_LINE("out_prot3", "OutProt 3")
                             MAGX_IST_CDAC20_ILK_LINE("imax",      "Imax")
                         ', `
-                            MAGX_IST_CDAC20_ILK_LINE("out_prot",  "Out Prot")
+                            MAGX_IST_CDAC20_ILK_LINE("out_prot",  ifelse($11, 1, `"OutPr+RB"', `"Out Prot"'))
                             MAGX_IST_CDAC20_ILK_LINE("water",     "Water")
                             MAGX_IST_CDAC20_ILK_LINE("imax",      "Imax")
                             MAGX_IST_CDAC20_ILK_LINE("umax",      "Umax")

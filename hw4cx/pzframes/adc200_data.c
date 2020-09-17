@@ -17,8 +17,8 @@ static void adc200_info2mes(fastadc_data_t      *adc,
         mes_p->plots[nl].numpts             = info[ADC200_CHAN_CUR_NUMPTS].valbuf.i32;
         mes_p->plots[nl].cur_range.int_r[0] = info[ADC200_CHAN_LINE1RANGEMIN + nl].valbuf.i32;
         mes_p->plots[nl].cur_range.int_r[1] = info[ADC200_CHAN_LINE1RANGEMAX + nl].valbuf.i32;
-        FastadcSymmMinMaxInt(mes_p->plots[nl].cur_range.int_r + 0,
-                             mes_p->plots[nl].cur_range.int_r + 1);
+//        FastadcSymmMinMaxInt(mes_p->plots[nl].cur_range.int_r + 0,
+//                             mes_p->plots[nl].cur_range.int_r + 1);
         mes_p->plots[nl].cur_int_zero       = 0;
 
         mes_p->plots[nl].x_buf              = info[ADC200_CHAN_LINE1 + nl].current_val;
@@ -106,7 +106,8 @@ static pzframe_chan_dscr_t adc200_chan_dscrs[] =
      1000000.0,                                          \
      {.int_r={ADC200_MIN_VALUE, ADC200_MAX_VALUE}},      \
      __CX_CONCATENATE(__CX_CONCATENATE(ADC200_CHAN_LINE,x),RANGEMIN), \
-     __CX_CONCATENATE(__CX_CONCATENATE(ADC200_CHAN_LINE,x),RANGEMAX)}
+     __CX_CONCATENATE(__CX_CONCATENATE(ADC200_CHAN_LINE,x),RANGEMAX), \
+     FASTADC_LINE_OPTION_NO_SYMM}
 static fastadc_line_dscr_t adc200_line_dscrs[] =
 {
     LINE_DSCR("A", 1),

@@ -182,8 +182,11 @@ static void ProcessAdcInfo(fastadc_data_t *adc)
                         pfr->other_info_changed = 1;
                     }
                     /* b. Symmetrize */
-                    FastadcSymmMinMaxInt(adc->mes.plots[nl].cur_range.int_r + 0,
-                                         adc->mes.plots[nl].cur_range.int_r + 1);
+////fprintf(stderr, "[%d].int_r==%d,%d\n", nl, adc->mes.plots[nl].cur_range.int_r[0], adc->mes.plots[nl].cur_range.int_r[1]);
+                    if ((atd->line_dscrs[nl].options & FASTADC_LINE_OPTION_NO_SYMM) == 0)
+                        FastadcSymmMinMaxInt(adc->mes.plots[nl].cur_range.int_r + 0,
+                                             adc->mes.plots[nl].cur_range.int_r + 1);
+////fprintf(stderr, "         :=%d,%d\n", adc->mes.plots[nl].cur_range.int_r[0], adc->mes.plots[nl].cur_range.int_r[1]);
                 }
                 else
                 {
@@ -203,9 +206,10 @@ static void ProcessAdcInfo(fastadc_data_t *adc)
                     }
                     /* b. Symmetrize */
 ////fprintf(stderr, "[%d].dbl_r==; :=%e,%e\n", nl, adc->mes.plots[nl].cur_range.dbl_r[0], adc->mes.plots[nl].cur_range.dbl_r[1]);
-                    FastadcSymmMinMaxDbl(adc->mes.plots[nl].cur_range.dbl_r + 0,
-                                         adc->mes.plots[nl].cur_range.dbl_r + 1);
-////fprintf(stderr, "    :=%e,%e\n", nl, adc->mes.plots[nl].cur_range.dbl_r[0], adc->mes.plots[nl].cur_range.dbl_r[1]);
+                    if ((atd->line_dscrs[nl].options & FASTADC_LINE_OPTION_NO_SYMM) == 0)
+                        FastadcSymmMinMaxDbl(adc->mes.plots[nl].cur_range.dbl_r + 0,
+                                             adc->mes.plots[nl].cur_range.dbl_r + 1);
+////fprintf(stderr, "    :=%e,%e\n", adc->mes.plots[nl].cur_range.dbl_r[0], adc->mes.plots[nl].cur_range.dbl_r[1]);
                 }
             }
             else
@@ -869,12 +873,15 @@ void FastadcDataInit       (fastadc_data_t *adc, fastadc_type_dscr_t *atd)
         adc->mes.plots[nl].all_range   =
         adc->mes.plots[nl].cur_range   = atd->line_dscrs[nl].range;
 
-        if (reprof_cxdtype(adc->mes.plots[nl].x_buf_dtype) == CXDTYPE_REPR_INT)
-            FastadcSymmMinMaxInt(adc->mes.plots[nl].cur_range.int_r + 0,
-                                 adc->mes.plots[nl].cur_range.int_r + 1);
-        else
-            FastadcSymmMinMaxDbl(adc->mes.plots[nl].cur_range.dbl_r + 0,
-                                 adc->mes.plots[nl].cur_range.dbl_r + 1);
+        if ((atd->line_dscrs[nl].options & FASTADC_LINE_OPTION_NO_SYMM) == 0)
+        {
+            if (reprof_cxdtype(adc->mes.plots[nl].x_buf_dtype) == CXDTYPE_REPR_INT)
+                FastadcSymmMinMaxInt(adc->mes.plots[nl].cur_range.int_r + 0,
+                                     adc->mes.plots[nl].cur_range.int_r + 1);
+            else
+                FastadcSymmMinMaxDbl(adc->mes.plots[nl].cur_range.dbl_r + 0,
+                                     adc->mes.plots[nl].cur_range.dbl_r + 1);
+        }
     }
 }
 
