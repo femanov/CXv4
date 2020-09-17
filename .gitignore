@@ -11,6 +11,19 @@ exports/
 moc_*
 
 # executables
+cx-starter
+histplot
+ppf4td_test_double
+rrund
+stand
+stop-all-servers
+cstart
+knobtest
+pult
+run-cx-server
+start-all-servers
+
+
 cxsd
 cdaclient
 cx-chan-search
@@ -22,8 +35,7 @@ drvinfo
 ppf4td_test
 test_rem_rd_rw.drvlet
 
-# more executables
-pult
+
 liuclient
 pzframeclient
 
