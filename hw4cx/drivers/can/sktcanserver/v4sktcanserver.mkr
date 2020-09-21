@@ -1,1 +1,0 @@
-v4sktcanserver: v4sktcanserver.o canserver_drivers.o sktcankoz_lyr.o cac208_drv.o ceac124_drv.o cdac20_drv.o candac16_drv.o canadc40_drv.o slio24_reg_drv.o cgvi8_drv.o cpks8_drv.o ckvch_drv.o curvv_drv.o vsdc2_drv.o caniva_drv.o canipp_drv.o senkov_vip_drv.o senkov_ebc_drv.o weld02_drv.o tvac320_drv.o panov_ubs_drv.o smc8_drv.o 

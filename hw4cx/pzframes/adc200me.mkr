@@ -1,1 +1,0 @@
-adc200me: adc200me.o adc200me_data.o adc200me_gui.o 

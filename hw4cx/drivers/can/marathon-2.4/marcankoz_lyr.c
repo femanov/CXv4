@@ -1,1 +1,0 @@
-../src/cankoz_lyr_common.c

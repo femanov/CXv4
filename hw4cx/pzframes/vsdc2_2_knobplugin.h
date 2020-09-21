@@ -1,1 +1,0 @@
-extern dataknob_pzfr_vmt_t vsdc2_2_pzfr_vmt;
