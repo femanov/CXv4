@@ -226,7 +226,7 @@ else
 endif
 
 # ---- File lists for cleaning ---------------------------------------
-RQD_GNTDFILES=	*.d *.mkr
+RQD_GNTDFILES=	*.d *.mkr .gitignore
 RQD_BCKPFILES=	*\~ .*\~
 RQD_INTMFILES=	*.o *.dep
 COREFILES=	core core.[^h]* *.core
@@ -326,6 +326,11 @@ endif
 
 clean distclean maintainer-clean crit-clean:
 		rm -f $(FILES4$@)
+		$(DO_SUBDIR_TARGET)
+
+.PHONY:		create-gitignore
+create-gitignore:
+		($(foreach F, $(strip $(FILES4maintainer-clean)), echo "$F";)) >.gitignore
 		$(DO_SUBDIR_TARGET)
 
 # ---- Publishing-related --------------------------------------------

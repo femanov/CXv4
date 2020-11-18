@@ -60,6 +60,9 @@ EXPORTSDIR=	lib/server/drivers/bivme2_drvlets
 #---------------------------------------------------------------------
 MONO_C_FILES+=	zzz_drv.so
 
+#---------------------------------------------------------------------
+MONO_C_FILES+=	test_rfmeas_a32r16
+
 ######################################################################
 PRJDIR=         ../../..
 X_RULES_DIR=	$(PRJDIR)/x-build/ppc860-linux
@@ -67,6 +70,9 @@ X_RULES_DIR=	$(PRJDIR)/x-build/ppc860-linux
 SECTION=	$(X_RULES_DIR)/x_rules.mk
 include		$(PRJDIR)/PrjRules.mk
 ######################################################################
+
+# Switch off optimization for libvmedirect.h users, because otherwise memory-mapped VME accesses work incorrectly
+$(VME_HAL_PFX)vme_lyr.o $(VME_HAL_PFX)_test.o test_rfmeas_a32r16.o: OPTIMIZATION=-O0
 
 GIVEN_DIR=	$(PRJDIR)/given/bivme2
 LOCAL_INCLUDES+=-I$(GIVEN_DIR)
@@ -82,3 +88,6 @@ v4$(VME_HAL_PFX)vmeserver:	SPECIFIC_LIBS+=$(LIBDL)
 
 #???
 $(VME_HAL_PFX)_test:	$(LIBVMEDIRECT) $(LIBMISC)
+
+test_rfmeas_a32r16: $(LIBVMEDIRECT)
+

@@ -62,7 +62,7 @@ typedef struct
 typedef struct
 {
     int              in_use;
-    const char      *reference; // Fully-resolved reference (w/ all prefixes/suffixes added)
+    char            *reference; // Fully-resolved reference (w/ all prefixes/suffixes added)
                                 // ...what to do with PROTOCOL::?
     void            *fla_privptr;
     cda_fla_p_rec_t *fla_vmt;
@@ -80,7 +80,7 @@ typedef struct
     size_t           usize;            // Size of 1 unit, =sizeof_cxdtype(dtype)
 
     char            *strings_buf;
-    const char      *strings_ptrs[REF_STRINGS_NUM];
+    char            *strings_ptrs[REF_STRINGS_NUM];
 
     int              phys_count;
     int              phys_n_allocd;    // in PAIRS -- i.e., malloc(sizeof(double)*phys_n_allocd*2)

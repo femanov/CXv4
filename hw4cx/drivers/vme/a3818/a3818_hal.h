@@ -29,6 +29,15 @@
 #endif
 
 
+#ifndef USE_SELECT_FOR_IRQ
+  #if 0
+    #define USE_SELECT_FOR_IRQ 1
+  #else
+    #define USE_SELECT_FOR_IRQ 0
+  #endif
+#endif
+
+
 enum
 {
     VME_HAL_BUS_MAXCOUNT = 10,  // An arbitrary limit
@@ -62,6 +71,9 @@ typedef struct
     int                   irq_pipe[2];
     sl_fdh_t              irq_rfdh;
     pthread_t             irq_thread;
+#elif USE_SELECT_FOR_IRQ
+    int                   handle_fd;
+    sl_fdh_t              handle_fdhandle;
 #endif
 
     int                   irq_mask;
@@ -129,7 +141,8 @@ static void *irq_wait_proc(void *arg)
 }
 
 static void irq2pipe_proc(int uniq, void *privptr1,
-                          sl_fdh_t fdh, int fd, int mask, void *privptr2)
+                          sl_fdh_t fdhandle, int fd, int mask,
+                          void *privptr2)
 {
   a3818_hal_bus_info_t *me = privptr2;
 
@@ -152,6 +165,12 @@ static void irq2pipe_proc(int uniq, void *privptr1,
     if (ii->cb != NULL)
         ii->cb(me - a3818_hal_bus_info /*!!! info2idx() !!! */,
                ii->privptr, level, vect);
+}
+#elif USE_SELECT_FOR_IRQ
+static void irq_fd_p(int uniq, void *privptr1,
+                     sl_fdh_t fdhandle, int fd, int mask,
+                     void *privptr2)
+{
 }
 #else
 enum {A3818_HEARTBEAT_USECS = 50*1000*1 + 5000000*0}; // Use 5s for debugging; 50ms<=>20Hz is enough for VEPP5's 10Hz
@@ -217,22 +236,26 @@ static int  vme_hal_init     (int uniq)
 {
     bzero(a3818_hal_bus_info, sizeof(a3818_hal_bus_info));
 
-#if !USE_THREAD_FOR_IRQ
+#if   USE_THREAD_FOR_IRQ
+#elif USE_SELECT_FOR_IRQ
+#else
     a3818_hbt_tid = sl_enq_tout_after(uniq, NULL,
                                       A3818_HEARTBEAT_USECS, a3818_heartbeat_proc, NULL);
-#endif /* !USE_THREAD_FOR_IRQ */
+#endif /* USE_THREAD_FOR_IRQ */
 
     return 0;
 }
 
 static void vme_hal_term     (void)
 {
-#if !USE_THREAD_FOR_IRQ
+#if   USE_THREAD_FOR_IRQ
+#elif USE_SELECT_FOR_IRQ
+#else
     if (a3818_hbt_tid >= 0)
     {
         sl_deq_tout(a3818_hbt_tid); a3818_hbt_tid = -1;
     }
-#endif /* !USE_THREAD_FOR_IRQ */
+#endif /* USE_THREAD_FOR_IRQ */
 }
 
 static int  vme_hal_open_bus (int bus_major, int bus_minor)
@@ -311,7 +334,7 @@ fprintf(stderr, "QQQ\n");
     err = CAENVME_IRQEnable(me->CAENVMElib_handle, 0x7F);
     fprintf(stderr, "\t####CAENVME_IRQEnable()=%d\n", err);
 #endif
-#if USE_THREAD_FOR_IRQ
+#if   USE_THREAD_FOR_IRQ
     // Initialize values for cleanup
     me->irq_rfdh               = -1;
     me->irq_pipe[PIPE_RD_SIDE] = -1;
@@ -341,6 +364,7 @@ fprintf(stderr, "Init(IRQ_handle)=%d\n", err);
     // Finally, create an IRQ-waiting-thread
     if (pthread_create(&(me->irq_thread), NULL, irq_wait_proc, me) != 0)
         goto ERREXIT;
+#elif USE_SELECT_FOR_IRQ
 #endif /* USE_THREAD_FOR_IRQ */
 
     return bus_handle;
@@ -376,13 +400,14 @@ static int  vme_hal_close_bus(int bus_handle)
         return -1;
     }
 
-#if USE_THREAD_FOR_IRQ
+#if   USE_THREAD_FOR_IRQ
     pthread_cancel(me->irq_thread);
     pthread_join  (me->irq_thread, NULL);
     sl_del_fd(me->irq_rfdh);
     close(me->irq_pipe[PIPE_RD_SIDE]);
     close(me->irq_pipe[PIPE_WR_SIDE]);
     CAENVME_End(me->CAENVMElib_IRQ_handle);
+#elif USE_SELECT_FOR_IRQ
 #endif /* USE_THREAD_FOR_IRQ */
     CAENVME_End(me->CAENVMElib_handle);
     me->in_use = 0;

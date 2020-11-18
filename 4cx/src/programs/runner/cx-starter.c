@@ -42,6 +42,8 @@
 #include "pixmaps/cx-starter.xpm"
 
 
+static const char *global_argv0;
+
 static XhWindow    onewin;
 static Widget      dash;
 
@@ -1037,7 +1039,7 @@ static int AddOneConfig(cfgfile_t *p, void *privptr)
   cfgbase_t *cfg = privptr;
 
 //fprintf(stderr, "%s: %p+=%s\n", __FILE__, cfg, p->filespec);
-    return CfgBaseMerge(cfg, NULL, p->filespec);
+    return CfgBaseMerge(cfg, global_argv0, p->filespec);
 }
 static cfgbase_t *ReadConfigs(void)
 {
@@ -1100,6 +1102,8 @@ int main(int argc, char *argv[])
 
     /* Make stdout ALWAYS line-buffered */
     setvbuf(stdout, NULL, _IOLBF, 0);
+
+    global_argv0 = argv[0];
     
     printf("%s CX-starter, CX version %d.%d\n",
            strcurtime(), CX_VERSION_MAJOR, CX_VERSION_MINOR);

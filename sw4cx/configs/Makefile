@@ -1,7 +1,7 @@
 SRVHOSTS=	cxhw canhw foxy v2k-k500-1 vepp4-pult6 can2 \
 		bike tower romeo ep1-berezin2 xweld \
 		rack0 rack1
-CLNHOSTS=	linac3 worker1 camilla2 io io2 vepp4-pult6 PULT \
+CLNHOSTS=	linac3 worker1 camilla2 io io2 vepp4-pult6 PULT VEPP4 \
 		tower ep1-berezin2 xweld
 ACCESSGROUPS=	vepp5
 
@@ -30,7 +30,7 @@ GIVEN_FILES=	devlist_magx_macros.m4 \
 		$(DEVLISTS) $(STARTERCONFS) $(ACCESSCONFS)
 UNCFILES=	$(SRVLISTS)
 
-EXPORTSFILES=	$(GIVEN_FILES) $(UNCFILES)
+EXPORTSFILES=	$(GIVEN_FILES) $(UNCFILES) cx-starter-setup-term-kls.sh
 EXPORTSDIR=	configs
 
 ######################################################################

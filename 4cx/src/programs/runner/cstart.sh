@@ -2,6 +2,7 @@
 
 cd
 
+SETUP_FILE=~/4pult/configs/cx-starter-setup-`hostname -s|tr A-Z a-z`.sh
 CONFIG_FILE=~/4pult/configs/cx-starter-`hostname -s|tr A-Z a-z`.conf
 PARAMS_FILE=~/4pult/configs/srvparams.conf
 LOG_FILE=/var/tmp/cx-starter.log
@@ -17,6 +18,11 @@ then
 	PARAMS_FILE=""
 fi
 
+if [ -f $SETUP_FILE ]
+then
+	. $SETUP_FILE
+fi
+
 GEOMETRY=`grep '^#GEOMETRY=' $CONFIG_FILE | sed -e 's/#GEOMETRY=//'`
 GEOM_OPT=""
 if [ -n "$GEOMETRY" ]
@@ -26,4 +32,4 @@ fi
 
 (xterm -geometry +0-0 -iconic -sl 10000 -T "cx-starter logs" -e \
  /bin/sh -c \
- "~/4pult/bin/cx-starter $GEOM_OPT $GEOMETRY $CONFIG_FILE $PARAMS_FILE 2>&1 | tee -a $LOG_FILE" &)
+ "~/4pult/bin/cx-starter $GEOM_OPT $GEOMETRY $CONFIG_FILE $PARAMS_FILE $* 2>&1 | tee -a $LOG_FILE" &)
