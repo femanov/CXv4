@@ -17,7 +17,6 @@ CDA_DRIVERS=	lebedev_subharmonic_drv.so liu_key_drv.so liu_doorilks_drv.so
 
 MONO_C_FILES=	$(VDEV_DRIVERS) $(CDA_DRIVERS)
 
-V4HDIR=		$(PRJDIR)/../hw4cx
 LOCAL_INCLUDES=	-I$(V4HDIR)/include
 
 ######################################################################

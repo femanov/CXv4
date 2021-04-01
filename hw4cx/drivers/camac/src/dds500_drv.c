@@ -412,6 +412,15 @@ static void dds500_rw_p(int devid, void *devptr,
                 rflags = me->infoword_rflags;
                 break;
             
+            case DDS500_CHAN_DEBUG_REG_N:
+                if (action == DRVA_WRITE)
+                {
+                    me->debug_reg = value;
+                }
+                value  = me->debug_reg;
+                rflags = 0;
+                break;
+
             case DDS500_CHAN_DEBUG_REG_W:
                 if (action == DRVA_WRITE)
                     rflags = wr_reg(me->N, me->debug_reg % 100, me->debug_reg / 100, value);

@@ -36,12 +36,15 @@ static Widget adc250_mkctls(pzframe_gui_t           *gui,
   Widget  verform;
   Widget  vergrid;
   Widget  ctlsep;
+  Widget  pllform;
+  Widget  pllgrid;
   Widget  clbform;
   Widget  clbgrid;
 
   Widget  w1;
   Widget  w2;
 
+  int     x;
   int     y;
   int     nl;
   int     nr;
@@ -219,20 +222,27 @@ static Widget adc250_mkctls(pzframe_gui_t           *gui,
                                       ctlform,
                                       XmNorientation,     XmVERTICAL,
                                       NULL);
+    pllform = XtVaCreateManagedWidget("form", xmFormWidgetClass, ctlform,
+                                      XmNshadowThickness, 0,
+                                      NULL);
+    pllgrid = MakeFreeGrid(pllform);
     clbform = XtVaCreateManagedWidget("form", xmFormWidgetClass, ctlform,
                                       XmNshadowThickness, 0,
                                       NULL);
     clbgrid = MakeFreeGrid(clbform);
-            
+
     attachleft  (verform, NULL,    0);
     attachleft  (ctlsep,  verform, MOTIFKNOBS_INTERKNOB_H_SPACING);
+    attachleft  (pllform, ctlsep,  MOTIFKNOBS_INTERKNOB_H_SPACING);
+    attachtop   (pllform, NULL,    0);
     attachleft  (clbform, ctlsep,  MOTIFKNOBS_INTERKNOB_H_SPACING);
+    attachtop   (clbform, pllform, MOTIFKNOBS_INTERKNOB_V_SPACING);
     attachtop   (ctlsep,  NULL,    0);
     attachbottom(ctlsep,  NULL,    0);
 
     // Version info
     w1 = mkparknob(gui, verform,
-                   "look=inttext  ro label='Dev ID' options='withlabel' dpyfmt=%#10.0a",
+                   "look=inttext  ro label='Dev ID' options='withlabel' dpyfmt=%#10a",
                    ADC250_CHAN_DEVICE_ID);
     w2 = mkparknob(gui, verform,
                    "look=selector ro label='Var' items='#T0:1ch/1000MSPS\t1:2ch/500MSPS\t2:4ch/250MSPS\t3:UNKNOWN/err'",
@@ -257,6 +267,18 @@ static Widget adc250_mkctls(pzframe_gui_t           *gui,
     MakeParKnob(vergrid, 2, y, "look=text ro dpyfmt=%-5.0f", gui, mkparknob, ADC250_CHAN_PGA_UNIQ_ID);
     y++;
     XhGridSetSize(vergrid, 3, y);
+
+    // PLL-related stuff
+    x = 0;
+    MakeParKnob(pllgrid, x++, 0, "look=selector ro label='PLL' items='fail\b\blit=red\tlocked\b\blit=green'",
+                gui, mkparknob, ADC250_CHAN_PLL_LOCKED);
+    MakeParKnob(pllgrid, x++, 0, "look=text     rw label=' Prs#' options='withlabel,noincdec' dpyfmt=%2.0f",
+                gui, mkparknob, ADC250_CHAN_PLL_PRESET);
+    MakeParKnob(pllgrid, x++, 0, "look=inttext  ro dpyfmt=%#10a",
+                gui, mkparknob, ADC250_CHAN_CUR_PLL1_CTRL);
+    MakeParKnob(pllgrid, x++, 0, "look=inttext  ro dpyfmt=%#10a",
+                gui, mkparknob, ADC250_CHAN_CUR_PLL2_CTRL);
+    XhGridSetSize(pllgrid, x, 1);
 
     // Calibrations
     MakeParKnob(clbgrid, 0, 0, " look=button rw label='Calibrate'",

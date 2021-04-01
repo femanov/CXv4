@@ -1,9 +1,24 @@
+vepp4_SRVHOSTS=	vepp4-pult6 can2
+vepp4_CLNHOSTS=	vepp4-pult6 VEPP4
+
+vepp5_SRVHOSTS=	cxhw canhw
+vepp5_CLNHOSTS=	PULT
+
+weld_SRVHOSTS=	bike tower romeo ep1-berezin2 xweld
+weld_CLNHOSTS=	tower ep1-berezin2 xweld
+
+liu_SRVHOSTS=	rack0 rack1 wolf
+liu_CLNHOSTS=	
+
 SRVHOSTS=	cxhw canhw foxy v2k-k500-1 vepp4-pult6 can2 \
 		bike tower romeo ep1-berezin2 xweld \
 		rack0 rack1
 CLNHOSTS=	linac3 worker1 camilla2 io io2 vepp4-pult6 PULT VEPP4 \
 		tower ep1-berezin2 xweld
 ACCESSGROUPS=	vepp5
+
+#SRVHOSTS=	$(sort $(foreach P, $(PARTS), $($(P)_SRVHOSTS)) )
+#CLNHOSTS=	$(sort $(foreach P, $(PARTS), $($(P)_CLNHOSTS)) )
 
 cxhw_SERVERS=		15 16 17 18 24 25 26 27
 canhw_SERVERS=		11 12 13 14 19 21 22 23

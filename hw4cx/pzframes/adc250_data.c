@@ -51,6 +51,8 @@ static pzframe_chan_dscr_t adc250_chan_dscrs[] =
     [ADC250_CHAN_TRIG_TYPE]    = {"trig_type"},
     [ADC250_CHAN_TRIG_INPUT]   = {"trig_input"},
 
+    [ADC250_CHAN_PLL_PRESET]   = {"pll_preset",   0, PZFRAME_CHAN_IMMEDIATE_MASK | PZFRAME_CHAN_ON_CYCLE_MASK | PZFRAME_CHAN_RW_ONLY_MASK},
+
     [ADC250_CHAN_DEVICE_ID]    = {"device_id",    0, PZFRAME_CHAN_IMMEDIATE_MASK | PZFRAME_CHAN_ON_CYCLE_MASK},
     [ADC250_CHAN_BASE_SW_VER]  = {"base_sw_ver",  0, PZFRAME_CHAN_IMMEDIATE_MASK | PZFRAME_CHAN_ON_CYCLE_MASK},
     [ADC250_CHAN_PGA_SW_VER]   = {"pga_sw_ver",   0, PZFRAME_CHAN_IMMEDIATE_MASK | PZFRAME_CHAN_ON_CYCLE_MASK},
@@ -59,6 +61,8 @@ static pzframe_chan_dscr_t adc250_chan_dscrs[] =
     [ADC250_CHAN_PGA_VAR]      = {"pga_var",      0, PZFRAME_CHAN_IMMEDIATE_MASK | PZFRAME_CHAN_ON_CYCLE_MASK},
     [ADC250_CHAN_BASE_UNIQ_ID] = {"base_uniq_id", 0, PZFRAME_CHAN_IMMEDIATE_MASK | PZFRAME_CHAN_ON_CYCLE_MASK},
     [ADC250_CHAN_PGA_UNIQ_ID]  = {"pga_uniq_id",  0, PZFRAME_CHAN_IMMEDIATE_MASK | PZFRAME_CHAN_ON_CYCLE_MASK},
+
+    [ADC250_CHAN_PLL_LOCKED]   = {"pll_locked",   0, PZFRAME_CHAN_IMMEDIATE_MASK | PZFRAME_CHAN_ON_CYCLE_MASK},
 
     [ADC250_CHAN_ELAPSED]      = {"elapsed",      0, PZFRAME_CHAN_IMMEDIATE_MASK | PZFRAME_CHAN_ON_CYCLE_MASK},
     [ADC250_CHAN_XS_PER_POINT] = {"xs_per_point", 1},
@@ -84,6 +88,9 @@ static pzframe_chan_dscr_t adc250_chan_dscrs[] =
     DSCR_X4RDS(MAX,,                "max","",       0, 0, 0, 0, ADC250_CHAN_LINE0),
     DSCR_X4RDS(AVG,,                "avg","",       0, 0, 0, 0, ADC250_CHAN_LINE0),
     DSCR_X4RDS(INT,,                "int","",       0, 0, 0, 0, ADC250_CHAN_LINE0),
+
+    [ADC250_CHAN_CUR_PLL1_CTRL] = {"cur_pll1_ctrl", PZFRAME_CHAN_IMMEDIATE_MASK | PZFRAME_CHAN_ON_CYCLE_MASK},
+    [ADC250_CHAN_CUR_PLL2_CTRL] = {"cur_pll2_ctrl", PZFRAME_CHAN_IMMEDIATE_MASK*0 | PZFRAME_CHAN_ON_CYCLE_MASK*0 | PZFRAME_CHAN_IS_PARAM},
 
     // LINE[0-3]TOTAL{MIN,MAX} and NUM_LINES are omitted
 

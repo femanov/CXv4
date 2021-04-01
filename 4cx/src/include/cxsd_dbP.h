@@ -53,6 +53,7 @@ typedef struct
 {
     int                 is_builtin;
     int                 is_simulated;
+    int                 is_readonly;
 
     int                 instname_ofs;
     int                 typename_ofs;

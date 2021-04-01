@@ -20,6 +20,12 @@ else
 #  CAENVMElib_LIB_PARAMS=	$(CAENVMElib_LIB_DIR)/libCAENVME.so.2.50
   CAENVMElib_LIB_PARAMS=	-L$(CAENVMElib_LIB_DIR) -l:libCAENVME.so.2.50
 endif
+# 3.2,0 with poll() support
+ifeq ":$(USE320):" ":YES:"
+  CAENVMElib_BASE_DIR=	$(HOME)/compile/CAENVMELib-3.2.0_sources.new
+  CAENVMElib_LIB_DIR=	$(CAENVMElib_BASE_DIR)
+  CAENVMElib_LIB_PARAMS=-L$(CAENVMElib_LIB_DIR) -l:libCAENVME.so.3.1.0
+endif
 ######################################################################
 PRJDIR=		../../..
 #include		CAENVMElibDefs.mk

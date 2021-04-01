@@ -1,2 +1,38 @@
 devtype rfmeas_l_timer w50i,r50i {
+	shot		0
+	special_start	1
+	reset_c_ilks	2
+	operation_mode	3
+
+	debug_wr_addr	47
+	debug_wr_val	48
+	debug_rd_addr	49
+
+	event		50
+	phase		51
+	gatestat	52
+	special_start_result	53
+
+	clks_TLos		60
+	clks_LockPLL		61
+	clks_PllWasUnlocked	62
+	clks_ActiveClk		63
+	clks_ExtClockIsBad	64
+	clks_ExtPlllock		65
+	clks_ExtWasUnlocked	66
+	clks_ExtActiveClk	67
+
+	c_clks_PllWasUnlocked	68
+	c_clks_ExtWasUnlocked	69
+
+	device_id	80
+	hw_version	81
+	sw_version	82
+	version_b_30_31	83
+	uniq_id		84
+	capabilities	85
+	baseaddr	86
+	addrspace	87
+
+	debug_rd_val	99
 }

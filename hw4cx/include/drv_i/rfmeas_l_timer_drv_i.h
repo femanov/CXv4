@@ -4,6 +4,50 @@
 
 enum // w50i,r50i
 {
+    RFMEAS_L_TIMER_CHAN_SHOT            = 0,
+    RFMEAS_L_TIMER_CHAN_SPECIAL_START   = 1,
+    RFMEAS_L_TIMER_CHAN_RESET_C_ILKS    = 2,
+    RFMEAS_L_TIMER_CHAN_OPERATION_MODE  = 3,
+
+    RFMEAS_L_TIMER_CHAN_DEBUG_WR_ADDR   = 47,
+    RFMEAS_L_TIMER_CHAN_DEBUG_WR_VAL    = 48,
+    RFMEAS_L_TIMER_CHAN_DEBUG_RD_ADDR   = 49,
+
+    RFMEAS_L_TIMER_CHAN_EVENT           = 50,
+    RFMEAS_L_TIMER_CHAN_PHASE           = 51,
+    RFMEAS_L_TIMER_CHAN_GATESTAT        = 52,
+    RFMEAS_L_TIMER_CHAN_SPECIAL_START_RESULT = 53,
+
+    RFMEAS_L_TIMER_CHAN_CLKS_n_base     = 60,  RFMEAS_L_TIMER_CHAN_CLKS_n_count = 8,
+    RFMEAS_L_TIMER_CHAN_CLKS_TLos             = RFMEAS_L_TIMER_CHAN_CLKS_n_base + 0,
+    RFMEAS_L_TIMER_CHAN_CLKS_LockPLL          = RFMEAS_L_TIMER_CHAN_CLKS_n_base + 1,
+    RFMEAS_L_TIMER_CHAN_CLKS_PllWasUnlocked   = RFMEAS_L_TIMER_CHAN_CLKS_n_base + 2,
+    RFMEAS_L_TIMER_CHAN_CLKS_ActiveClk        = RFMEAS_L_TIMER_CHAN_CLKS_n_base + 3,
+    RFMEAS_L_TIMER_CHAN_CLKS_ExtClockIsBad    = RFMEAS_L_TIMER_CHAN_CLKS_n_base + 4,
+    RFMEAS_L_TIMER_CHAN_CLKS_ExtPlllock       = RFMEAS_L_TIMER_CHAN_CLKS_n_base + 5,
+    RFMEAS_L_TIMER_CHAN_CLKS_ExtWasUnlocked   = RFMEAS_L_TIMER_CHAN_CLKS_n_base + 6,
+    RFMEAS_L_TIMER_CHAN_CLKS_ExtActiveClk     = RFMEAS_L_TIMER_CHAN_CLKS_n_base + 7,
+
+    RFMEAS_L_TIMER_CHAN_C_CLKS_PllWasUnlocked = 68, RFMEAS_L_TIMER_CHAN_C_CLKS_first = RFMEAS_L_TIMER_CHAN_C_CLKS_PllWasUnlocked,
+    RFMEAS_L_TIMER_CHAN_C_CLKS_ExtWasUnlocked = 69, RFMEAS_L_TIMER_CHAN_C_CLKS_last  = RFMEAS_L_TIMER_CHAN_C_CLKS_ExtWasUnlocked,
+                                                    RFMEAS_L_TIMER_CHAN_C_CLKS_count = RFMEAS_L_TIMER_CHAN_C_CLKS_last  -
+                                                                                       RFMEAS_L_TIMER_CHAN_C_CLKS_first + 1,
+
+    RFMEAS_L_TIMER_CHAN_DEVICE_ID       = 80, RFMEAS_L_TIMER_CHAN_HWINFO_first = RFMEAS_L_TIMER_CHAN_DEVICE_ID,
+    RFMEAS_L_TIMER_CHAN_HW_VERSION      = 81,
+    RFMEAS_L_TIMER_CHAN_SW_VERSION      = 82,
+    RFMEAS_L_TIMER_CHAN_VERSION_B_30_31 = 83,
+    RFMEAS_L_TIMER_CHAN_UNIQ_ID         = 84,
+    RFMEAS_L_TIMER_CHAN_CAPABILITIES    = 85,
+    RFMEAS_L_TIMER_CHAN_BASEADDR        = 86,
+    RFMEAS_L_TIMER_CHAN_ADDRSPACE       = 87, 
+    RFMEAS_L_TIMER_CHAN_unused_88       = 88,
+    RFMEAS_L_TIMER_CHAN_unused_89       = 89, RFMEAS_L_TIMER_CHAN_HWINFO_last  = RFMEAS_L_TIMER_CHAN_unused_89,
+                                              RFMEAS_L_TIMER_CHAN_HWINFO_count = RFMEAS_L_TIMER_CHAN_HWINFO_last  -
+                                                                                 RFMEAS_L_TIMER_CHAN_HWINFO_first + 1,
+
+    RFMEAS_L_TIMER_CHAN_DEBUG_RD_VAL    = 99,
+
     RFMEAS_L_TIMER_NUMCHANS = 100
 };
 

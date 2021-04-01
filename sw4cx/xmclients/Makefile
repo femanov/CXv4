@@ -26,7 +26,6 @@ UNCFILES=		$(foreach D, $(LOCAL_DEVS), \
 DIR_DEPENDS=            $(UNCFILES:.o=.d)
                                                    
 
-V4HDIR=		$(PRJDIR)/../hw4cx
 PZDIR=		$(V4HDIR)/pzframes
 LOCAL_INCLUDES=	-I$(PZDIR)
 LOCAL_LIBDEPS=	$(LIBPZFRAME_GUI) $(LIBPZFRAME_DATA)

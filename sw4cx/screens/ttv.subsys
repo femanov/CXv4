@@ -27,6 +27,13 @@ define(`TTV_LINE', `
     disp s_0213    "" led "color=blue" r:um$1.s_cmds_02_13
 
     disp num_curs  "" text - -  "%2.0f" um$1.num_currents
+    disp i1        "" text - - "%4.1f" um$1.i1
+    disp i2        "" text - - "%4.1f" um$1.i2
+    disp i3        "" text - - "%4.1f" um$1.i3
+    disp i4        "" text - - "%4.1f" um$1.i4
+    disp i5        "" text - - "%4.1f" um$1.i5
+    disp i6        "" text - - "%4.1f" um$1.i6
+    disp i7        "" text - - "%4.1f" um$1.i7
 ')
 
 grouping main ttv "TTV" grid \
@@ -35,14 +42,14 @@ grouping main ttv "TTV" grid \
                   "F\bFault\t#\bFault param # (0:none)\t"\
                   ":\bDisplacement is being processed\t?\bDisplacement state\t"\
                   "1\bFan1\t2\bFan2\t3\bFan3\tP\bPowerSupply\tF\bFast prot. Pin/Prefl\tI\bInput signal missing\tx\bCommands 0x02-0x13 support\t"\
-                  "I#\bNumber of currents" \
-        ncols:23 content:eval(8*23) {
+                  "I#\bNumber of currents\t1\t2\t3\t4\t5\t6\t7" \
+        ncols:30 content:eval(2*30) {
     TTV_LINE(1)
     TTV_LINE(2)
-    TTV_LINE(3)
-    TTV_LINE(4)
-    TTV_LINE(5)
-    TTV_LINE(6)
-    TTV_LINE(7)
-    TTV_LINE(8)
+    #TTV_LINE(3)
+    #TTV_LINE(4)
+    #TTV_LINE(5)
+    #TTV_LINE(6)
+    #TTV_LINE(7)
+    #TTV_LINE(8)
 }

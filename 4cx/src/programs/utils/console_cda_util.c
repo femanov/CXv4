@@ -3,6 +3,7 @@
 #include <signal.h>
 #include <string.h>
 #include <ctype.h>
+#include <sys/time.h> // for struct timeval
 
 #include "misc_macros.h"
 #include "misclib.h"
@@ -81,6 +82,7 @@ void PrintDatarefData(FILE *fp, util_refrec_t *urp, int parts)
   int            n;
   const char    *src_p;
   cx_time_t      timestamp;
+  struct timeval tv;
 
   rflags_t       rflags;
   int            shift;
@@ -185,14 +187,21 @@ void PrintDatarefData(FILE *fp, util_refrec_t *urp, int parts)
         }
         if (max_nelems != 1  &&  parts & UTIL_PRINT_PARENS) fprintf(fp, "}");
     }
-    if (parts & UTIL_PRINT_TIMESTAMP)
+    if (parts & (UTIL_PRINT_TIMESTAMP | UTIL_PRINT_TIMES8601))
     {
         if (cda_get_ref_stat(urp->ref, NULL, &timestamp) >= 0)
         {
-            fprintf(fp, " @%ld.%06ld", timestamp.sec, timestamp.nsec/1000);
+            if (parts & UTIL_PRINT_TIMES8601)
+            {
+                tv.tv_sec  = timestamp.sec;
+                tv.tv_usec = timestamp.nsec/1000;
+                fprintf(fp, "@%s", stroftime_msc(&tv, "-"));
+            }
+            else
+                fprintf(fp, " @%ld.%06ld", timestamp.sec, timestamp.nsec/1000);
         }
         else
-            fprintf(fp, " @UNKNOWN.TIME");
+            fprintf    (fp, " @UNKNOWN.TIME");
     }
     if (parts & UTIL_PRINT_RFLAGS)
     {

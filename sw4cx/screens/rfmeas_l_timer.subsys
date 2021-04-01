@@ -1,0 +1,63 @@
+sysname rfmeas_l_timer
+defserver cxhw:15
+wintitle main "rf-L_TIMER diag"
+winname  main rfmeas_l_timer
+winclass main RFMeas_L_Timer
+winopts  main ""
+
+grouping main rfmeas_l_timer_grouping "" \
+        grid nodecor base:l_timer content:7 {
+
+    button tyk  ""       arrowrt "offcol=blue size=giant"  r:shot
+    container special_start "" grid nodecor ncols:2 content:2 {
+        button special_start "Special Start"  button r:special_start
+        disp result "" selector items:"Fail\tSuccess" r:special_start_result
+    }
+
+    container numbers "" grid notitle,noshadow,nocoltitles content:2 {
+        disp phase    Phase    text dpyfmt:%5.0f r:phase
+        disp gatestat GateStat text dpyfmt:%5.0f r:gatestat
+    }
+
+    knob mode "Mode" choicebs items:"Continouos\tOneShot" r:operation_mode
+
+    container clk_status "CLK_STATUS" grid nocoltitles \
+            rowtitles:"0\t1\t2\t3\t4\t5\t6\t7" ncols:2 nattl:1 content:17 {
+        button rci "R" button r:reset_c_ilks tip:"Reset remembered states of\nPllWasUnlocked and ExtWasUnlocked"
+
+        disp TLos           TLos           led "shape=circle,color=blue"  r:clks_TLos
+        noop
+        disp LockPLL        LockPLL        led "shape=circle,color=green" r:clks_LockPLL
+        noop
+        disp PllWasUnlocked PllWasUnlocked led "shape=circle,color=red"   r:clks_PllWasUnlocked
+        disp c_PllWasUnlocked ""           led "shape=circle,color=amber" r:c_clks_PllWasUnlocked  tip:"PllWasUnlocked was 1 somewhen"
+        disp ActiveClk      ActiveClk choicebs nolabel items:"Internal\tOpticIn" r:clks_ActiveClk layinfo:horz=center
+        noop
+        disp ExtClockIsBad  ExtClockIsBad  led "shape=circle,color=red"   r:clks_ExtClockIsBad
+        noop
+        disp ExtPlllock     ExtPlllock     led "shape=circle,color=green" r:clks_ExtPlllock
+        noop
+        disp ExtWasUnlocked ExtWasUnlocked led "shape=circle,color=red"   r:clks_ExtWasUnlocked
+        disp c_ExtWasUnlocked ""           led "shape=circle,color=amber" r:c_clks_ExtWasUnlocked  tip:"ExtWasUnlocked was 1 somewhen"
+        disp ExtActiveClk   ExtActiveClk choicebs nolabel items:"=ActiveClk\tExt" r:clks_ExtActiveClk layinfo:horz=center
+        noop
+    }
+
+    container debug "Debug" grid coltitles:"Addr\tValue" rowtitles:"Write\tRead" \
+            ncols:2 content:4 {
+        knob wr_addr "" inttext - - "%#08a" debug_wr_addr
+        knob wr_val  "" inttext - - "%#06a" debug_wr_val
+        knob rd_addr "" inttext - - "%#08a" debug_rd_addr
+        disp rd_val  "" inttext - - "%#06a" debug_rd_val
+    }
+
+    container "" "" grid "notitle,noshadow,nocoltitles" content:7 {
+        disp device_id    "Dev ID"    inttext "" r:device_id    dpyfmt:"%#010a"
+        disp uniq_id      "Uniq ID"   inttext "" r:uniq_id      dpyfmt:"%#010a"
+        disp hw_version   "HW ver"    inttext "" r:hw_version   dpyfmt:"%#006a"
+        disp sw_version   "SW ver"    inttext "" r:sw_version   dpyfmt:"%#006a"
+        disp baseaddr     "Capabls"   inttext "" r:capabilities dpyfmt:"%#010a"
+        disp baseaddr     "Base addr" inttext "" r:baseaddr     dpyfmt:"%#010a"
+        disp addrspace    "Addr spc"  inttext "" r:addrspace    dpyfmt:"%#010a"
+    }
+}

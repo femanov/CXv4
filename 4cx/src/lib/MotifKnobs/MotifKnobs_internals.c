@@ -794,7 +794,7 @@ int    MotifKnobs_ExtractIntValue      (Widget w, int    *result)
   char   *text = XmTextGetString(w);
   int     ret;
 
-    v = strtol(text, &err, 10);
+    v = strtoul(text, &err, 0); // Note: base is 0 for "0x" prefix to be possible
     ret = !(err == text  ||  *err != '\0');
 
     if (ret)

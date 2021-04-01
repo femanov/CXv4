@@ -18,6 +18,139 @@
 
 
 //////////////////////////////////////////////////////////////////////
+#define XK_MISCELLANY
+#define XK_LATIN1
+#include <X11/keysymdef.h>
+
+#include "misc_macros.h"
+#include "misclib.h"
+
+static void NEW_TextChangeCB(Widget     w,
+                         XtPointer  closure,
+                         XtPointer  call_data)
+{
+  DataKnob             k    = (DataKnob)              closure;
+  XmAnyCallbackStruct *info = (XmAnyCallbackStruct *) call_data;
+  int                  iv;
+  
+    /* Do a CANCEL if losing focus */
+    if (info->reason != XmCR_ACTIVATE)
+    {
+        cancel_knob_editing(k);
+        return;
+    }
+
+    if (MotifKnobs_ExtractIntValue(w, &iv))
+    {
+        store_knob_undo_value (k);
+        MotifKnobs_SetControlValue(k, iv, 1);
+    }
+}
+
+static void NEW_TextUserCB(Widget     w __attribute__((unused)),
+                       XtPointer  closure,
+                       XtPointer  call_data)
+{
+  DataKnob                    k    = (DataKnob)                     closure;
+  XmTextVerifyCallbackStruct *info = (XmTextVerifyCallbackStruct *) call_data;
+    
+    if (info->reason == XmCR_MOVING_INSERT_CURSOR ||
+        info->event  != NULL)
+        user_began_knob_editing(k);
+}
+
+static void NEW_HandleTextUpDown(Widget        w,
+                             DataKnob      k,
+                             unsigned int  state,
+                             Boolean       up)
+{
+  int           iv;
+  int           incdec_step;
+
+    if (!MotifKnobs_ExtractIntValue(w, &iv)) return;
+
+    if (k->u.k.num_params > DATAKNOB_PARAM_STEP)
+        incdec_step = k->u.k.params[DATAKNOB_PARAM_STEP].value;
+    else
+        incdec_step = 1;
+
+    if (state & MOD_BIGSTEPS_MASK)  incdec_step *= 10;
+
+    if (up)
+        iv += incdec_step;
+    else
+        iv -= incdec_step;
+
+    store_knob_undo_value(k);
+    MotifKnobs_SetControlValue(k, iv, 1);
+}
+
+static void NEW_TextKbdHandler(Widget     w,
+                           XtPointer  closure,
+                           XEvent    *event,
+                           Boolean   *continue_to_dispatch)
+{
+  DataKnob      k  = (DataKnob)    closure;
+  XKeyEvent    *ev = (XKeyEvent *) event;
+
+  KeySym        ks;
+  Modifiers     mr;
+
+  Boolean       up;
+
+    if (event->type != KeyPress) return;
+    XtTranslateKeycode(XtDisplay(w), ev->keycode, ev->state, &mr, &ks);
+
+    /* [Cancel] */
+    if ((ks == XK_Escape  ||  ks == osfXK_Cancel)  &&
+        (ev->state & (ShiftMask | ControlMask | Mod1Mask)) == 0
+        &&  k->usertime != 0)
+    {
+        cancel_knob_editing(k);
+        *continue_to_dispatch = False;
+        return;
+    }
+
+    /* [Undo] */
+    if (
+        ((ks == XK_Z  ||  ks == XK_z)  &&  (ev->state & ControlMask) != 0)
+        ||
+        ((ks == XK_BackSpace  ||  ks == osfXK_BackSpace)  &&  (ev->state & Mod1Mask) != 0)
+       )
+    {
+        perform_knob_undo(k);
+        *continue_to_dispatch = False;
+        return;
+    }
+    
+    /* [Up] or [Down] */
+    if      (ks == XK_Up    ||  ks == XK_KP_Up    ||  ks == osfXK_Up)   up = True;
+    else if (ks == XK_Down  ||  ks == XK_KP_Down  ||  ks == osfXK_Down) up = False;
+    else return;
+
+    *continue_to_dispatch = False;
+
+    NEW_HandleTextUpDown(w, k, ev->state, up);
+}
+
+static void NEW_TextWheelHandler(Widget     w,
+                             XtPointer  closure,
+                             XEvent    *event,
+                             Boolean   *continue_to_dispatch)
+{
+  DataKnob             k  = (DataKnob)              closure;
+  XButtonPressedEvent *ev = (XButtonPressedEvent *) event;
+  Boolean              up;
+
+    if      (ev->button == Button4) up = True;
+    else if (ev->button == Button5) up = False;
+    else return;
+
+    *continue_to_dispatch = False;
+
+    NEW_HandleTextUpDown(w, k, ev->state, up);
+}
+//////////////////////////////////////////////////////////////////////
 static
 Widget NEW_MotifKnobs_CreateIntTextValue(DataKnob k, Widget parent)
 {
@@ -37,16 +170,16 @@ Widget NEW_MotifKnobs_CreateIntTextInput(DataKnob k, Widget parent)
 
     w = MotifKnobs_MakeTextWidget(parent, True,  columns);
 
-//    XtAddCallback(w, XmNactivateCallback,     TextChangeCB, (XtPointer)k);
-//    XtAddCallback(w, XmNlosingFocusCallback,  TextChangeCB, (XtPointer)k);
+    XtAddCallback(w, XmNactivateCallback,     NEW_TextChangeCB, (XtPointer)k);
+    XtAddCallback(w, XmNlosingFocusCallback,  NEW_TextChangeCB, (XtPointer)k);
     
-//    XtAddCallback(w, XmNmodifyVerifyCallback, TextUserCB,   (XtPointer)k);
-//    XtAddCallback(w, XmNmotionVerifyCallback, TextUserCB,   (XtPointer)k);
+    XtAddCallback(w, XmNmodifyVerifyCallback, NEW_TextUserCB,   (XtPointer)k);
+    XtAddCallback(w, XmNmotionVerifyCallback, NEW_TextUserCB,   (XtPointer)k);
     
     MotifKnobs_SetTextCursorCallback(w);
     
-//    XtAddEventHandler(w, KeyPressMask,    False, TextKbdHandler,   (XtPointer)k);
-//    XtAddEventHandler(w, ButtonPressMask, False, TextWheelHandler, (XtPointer)k);
+    XtAddEventHandler(w, KeyPressMask,    False, NEW_TextKbdHandler,   (XtPointer)k);
+    XtAddEventHandler(w, ButtonPressMask, False, NEW_TextWheelHandler, (XtPointer)k);
 
     return w;
 }
@@ -432,6 +565,6 @@ dataknob_knob_vmt_t motifknobs_inttext_knob_vmt =
         sizeof(inttext_knob_privrec_t), text2inttextknobopts,
         0,
         CreateIntTextKnob, MotifKnobs_CommonDestroy_m,
-        MotifKnobs_CommonColorize_m, NULL},
+        IntTextKnobColorize_m, NULL},
     IntTextSetValue_m, IntTextPropsChg_m
 };

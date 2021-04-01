@@ -11,38 +11,38 @@ exports/
 moc_*
 
 # executables
-cx-starter
-histplot
-ppf4td_test_double
-rrund
-stand
-stop-all-servers
-cstart
-knobtest
-pult
-run-cx-server
-start-all-servers
+#cx-starter
+#histplot
+#ppf4td_test_double
+#rrund
+#stand
+#stop-all-servers
+#cstart
+#knobtest
+#pult
+#run-cx-server
+#start-all-servers
 
 
-cxsd
-cdaclient
-cx-chan-search
-cxclient
-das-experiment
-dataset-save
-pipe2cda
-drvinfo
-ppf4td_test
-test_rem_rd_rw.drvlet
+#cxsd
+#cdaclient
+#cx-chan-search
+#cxclient
+#das-experiment
+#dataset-save
+#pipe2cda
+#drvinfo
+#ppf4td_test
+#test_rem_rd_rw.drvlet
 
 
-liuclient
-pzframeclient
+#liuclient
+#pzframeclient
 
 # epics executables
-epics_cdaclient
-epics_das-experiment
-epics_dataset-save
+#epics_cdaclient
+#epics_das-experiment
+#epics_dataset-save
 
 
 

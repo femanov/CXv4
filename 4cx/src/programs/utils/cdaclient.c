@@ -63,6 +63,7 @@ static int            option_binary    = 0;
 static char          *option_baseref   = NULL;
 static char          *option_defpfx    = NULL;
 static int            option_help      = 0;
+static int            option_ignore_nf = 0;
 static int            option_monitor   = 0;
 static const char    *option_outfile   = NULL;
 static int            option_relative  = 0;
@@ -82,6 +83,7 @@ static int            print_quants     = 0;
 static int            print_lockstats  = 0;
 static int            print_ranges     = 0;
 static int            print_timestamp  = 0;
+static int            print_times8601  = 0;
 static int            print_rflags     = 0;
 static int            print_fresh_ages = 0;
 static int            print_rds        = 0;
@@ -201,16 +203,19 @@ static void ProcessDatarefEvent(int            uniq,
             fprintf(stderr, "# %s channel \"%s\" not found\n",
                     print_time?strcurtime():"", src_p);
 
-            if (rp->ur.rd_req)
+            if (option_ignore_nf == 0)
             {
-                rp->ur.rd_req = 0;
-                num2read--;
-            }
-            if (rp->ur.wr_req  ||  rp->ur.wr_snt)
-            {
-                rp->ur.wr_req = 0;
-                rp->ur.wr_snt = 0;
-                num2write--;
+                if (rp->ur.rd_req)
+                {
+                    rp->ur.rd_req = 0;
+                    num2read--;
+                }
+                if (rp->ur.wr_req  ||  rp->ur.wr_snt)
+                {
+                    rp->ur.wr_req = 0;
+                    rp->ur.wr_snt = 0;
+                    num2write--;
+                }
             }
         }
         else if (ptr2lint(info_ptr) == CDA_RSLVSTAT_FOUND)
@@ -285,6 +290,7 @@ if (0)
                                  (print_unescaped ? UTIL_PRINT_UNESCAPED : 0) |
                                  (option_relative ? UTIL_PRINT_RELATIVE  : 0) |
                                  (print_timestamp ? UTIL_PRINT_TIMESTAMP : 0) |
+                                 (print_times8601 ? UTIL_PRINT_TIMES8601 : 0) |
                                  (print_rflags    ? UTIL_PRINT_RFLAGS    : 0) |
                                  UTIL_PRINT_NEWLINE);
             else if (cda_acc_ref_data(rp->ur.ref,
@@ -333,6 +339,7 @@ if (0)
                          (print_unescaped ? UTIL_PRINT_UNESCAPED : 0) |
                          (option_relative ? UTIL_PRINT_RELATIVE  : 0) |
                          (print_timestamp ? UTIL_PRINT_TIMESTAMP : 0) |
+                         (print_times8601 ? UTIL_PRINT_TIMES8601 : 0) |
                          (print_rflags    ? UTIL_PRINT_RFLAGS    : 0) |
                          UTIL_PRINT_NEWLINE);
     }
@@ -693,7 +700,7 @@ int main(int argc, char *argv[])
     BUILTINS_REGISTRATION_CODE
 #endif /* BUILTINS_REGISTRATION_CODE */
 
-    while ((c = getopt(argc, argv, "1b:Bd:D:f:hmo:rT:w")) != EOF)
+    while ((c = getopt(argc, argv, "1b:Bd:D:f:hmNo:rT:w")) != EOF)
         switch (c)
         {
             case '1':
@@ -745,6 +752,7 @@ int main(int argc, char *argv[])
                         case 'q': print_quotes     = val2set; break;
                         case 'e': print_unescaped  = val2set; break;
                         case 't': print_timestamp  = val2set; break;
+                        case '8': print_times8601  = val2set; break;
                         case 'f': print_rflags     = val2set; break;
                         case 'F': print_fresh_ages = val2set; break;
                         case 's': print_srvlist    = val2set; break;
@@ -773,6 +781,9 @@ int main(int argc, char *argv[])
             case 'm':
                 option_monitor  = 1;
                 break;
+
+            case 'N':
+                option_ignore_nf = 1;
 
             case 'o':
                 option_outfile  = optarg;
@@ -811,6 +822,7 @@ int main(int argc, char *argv[])
                "  -D DISPMODE -- display mode control flags ('-hh' for details)\n"
                "  -f FILENAME -- read list of channels from FILENAME (one per line)\n"
                "  -m          -- monitor mode (run infinitely)\n"
+               "  -N          -- ignore NOTFOUND events\n"
                "  -o OUTFILE  -- send output to OUTFILE\n"
                "  -r          -- print relative channel names\n"
                "  -T DURATION -- how many seconds to run (time limit)\n"
@@ -833,6 +845,7 @@ int main(int argc, char *argv[])
                " q  print Quotes around text values (default=yes; \"-D-q\" for no)\n"
                " e  prunt unEscaped strings (instead of \\xNN etc.)\n"
                " t  print Timestamps\n"
+               " 8                   ...in ISO8601 human-readable format\n"
                " f  print rFlags\n"
                " s  print list of Servers\n"
                " F  print Fresh ages\n"

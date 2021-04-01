@@ -295,6 +295,7 @@ int  CxsdHwSetDb   (CxsdDb db)
   CxsdChanInfoRec   *grp_p;
   cxsd_hw_chan_t    *chn_p;
   int                nchans;
+  int                effective_rw;
 
   int                nsp_kind;
   int                nsp_id;
@@ -360,6 +361,7 @@ int  CxsdHwSetDb   (CxsdDb db)
 
                 dev_p->db_ref       = hw_d;
                 dev_p->is_simulated = hw_d->is_simulated;
+                dev_p->is_readonly  = hw_d->is_readonly;
                 dev_p->state        = DEVSTATE_OFFLINE;
 
                 /* Remember 1st (0th!) channel number */
@@ -371,6 +373,9 @@ int  CxsdHwSetDb   (CxsdDb db)
                  g < hw_d->changrpcount;
                  g++,    grp_p++)
             {
+                effective_rw = ((grp_p->rw  &&  hw_d->is_readonly == 0)    ||
+                                hw_d->is_simulated   >= CXSD_SIMULATE_SUP  ||
+                                MustSimulateHardware >= CXSD_SIMULATE_SUP);
                 usize = sizeof_cxdtype(grp_p->dtype);
                 csize = usize * grp_p->max_nelems;
                 /* Perform padding for alignment, if required */
@@ -389,7 +394,7 @@ int  CxsdHwSetDb   (CxsdDb db)
                     current_val_bufsize     = (current_val_bufsize + usize-1)
                                               & (~(usize - 1));
                     // b. next_wr_val only if rw
-                    if (grp_p->rw)
+                    if (effective_rw)
                         next_wr_val_bufsize = (next_wr_val_bufsize + usize-1)
                                               & (~(usize - 1));
                 }
@@ -399,9 +404,7 @@ int  CxsdHwSetDb   (CxsdDb db)
                 if (stage == 0)
                 {
                     current_val_bufsize += csize * grp_p->count;
-                    if (grp_p->rw  ||
-                        hw_d->is_simulated   >= CXSD_SIMULATE_SUP  ||
-                        MustSimulateHardware >= CXSD_SIMULATE_SUP)
+                    if (effective_rw)
                         next_wr_val_bufsize += csize * grp_p->count;
                     nchans += grp_p->count;
                 }
@@ -411,9 +414,12 @@ int  CxsdHwSetDb   (CxsdDb db)
                          x < grp_p->count;
                          x++,    chn_p++,  nchans++)
                     {
-                        chn_p->rw             = (grp_p->rw  ||
-                                                 hw_d->is_simulated   >= CXSD_SIMULATE_SUP  ||
-                                                 MustSimulateHardware >= CXSD_SIMULATE_SUP);
+                        chn_p->rw             = effective_rw;
+                        if (chn_p->rw == 0  &&  dev_p->is_readonly)
+                        {
+                            chn_p->is_autoupdated = 1;
+                            chn_p->rw_readonly    = 1;
+                        }
                         chn_p->devid          = devid;
                         chn_p->boss           = -1; /*!!!*/
 #if CXSD_HW_SUPPORTS_CXDTYPE_UNKNOWN
@@ -427,7 +433,7 @@ int  CxsdHwSetDb   (CxsdDb db)
 #endif
                         chn_p->timestamp.sec  = INITIAL_TIMESTAMP_SECS;
                         chn_p->timestamp.nsec = 0;
-                        if (chn_p->rw == 0)
+                        if (chn_p->rw == 0  &&  chn_p->rw_readonly == 0)
                             chn_p->fresh_age  = (cx_time_t){5,0}; /*!!!*/
                         else
                             chn_p->fresh_age  = (cx_time_t){0,0}; /* No-fresh-aging */
@@ -1292,14 +1298,14 @@ static void FillPropsOfChan(cxsd_cpntid_t  cpid,
                             int           *phys_count_p,
                             double        *rds_buf,
                             int            rds_buf_cap,
-                            char         **ident_p,
-                            char         **label_p,
-                            char         **tip_p,
-                            char         **comment_p,
-                            char         **geoinfo_p,
-                            char         **rsrvd6_p,
-                            char         **units_p,
-                            char         **dpyfmt_p)
+                            const char   **ident_p,
+                            const char   **label_p,
+                            const char   **tip_p,
+                            const char   **comment_p,
+                            const char   **geoinfo_p,
+                            const char   **rsrvd6_p,
+                            const char   **units_p,
+                            const char   **dpyfmt_p)
 {
   CxsdDbCpntInfo_t *cp;
   int               rds_buf_used = 0;
@@ -1397,14 +1403,14 @@ cxsd_cpntid_t  CxsdHwResolveChan(const char    *name,
                                  int           *phys_count_p,
                                  double        *rds_buf,
                                  int            rds_buf_cap,
-                                 char         **ident_p,
-                                 char         **label_p,
-                                 char         **tip_p,
-                                 char         **comment_p,
-                                 char         **geoinfo_p,
-                                 char         **rsrvd6_p,
-                                 char         **units_p,
-                                 char         **dpyfmt_p)
+                                 const char   **ident_p,
+                                 const char   **label_p,
+                                 const char   **tip_p,
+                                 const char   **comment_p,
+                                 const char   **geoinfo_p,
+                                 const char   **rsrvd6_p,
+                                 const char   **units_p,
+                                 const char   **dpyfmt_p)
 {
   cxsd_cpntid_t          cpid;
   int                    chan;
@@ -1439,14 +1445,14 @@ int            CxsdHwGetCpnProps(cxsd_cpntid_t  cpid,
                                  int           *phys_count_p,
                                  double        *rds_buf,
                                  int            rds_buf_cap,
-                                 char         **ident_p,
-                                 char         **label_p,
-                                 char         **tip_p,
-                                 char         **comment_p,
-                                 char         **geoinfo_p,
-                                 char         **rsrvd6_p,
-                                 char         **units_p,
-                                 char         **dpyfmt_p)
+                                 const char   **ident_p,
+                                 const char   **label_p,
+                                 const char   **tip_p,
+                                 const char   **comment_p,
+                                 const char   **geoinfo_p,
+                                 const char   **rsrvd6_p,
+                                 const char   **units_p,
+                                 const char   **dpyfmt_p)
 {
     if (cpid <= 0
         ||
@@ -1480,8 +1486,8 @@ int            CxsdHwGetChanType(cxsd_gchnid_t  gcid,
 }
 
 int            CxsdHwGetChanAuxs(cxsd_gchnid_t  gcid,
-                                 char         **dbprops_p,
-                                 char         **drvinfo_p)
+                                 const char   **dbprops_p,
+                                 const char   **drvinfo_p)
 {
   int               dbprops_ofs = -1;
   int               drvinfo_ofs = -1;
@@ -1897,7 +1903,7 @@ static int  ConsiderRequest(int            requester,
             (chn_p->upd_cycle == current_cycle  &&  
              (chn_p->do_ignore_upd_cycle == 0  ||  ignore_upd_cycle == 0)
             )  ||
-            chn_p->is_autoupdated)
+            (chn_p->is_autoupdated  &&  chn_p->rw_readonly == 0))
         {
             return DRVA_IGNORE;
         }
@@ -2188,11 +2194,13 @@ static void ReqRofWrChsOf(int devid)
         /* Filter-out non-rw channels: */
         /* 1. Find first rw channel */
         while (n    < dev_p->count  &&
-               cxsd_hw_channels[dev_p->first + n   ].rw == 0) n++;
+               (cxsd_hw_channels[dev_p->first + n   ].rw |
+                cxsd_hw_channels[dev_p->first + n   ].rw_readonly) == 0) n++;
         /* 2. Find last rw channel */
         last = n;
         while (last < dev_p->count  &&
-               cxsd_hw_channels[dev_p->first + last].rw != 0) last++;
+               (cxsd_hw_channels[dev_p->first + last].rw |
+                cxsd_hw_channels[dev_p->first + last].rw_readonly) != 0) last++;
 
         seglen = last - n;
         if (seglen == 0) break;

@@ -2685,7 +2685,7 @@ void  cda_dat_p_update_dataset     (cda_srvconn_t  sid,
                     CX_TIME_IS_AFTER(delta, ri->fresh_age))
                 {
                     ri->rflags |= CXCF_FLAG_DEFUNCT;
-                    //fprintf(stderr, "d=%ld,%ld (%ld,%ld)-(%ld,%ld) >%d,%d ch=%s\n", delta.sec, delta.nsec, curtime.sec, curtime.nsec, ri->timestamp.sec, ri->timestamp.nsec, ri->fresh_age.sec, ri->fresh_age.nsec, ri->reference);
+                    //fprintf(stderr, "d=%ld,%09ld (%ld.%09ld)-(%ld.%09ld) >%d,%d ch=%s\n", delta.sec, delta.nsec, curtime.sec, curtime.nsec, ri->timestamp.sec, ri->timestamp.nsec, ri->fresh_age.sec, ri->fresh_age.nsec, ri->reference);
                 }
             }
             else if (timestamps[x].sec == CX_TIME_SEC_NEVER_READ)

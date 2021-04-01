@@ -350,14 +350,14 @@ static void insrv_fd_p(int uniq, void *privptr1,
   cxsd_gchnid_t          dummy_gcid;
   int                    phys_count;
   double                 rds_buf[RDS_MAX_COUNT*2];
-  char                  *ident;
-  char                  *label;
-  char                  *tip;
-  char                  *comment;
-  char                  *geoinfo;
-  char                  *rsrvd6;
-  char                  *units;
-  char                  *dpyfmt;
+  const char            *ident;
+  const char            *label;
+  const char            *tip;
+  const char            *comment;
+  const char            *geoinfo;
+  const char            *rsrvd6;
+  const char            *units;
+  const char            *dpyfmt;
 
     for (repcount = 100;  repcount > 0;  repcount--)
     {
@@ -456,14 +456,14 @@ static int  cda_d_insrv_new_chan(cda_dataref_t ref, const char *name,
   cxsd_gchnid_t          gcid;
   int                    phys_count;
   double                 rds_buf[RDS_MAX_COUNT*2];
-  char                  *ident;
-  char                  *label;
-  char                  *tip;
-  char                  *comment;
-  char                  *geoinfo;
-  char                  *rsrvd6;
-  char                  *units;
-  char                  *dpyfmt;
+  const char            *ident;
+  const char            *label;
+  const char            *tip;
+  const char            *comment;
+  const char            *geoinfo;
+  const char            *rsrvd6;
+  const char            *units;
+  const char            *dpyfmt;
 
   cda_hwcnref_t          hwr;
   hwrinfo_t             *hi;

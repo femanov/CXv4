@@ -268,7 +268,11 @@ void  PzframeGuiUpdate     (pzframe_gui_t *gui, int info_changed)
 
     /* Display current params */
     for (cn = 0;  cn < ftd->chan_count;  cn++)
-        if (gui->k_params[cn] != NULL)
+        if (gui->k_params[cn] != NULL  &&
+            /* Opposite to PzframeDataRealize() condition for 
+               individually-updated channels, for their knobs to
+               NOT be touched along with on-data-updated ones. */
+            (ftd->chan_dscrs[cn].chan_type & PZFRAME_CHAN_IMMEDIATE_MASK) == 0)
             UpdateParamKnob(gui, cn);
 
     /* Renew displayed data */

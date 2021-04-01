@@ -1,0 +1,7 @@
+devtype target10 r5i,w5i {
+	r<0-2>	0
+	w<5-7>	5
+}
+
+dev target target10/noop   ~ -
+dev bridge target10/bridge ~ - @*:cx::localhost:5.target

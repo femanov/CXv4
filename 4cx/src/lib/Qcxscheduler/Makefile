@@ -38,11 +38,25 @@ else
     DUMMY := $(warning INFO: Qt versions: $(QTS))
     ifneq "$(findstring qt5,$(QTS))" ""
       DUMMY := $(warning Qt5 found))
-      QMAKE_QT5 = qtchooser -qt=qt5 -run-tool=qmake
+      QMAKE_QT5 := qtchooser -qt=qt5 -run-tool=qmake
+      qt5_test := $(shell $(QMAKE_QT5) -v)
+      ifeq "$(findstring version,$(qt5_test))" ""
+        DUMMY := $(warning Qt5 found, but no qmake))
+        QMAKE_QT5 :=
+      else
+        DUMMY := $(warning Qt5 qmake found))
+      endif
     endif
     ifneq "$(findstring qt4,$(QTS))" ""
       DUMMY := $(warning Qt4 found))
       QMAKE_QT4 = qtchooser -qt=qt4 -run-tool=qmake
+      qt4_test := $(shell $(QMAKE_QT4) -v)
+      ifeq "$(findstring version,$(qt4_test))" ""
+        DUMMY := $(warning Qt4 found, but no qmake))
+        QMAKE_QT4 :=
+      else
+        DUMMY := $(warning Qt4 qmake found))
+      endif
     endif
   else
     DUMMY:= $(warning WARNING: $(QTCHOOSER) is absent, trying to use qmakes)

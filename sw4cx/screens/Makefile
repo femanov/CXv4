@@ -1,3 +1,9 @@
+vepp4_CLIENTS=	
+vepp5_CLIENTS=	
+weld_CLIENTS=	baachi verona weldcc xweldcc lhebwcc
+liu_CLIENTS=	liu
+common_CLIENTS=	ist_cdac20 v1k_cdac20 v3h_a40d16 mps20_ceac124 \
+		gid25x4
 CLIENTS=	rfsyn_eng v5rfsyn v5ie v5kls v5cnv \
 		linmag linvac linthermcan linslbpms linipp lin485s linrf_smc \
 		ringmag ringcor23 ringcor45 ringrf ringcurmon \
@@ -9,13 +15,14 @@ CLIENTS=	rfsyn_eng v5rfsyn v5ie v5kls v5cnv \
 		ttv \
 		ist_cdac20 v1k_cdac20 v3h_a40d16 mps20_ceac124 \
 		v5p2camera \
-		modbus_tcp_rb \
+		modbus_tcp_rb rfmeas_l_timer \
 		k500gid25s \
 		v5k500vepp4 \
-		gid25x4 v4gid25s v4k500mag \
+		gid25x4 v4gid25s v4k500mag v4k500 \
 		vepp34info vepp5info \
 		v5ringcurmon4v4 \
 		baachi verona weldcc xweldcc lhebwcc
+#CLIENTS=	$(sort $(foreach P, $(PARTS), $($(P)_CLIENTS)) )
 AUX_SCREEN_FILES=	subsys_magx_macros.m4 gid25_subsys_macros.m4
 
 EXPORTSFILES3=	weld_mes_up_mv2mka.lst
@@ -23,7 +30,6 @@ EXPORTSDIR3=	settings/common
 
 #---
 CLIENTS+=	liu
-V4HDIR=		$(PRJDIR)/../hw4cx
 LOCAL_BCKPFILES+= panov_ubs.m4 kshd485.m4 dl200me_f.m4
 AUX_SCREEN_FILES+=panov_ubs.m4 kshd485.m4 dl200me_f.m4
 #---

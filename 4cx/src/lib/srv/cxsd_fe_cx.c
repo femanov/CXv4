@@ -141,7 +141,10 @@ typedef struct
 
     /* Data buffers */
     CxV4Header      *replybuf;
-    size_t           replybufsize;
+    size_t           replybufsize;    // Amount of memory ALLOCATED for replybuf
+
+    int              rpycn;           // RePlY chunk # (total # at end)
+    size_t           replydatasize;   // Current CONSUMED size in replybuf
 
     moninfo_t       *monitors_list;
     int              monitors_list_allocd;
@@ -355,9 +358,9 @@ static int sanitize_strzcpy(char *dst, size_t dst_size,
 
 //////////////////////////////////////////////////////////////////////
 
-static int  InitReplyPacket (v4clnt_t *cp, int32 code, int32 Seq)
+static int   InitReplyPacket (v4clnt_t *cp, int32 code, int32 Seq)
 {
-    if (cp->replybuf->Type != 0) return -1;
+    if (cp->replybuf->Type != 0) {fprintf(stderr, "cp->replybuf->Type=%d\n", cp->replybuf->Type); return +1;}
 
     bzero(cp->replybuf, sizeof(CxV4Header));
 
@@ -365,24 +368,44 @@ static int  InitReplyPacket (v4clnt_t *cp, int32 code, int32 Seq)
     cp->replybuf->ID   = clnt_u32(cp, cp->ID);
     cp->replybuf->Seq  = Seq; /* Direct copy -- no need for (double) conversion */
 
+    cp->rpycn          = 0;
+    cp->replydatasize  = 0;
+
     return 0;
 }
 
-static int  GrowReplyPacket (v4clnt_t *cp, size_t datasize)
+static void *GrowReplyPacket (v4clnt_t *cp, size_t rpycsize)
 {
-  int r;
+  int     r;
+  size_t  old_replydatasize;
+  size_t  new_replydatasize;
 
+    old_replydatasize = cp->replydatasize;
+    new_replydatasize = old_replydatasize + rpycsize;
     r = GrowBuf((void *) &(cp->replybuf), &(cp->replybufsize),
-                sizeof(CxV4Header) + datasize);
-    if (r < 0) return r;
+                sizeof(CxV4Header) + new_replydatasize);
+    if (r < 0) return NULL;
+
+    cp->rpycn++;
+    cp->replydatasize = new_replydatasize;
+
+    return (void*)(cp->replybuf->data + old_replydatasize);
+}
+
+static int   DropReplyPacket (v4clnt_t *cp)
+{
+    cp->replybuf->Type = 0;  // Switch replybuf back to "free" (not busy) state
 
     return 0;
 }
 
-static void DisconnectClient(v4clnt_t *cp, int err, uint32 code);  /*!!! Shoule better reorder definitions somehow... */
-static int  SendReplyPacket (v4clnt_t *cp, size_t datasize)
+static void DisconnectClient(v4clnt_t *cp, int err, uint32 code);  /*!!! Should better reorder definitions somehow... */
+static int   SendReplyPacket (v4clnt_t *cp)
 {
-    if (fdio_send(cp->fhandle, cp->replybuf, sizeof(CxV4Header) + datasize) != 0)
+    cp->replybuf->DataSize  = clnt_u32(cp, cp->replydatasize);
+    cp->replybuf->NumChunks = clnt_u32(cp, cp->rpycn);
+
+    if (fdio_send(cp->fhandle, cp->replybuf, sizeof(CxV4Header) + cp->replydatasize) != 0)
     {
         DisconnectClient(cp, errno, 0);
         return -1;
@@ -485,7 +508,6 @@ static int CreateGuruSockets(void)
   int                 r;                /* Result of system calls */
   struct sockaddr_in  iaddr;            /* Address to bind `inet_guru_socket' to */
   struct sockaddr_un  uaddr;            /* Address to bind `unix_guru_socket' to */
-  int                 on     = 1;       /* "1" for REUSE_ADDR */
   char                unix_name[PATH_MAX]; /* Buffer to hold unix socket name */
 
     /* 1. INET/DGRAM socket */
@@ -496,7 +518,6 @@ static int CreateGuruSockets(void)
         return -1;
 
     /* Bind it to the name */
-    //setsockopt(inet_guru_socket, SOL_SOCKET, SO_REUSEADDR, &on, sizeof(on));
     iaddr.sin_family      = AF_INET;
     iaddr.sin_addr.s_addr = htonl(INADDR_ANY);
     iaddr.sin_port        = htons(CX_V4_INET_RESOLVER);
@@ -1555,20 +1576,16 @@ static cxsd_gchnid_t cpid2gcid(cxsd_cpntid_t  cpid)
 #define PUT_ERROR_CHUNK_REPLY(errcode)                             \
     do {                                                           \
         rpycsize = CXV4_CHUNK_CEIL(sizeof(CxV4Chunk));             \
-        if (GrowReplyPacket(cp, replydatasize + rpycsize) != 0)    \
+        if ((rpy = GrowReplyPacket(cp, rpycsize)) == NULL)         \
             {break;/*!!!*/}                                        \
-        rpy = (void*)(cp->replybuf->data + replydatasize);         \
         bzero(rpy, sizeof(*rpy));                                  \
         rpy->OpCode   = clnt_u32(cp, CXC_CVT_TO_RPY(OpCode));      \
         rpy->ByteSize = clnt_u32(cp, rpycsize);                    \
         rpy->param1   = req->param1;                               \
         rpy->param2   = req->param2;                               \
-                                                                   \
-        replydatasize += rpycsize;                                 \
-        rpycn++;                                                   \
     } while (0)
 
-typedef size_t (put_reply_chunk_t)(v4clnt_t *cp, size_t replydatasize,
+typedef size_t (put_reply_chunk_t)(v4clnt_t *cp,
                                    int param1, int param2,
                                    cxsd_cpntid_t cpid, uint32 Seq,
                                    int info_int);
@@ -1577,34 +1594,29 @@ static int  SendAReply(v4clnt_t *cp, moninfo_t *mp,
                        put_reply_chunk_t chunk_maker,
                        int info_int)
 {
-  int        rpycn;           // RePlY chunk # (total # at end)
-  size_t     rpycsize;        // RePlY chunk size in bytes
-  size_t     replydatasize;
+  int        irp_r;
+  int        cnk_r;
 
-    if (InitReplyPacket(cp, CXT4_DATA_MONITOR, mp->Seq) != 0) return 0;
-    rpycn         = 0;
-    replydatasize = 0;
+    irp_r = InitReplyPacket(cp, CXT4_DATA_MONITOR, mp->Seq);
+    if (irp_r < 0) return -1;
 
-    rpycsize = chunk_maker(cp, replydatasize,
-                           mp->param1, mp->param2,
-                           mp->cpid,
-                           mp->Seq,
-                           info_int);
-    if (rpycsize == 0)
+    cnk_r = chunk_maker(cp,
+                        mp->param1, mp->param2,
+                        mp->cpid,
+                        mp->Seq,
+                        info_int);
+    if (cnk_r == 0)
 #if 1
+    {
+        if (irp_r == 0) DropReplyPacket(cp);
         return -1;
+    }
 #else
         PUT_ERROR_CHUNK_REPLY(0);
 #endif
-    else
-    {
-        replydatasize += rpycsize;
-        rpycn++;
-    }
-    cp->replybuf->DataSize  = clnt_u32(cp, replydatasize);
-    cp->replybuf->NumChunks = clnt_u32(cp, rpycn);
-    
-    if (SendReplyPacket(cp, replydatasize) != 0) return -1;
+
+    if (irp_r == 0)    
+        if (SendReplyPacket(cp) != 0) return -1;
 
     return 0;
 }
@@ -1612,9 +1624,9 @@ static int  SendAReply(v4clnt_t *cp, moninfo_t *mp,
 
 /*
       PutDataChunkReply()
-          Returns size of chunk, 0 upon error.
+          Returns +1 on success, 0 upon error.
  */
-static size_t PutDataChunkReply(v4clnt_t *cp, size_t replydatasize,
+static size_t PutDataChunkReply(v4clnt_t *cp,
                                 int param1, int param2,
                                 cxsd_cpntid_t cpid, uint32 Seq,
                                 int info_int)
@@ -1638,10 +1650,9 @@ static size_t PutDataChunkReply(v4clnt_t *cp, size_t replydatasize,
     datasize = chn_p->usize * chn_p->current_nelems;
 #endif
     rpycsize = CXV4_CHUNK_CEIL(sizeof(*rslt) + datasize);
-    if (GrowReplyPacket(cp, replydatasize + rpycsize) != 0)
+    if ((rslt = GrowReplyPacket(cp, rpycsize)) == NULL)
         {/*!!!*/return 0;}
 
-    rslt = (void*)(cp->replybuf->data + replydatasize);
     bzero(rslt, sizeof(*rslt));
     rslt->ck.OpCode   = clnt_u32(cp, info_int);
     rslt->ck.ByteSize = clnt_u32(cp, rpycsize);
@@ -1664,10 +1675,10 @@ static size_t PutDataChunkReply(v4clnt_t *cp, size_t replydatasize,
     if (datasize != 0) memcpy(rslt->data, chn_p->current_val, datasize);
 ////fprintf(stderr, "%s() gcid=%d code=%08x (CUR=%08x,NEW=%08x) ts=%ld\n", __FUNCTION__, gcid, info_int, CXC_CURVAL, CXC_NEWVAL, cxsd_hw_channels[gcid].timestamp.sec);
 
-    return rpycsize;
+    return +1;
 }
 
-static size_t PutStrsChunkReply(v4clnt_t *cp, size_t replydatasize,
+static size_t PutStrsChunkReply(v4clnt_t *cp,
                                 int param1, int param2,
                                 cxsd_cpntid_t cpid, uint32 Seq,
                                 int info_int)
@@ -1676,7 +1687,7 @@ static size_t PutStrsChunkReply(v4clnt_t *cp, size_t replydatasize,
   CxV4StrsChunk         *strd;
 
   cxsd_gchnid_t          dummy_gcid;
-  char                  *strings[8];
+  const char            *strings[8];
   int                    n;
   size_t                 strsize;
   size_t                 ofs;
@@ -1696,10 +1707,9 @@ static size_t PutStrsChunkReply(v4clnt_t *cp, size_t replydatasize,
         if (strings[n] != NULL) strsize += strlen(strings[n]) + 1;
 
     rpycsize = CXV4_CHUNK_CEIL(sizeof(*strd) + strsize);
-    if (GrowReplyPacket(cp, replydatasize + rpycsize) != 0)
+    if ((strd = GrowReplyPacket(cp, rpycsize)) == NULL)
         /*!!!*/return 0;
 
-    strd = (void*)(cp->replybuf->data + replydatasize);
     bzero(strd, sizeof(*strd));
     strd->ck.OpCode   = clnt_u32(cp, CXC_CVT_TO_RPY(CXC_STRS));
     strd->ck.ByteSize = clnt_u32(cp, rpycsize);
@@ -1720,10 +1730,10 @@ static size_t PutStrsChunkReply(v4clnt_t *cp, size_t replydatasize,
             strd->offsets[n] = clnt_i32(cp, -1);
     }
 
-    return rpycsize;
+    return +1;
 }
 
-static size_t PutRDsChunkReply (v4clnt_t *cp, size_t replydatasize,
+static size_t PutRDsChunkReply (v4clnt_t *cp,
                                 int param1, int param2,
                                 cxsd_cpntid_t cpid, uint32 Seq,
                                 int info_int)
@@ -1742,10 +1752,9 @@ static size_t PutRDsChunkReply (v4clnt_t *cp, size_t replydatasize,
                           NULL, NULL, NULL, NULL,
                           NULL, NULL, NULL, NULL) < 0) return 0;
     rpycsize = CXV4_CHUNK_CEIL(sizeof(*rdsl) + sizeof(float64) * phys_count * 2);
-    if (GrowReplyPacket(cp, replydatasize + rpycsize) != 0)
+    if ((rdsl = GrowReplyPacket(cp, rpycsize)) == NULL)
         /*!!!*/return 0;
 
-    rdsl = (void*)(cp->replybuf->data + replydatasize);
     bzero(rdsl, sizeof(*rdsl));
     rdsl->ck.OpCode   = clnt_u32(cp, CXC_CVT_TO_RPY(CXC_RDS));
     rdsl->ck.ByteSize = clnt_u32(cp, rpycsize);
@@ -1759,10 +1768,10 @@ static size_t PutRDsChunkReply (v4clnt_t *cp, size_t replydatasize,
         *f64p = rds_buf[x];
     }
 
-    return rpycsize;
+    return +1;
 }
 
-static size_t PutFrAgChunkReply(v4clnt_t *cp, size_t replydatasize,
+static size_t PutFrAgChunkReply(v4clnt_t *cp,
                                 int param1, int param2,
                                 cxsd_cpntid_t cpid, uint32 Seq,
                                 int info_int)
@@ -1777,10 +1786,9 @@ static size_t PutFrAgChunkReply(v4clnt_t *cp, size_t replydatasize,
     chn_p = cxsd_hw_channels + gcid;
 
     rpycsize = CXV4_CHUNK_CEIL(sizeof(*frsh));
-    if (GrowReplyPacket(cp, replydatasize + rpycsize) != 0)
+    if ((frsh = GrowReplyPacket(cp, rpycsize)) == NULL)
         {/*!!!*/return 0;}
 
-    frsh = (void*)(cp->replybuf->data + replydatasize);
     bzero(frsh, sizeof(*frsh));
     frsh->ck.OpCode   = clnt_u32(cp, CXC_CVT_TO_RPY(CXC_FRH_AGE));
     frsh->ck.ByteSize = clnt_u32(cp, rpycsize);
@@ -1790,10 +1798,10 @@ static size_t PutFrAgChunkReply(v4clnt_t *cp, size_t replydatasize,
     frsh->fresh_age_sec_lo32 = clnt_u32(cp, chn_p->fresh_age.sec);
     frsh->fresh_age_sec_hi32 = clnt_u32(cp, 0); /*!!!*/
 
-    return rpycsize;
+    return +1;
 }
 
-static size_t PutQuantChunkReply(v4clnt_t *cp, size_t replydatasize,
+static size_t PutQuantChunkReply(v4clnt_t *cp,
                                 int param1, int param2,
                                 cxsd_cpntid_t cpid, uint32 Seq,
                                 int info_int)
@@ -1820,10 +1828,9 @@ static size_t PutQuantChunkReply(v4clnt_t *cp, size_t replydatasize,
     }
 
     rpycsize = CXV4_CHUNK_CEIL(sizeof(*qunt));
-    if (GrowReplyPacket(cp, replydatasize + rpycsize) != 0)
+    if ((qunt = GrowReplyPacket(cp, rpycsize)) == NULL)
         {/*!!!*/return 0;}
 
-    qunt = (void*)(cp->replybuf->data + replydatasize);
     bzero(qunt, sizeof(*qunt));
     qunt->ck.OpCode   = clnt_u32(cp, CXC_CVT_TO_RPY(CXC_NT_QUANT));
     qunt->ck.ByteSize = clnt_u32(cp, rpycsize);
@@ -1833,10 +1840,10 @@ static size_t PutQuantChunkReply(v4clnt_t *cp, size_t replydatasize,
     /*!!! ENDIAN!!! do conversion, in a CORRECT way (q_dsize bytes) */
     memcpy(qunt->q_data, &(chn_p->q), sizeof(qunt->q_data));
 
-    return rpycsize;
+    return +1;
 }
 
-static size_t PutRangeChunkReply(v4clnt_t *cp, size_t replydatasize,
+static size_t PutRangeChunkReply(v4clnt_t *cp,
                                 int param1, int param2,
                                 cxsd_cpntid_t cpid, uint32 Seq,
                                 int info_int)
@@ -1863,10 +1870,9 @@ static size_t PutRangeChunkReply(v4clnt_t *cp, size_t replydatasize,
     }
 
     rpycsize = CXV4_CHUNK_CEIL(sizeof(*rnge));
-    if (GrowReplyPacket(cp, replydatasize + rpycsize) != 0)
+    if ((rnge = GrowReplyPacket(cp, rpycsize)) == NULL)
         {/*!!!*/return 0;}
 
-    rnge = (void*)(cp->replybuf->data + replydatasize);
     bzero(rnge, sizeof(*rnge));
     rnge->ck.OpCode   = clnt_u32(cp, CXC_CVT_TO_RPY(CXC_RANGE));
     rnge->ck.ByteSize = clnt_u32(cp, rpycsize);
@@ -1877,10 +1883,10 @@ static size_t PutRangeChunkReply(v4clnt_t *cp, size_t replydatasize,
     memcpy(rnge->range_min, &(chn_p->range[0]), sizeof(rnge->range_min));
     memcpy(rnge->range_max, &(chn_p->range[1]), sizeof(rnge->range_max));
 
-    return rpycsize;
+    return +1;
 }
 
-static size_t PutLkStChunkReply(v4clnt_t *cp, size_t replydatasize,
+static size_t PutLkStChunkReply(v4clnt_t *cp,
                                 int param1, int param2,
                                 cxsd_cpntid_t cpid, uint32 Seq,
                                 int info_int)
@@ -1895,10 +1901,9 @@ static size_t PutLkStChunkReply(v4clnt_t *cp, size_t replydatasize,
     chn_p = cxsd_hw_channels + gcid;
 
     rpycsize = CXV4_CHUNK_CEIL(sizeof(*lkop));
-    if (GrowReplyPacket(cp, replydatasize + rpycsize) != 0)
+    if ((lkop = GrowReplyPacket(cp, rpycsize)) == NULL)
         {/*!!!*/return 0;}
 
-    lkop = (void*)(cp->replybuf->data + replydatasize);
     bzero(lkop, sizeof(*lkop));
     lkop->ck.OpCode   = clnt_u32(cp, CXC_CVT_TO_RPY(CXC_LOCK_OP));
     lkop->ck.ByteSize = clnt_u32(cp, rpycsize);
@@ -1907,11 +1912,11 @@ static size_t PutLkStChunkReply(v4clnt_t *cp, size_t replydatasize,
     lkop->cpid        = clnt_i32(cp, cpid);
     lkop->lockstat_result = clnt_u32(cp, chn_p->locker == cp->ID);
 
-    return rpycsize;
+    return +1;
 }
 
 
-typedef size_t (*put_nt_chunk_t)(v4clnt_t  *cp, size_t replydatasize,
+typedef size_t (*put_nt_chunk_t)(v4clnt_t  *cp,
                                  moninfo_t *mp,
                                  int info_int);
 
@@ -1919,35 +1924,30 @@ static int  SendNotification(v4clnt_t *cp, moninfo_t *mp,
                              put_nt_chunk_t  chunk_maker,
                              int info_int)
 {
-  int        rpycn;           // RePlY chunk # (total # at end)
-  size_t     rpycsize;        // RePlY chunk size in bytes
-  size_t     replydatasize;
+  int        irp_r;
+  int        cnk_r;
 
-    if (InitReplyPacket(cp, CXT4_DATA_MONITOR, mp->Seq) != 0) return;
-    rpycn         = 0;
-    replydatasize = 0;
+    irp_r = InitReplyPacket(cp, CXT4_DATA_MONITOR, mp->Seq);
+    if (irp_r < 0) return -1;
 
-    rpycsize = chunk_maker(cp, replydatasize, mp, info_int);
-    if (rpycsize == 0)
+    cnk_r = chunk_maker(cp, mp, info_int);
+    if (cnk_r == 0)
 #if 1
+    {
+        if (irp_r == 0) DropReplyPacket(cp);
         return -1;
+    }
 #else
         PUT_ERROR_CHUNK_REPLY(0);
 #endif
-    else
-    {
-        replydatasize += rpycsize;
-        rpycn++;
-    }
-    cp->replybuf->DataSize  = clnt_u32(cp, replydatasize);
-    cp->replybuf->NumChunks = clnt_u32(cp, rpycn);
     
-    if (SendReplyPacket(cp, replydatasize) != 0) return -1;
+    if (irp_r == 0)    
+        if (SendReplyPacket(cp) != 0) return -1;
 
     return 0;
 }
 
-static size_t Put_NT_AVALUE_Chunk  (v4clnt_t *cp, size_t replydatasize,
+static size_t Put_NT_AVALUE_Chunk  (v4clnt_t *cp,
                                     moninfo_t *mp,
                                     int info_int)
 {
@@ -1970,10 +1970,9 @@ static size_t Put_NT_AVALUE_Chunk  (v4clnt_t *cp, size_t replydatasize,
     datasize = chn_p->usize * chn_p->current_nelems;
 #endif
     rpycsize = CXV4_CHUNK_CEIL(sizeof(*aval) + datasize);
-    if (GrowReplyPacket(cp, replydatasize + rpycsize) != 0)
+    if ((aval = GrowReplyPacket(cp, rpycsize)) == NULL)
         {/*!!!*/return 0;}
 
-    aval = (void*)(cp->replybuf->data + replydatasize);
     bzero(aval, sizeof(*aval));
     aval->ck.OpCode   = clnt_u32(cp, info_int);
     aval->ck.ByteSize = clnt_u32(cp, rpycsize);
@@ -1996,10 +1995,10 @@ static size_t Put_NT_AVALUE_Chunk  (v4clnt_t *cp, size_t replydatasize,
     if (datasize != 0) memcpy(aval->data, chn_p->current_val, datasize);
 ////fprintf(stderr, "%s() gcid=%d code=%08x (CUR=%08x,NEW=%08x) ts=%ld\n", __FUNCTION__, gcid, info_int, CXC_CURVAL, CXC_NEWVAL, cxsd_hw_channels[gcid].timestamp.sec);
 
-    return rpycsize;
+    return +1;
 }
 
-static size_t Put_NT_STRS_Chunk    (v4clnt_t *cp, size_t replydatasize,
+static size_t Put_NT_STRS_Chunk    (v4clnt_t *cp,
                                     moninfo_t *mp,
                                     int info_int)
 {
@@ -2007,7 +2006,7 @@ static size_t Put_NT_STRS_Chunk    (v4clnt_t *cp, size_t replydatasize,
   CxV4_NT_STRS_Chunk    *strc;
 
   cxsd_gchnid_t          dummy_gcid;
-  char                  *strings[8];
+  const char            *strings[8];
   int                    n;
   size_t                 strsize;
   size_t                 ofs;
@@ -2027,10 +2026,9 @@ static size_t Put_NT_STRS_Chunk    (v4clnt_t *cp, size_t replydatasize,
         if (strings[n] != NULL) strsize += strlen(strings[n]) + 1;
 
     rpycsize = CXV4_CHUNK_CEIL(sizeof(*strc) + strsize);
-    if (GrowReplyPacket(cp, replydatasize + rpycsize) != 0)
+    if ((strc = GrowReplyPacket(cp, rpycsize)) == NULL)
         /*!!!*/return 0;
 
-    strc = (void*)(cp->replybuf->data + replydatasize);
     bzero(strc, sizeof(*strc));
     strc->ck.OpCode   = clnt_u32(cp, CXC_NT_STRS);
     strc->ck.ByteSize = clnt_u32(cp, rpycsize);
@@ -2052,10 +2050,10 @@ static size_t Put_NT_STRS_Chunk    (v4clnt_t *cp, size_t replydatasize,
             strc->offsets[n] = clnt_i32(cp, -1);
     }
 
-    return rpycsize;
+    return +1;
 }
 
-static size_t Put_NT_RDS_Chunk     (v4clnt_t *cp, size_t replydatasize,
+static size_t Put_NT_RDS_Chunk     (v4clnt_t *cp,
                                     moninfo_t *mp,
                                     int info_int)
 {
@@ -2073,10 +2071,9 @@ static size_t Put_NT_RDS_Chunk     (v4clnt_t *cp, size_t replydatasize,
                           NULL, NULL, NULL, NULL,
                           NULL, NULL, NULL, NULL) < 0) return 0;
     rpycsize = CXV4_CHUNK_CEIL(sizeof(*rpy) + sizeof(float64) * phys_count * 2);
-    if (GrowReplyPacket(cp, replydatasize + rpycsize) != 0)
+    if ((rpy = GrowReplyPacket(cp, rpycsize)) == NULL)
         /*!!!*/return 0;
 
-    rpy = (void*)(cp->replybuf->data + replydatasize);
     bzero(rpy, sizeof(*rpy));
     rpy->OpCode   = clnt_u32(cp, CXC_NT_RDS);
     rpy->ByteSize = clnt_u32(cp, rpycsize);
@@ -2092,10 +2089,10 @@ static size_t Put_NT_RDS_Chunk     (v4clnt_t *cp, size_t replydatasize,
         *f64p = rds_buf[x];
     }
 
-    return rpycsize;
+    return +1;
 }
 
-static size_t Put_NT_FRH_AGE_Chunk (v4clnt_t *cp, size_t replydatasize,
+static size_t Put_NT_FRH_AGE_Chunk (v4clnt_t *cp,
                                     moninfo_t *mp,
                                     int info_int)
 {
@@ -2109,10 +2106,9 @@ static size_t Put_NT_FRH_AGE_Chunk (v4clnt_t *cp, size_t replydatasize,
     chn_p = cxsd_hw_channels + gcid;
 
     rpycsize = CXV4_CHUNK_CEIL(sizeof(*rpy));
-    if (GrowReplyPacket(cp, replydatasize + rpycsize) != 0)
+    if ((rpy = GrowReplyPacket(cp, rpycsize)) == NULL)
         {/*!!!*/return 0;}
 
-    rpy = (void*)(cp->replybuf->data + replydatasize);
     bzero(rpy, sizeof(*rpy));
     rpy->OpCode   = clnt_u32(cp, CXC_NT_FRH_AGE);
     rpy->ByteSize = clnt_u32(cp, rpycsize);
@@ -2123,10 +2119,10 @@ static size_t Put_NT_FRH_AGE_Chunk (v4clnt_t *cp, size_t replydatasize,
     rpy->rs3      = clnt_u32(cp, chn_p->fresh_age.sec);
     rpy->rs4      = clnt_u32(cp, 0); /*!!!*/
 
-    return rpycsize;
+    return +1;
 }
 
-static size_t Put_NT_QUANT_Chunk   (v4clnt_t *cp, size_t replydatasize,
+static size_t Put_NT_QUANT_Chunk   (v4clnt_t *cp,
                                     moninfo_t *mp,
                                     int info_int)
 {
@@ -2144,10 +2140,9 @@ static size_t Put_NT_QUANT_Chunk   (v4clnt_t *cp, size_t replydatasize,
     q_dsize = sizeof_cxdtype(chn_p->q_dtype);
 
     rpycsize = CXV4_CHUNK_CEIL(sizeof(*rpy) + q_dsize);
-    if (GrowReplyPacket(cp, replydatasize + rpycsize) != 0)
+    if ((rpy = GrowReplyPacket(cp, rpycsize)) == NULL)
         {/*!!!*/return 0;}
 
-    rpy = (void*)(cp->replybuf->data + replydatasize);
     bzero(rpy, sizeof(*rpy));
     rpy->OpCode   = clnt_u32(cp, CXC_NT_QUANT);
     rpy->ByteSize = clnt_u32(cp, rpycsize);
@@ -2158,10 +2153,10 @@ static size_t Put_NT_QUANT_Chunk   (v4clnt_t *cp, size_t replydatasize,
     /*!!! ENDIAN!!! do conversion, in a CORRECT way (q_dsize bytes) */
     memcpy(rpy->data, &(chn_p->q), q_dsize);
 
-    return rpycsize;
+    return +1;
 }
 
-static size_t Put_NT_RANGE_Chunk   (v4clnt_t *cp, size_t replydatasize,
+static size_t Put_NT_RANGE_Chunk   (v4clnt_t *cp,
                                     moninfo_t *mp,
                                     int info_int)
 {
@@ -2179,25 +2174,24 @@ static size_t Put_NT_RANGE_Chunk   (v4clnt_t *cp, size_t replydatasize,
     r_dsize = sizeof_cxdtype(chn_p->range_dtype);
 
     rpycsize = CXV4_CHUNK_CEIL(sizeof(*rpy) + r_dsize);
-    if (GrowReplyPacket(cp, replydatasize + rpycsize) != 0)
+    if ((rpy = GrowReplyPacket(cp, rpycsize)) == NULL)
         {/*!!!*/return 0;}
 
-    rpy = (void*)(cp->replybuf->data + replydatasize);
     bzero(rpy, sizeof(*rpy));
     rpy->OpCode   = clnt_u32(cp, CXC_NT_RANGE);
     rpy->ByteSize = clnt_u32(cp, rpycsize);
     rpy->param1   = mp->param1;
     rpy->param2   = mp->param2;
     rpy->rs1      = mp2chnd(cp, mp);
-    rpy->rs2      = clnt_u32(cp, chn_p->q_dtype);
+    rpy->rs2      = clnt_u32(cp, chn_p->range_dtype);
     /*!!! ENDIAN!!! do conversion, in a CORRECT way (r_dsize bytes) */
     memcpy(rpy->data,           &(chn_p->range[0]), r_dsize);
     memcpy(rpy->data + r_dsize, &(chn_p->range[1]), r_dsize);
 
-    return rpycsize;
+    return +1;
 }
 
-static size_t Put_NT_LOCKSTAT_Chunk(v4clnt_t *cp, size_t replydatasize,
+static size_t Put_NT_LOCKSTAT_Chunk(v4clnt_t *cp,
                                     moninfo_t *mp,
                                     int info_int)
 {
@@ -2211,10 +2205,9 @@ static size_t Put_NT_LOCKSTAT_Chunk(v4clnt_t *cp, size_t replydatasize,
     chn_p = cxsd_hw_channels + gcid;
 
     rpycsize = CXV4_CHUNK_CEIL(sizeof(*rpy));
-    if (GrowReplyPacket(cp, replydatasize + rpycsize) != 0)
+    if ((rpy = GrowReplyPacket(cp, rpycsize)) == NULL)
         {/*!!!*/return 0;}
 
-    rpy = (void*)(cp->replybuf->data + replydatasize);
     bzero(rpy, sizeof(*rpy));
     rpy->OpCode   = clnt_u32(cp, CXC_NT_LOCKSTAT);
     rpy->ByteSize = clnt_u32(cp, rpycsize);
@@ -2223,7 +2216,7 @@ static size_t Put_NT_LOCKSTAT_Chunk(v4clnt_t *cp, size_t replydatasize,
     rpy->rs1      = mp2chnd(cp, mp);
     rpy->rs2      = clnt_u32(cp, chn_p->locker == cp->ID);
 
-    return rpycsize;
+    return +1;
 }
 
 typedef struct
@@ -2232,7 +2225,7 @@ typedef struct
     size_t     reqlen;
 } hack_req_info_t;
 static hack_req_info_t *hack_req_info_ptr = NULL;
-static size_t Put_NT_OPEN_nnn_Chunk(v4clnt_t *cp, size_t replydatasize,
+static size_t Put_NT_OPEN_nnn_Chunk(v4clnt_t *cp,
                                     moninfo_t *mp,
                                     int info_int)
 {
@@ -2286,10 +2279,9 @@ static size_t Put_NT_OPEN_nnn_Chunk(v4clnt_t *cp, size_t replydatasize,
     }
 
     rpycsize = CXV4_CHUNK_CEIL(sizeof(*opnc) + reqlen);
-    if (GrowReplyPacket(cp, replydatasize + rpycsize) != 0)
+    if ((opnc = GrowReplyPacket(cp, rpycsize)) == NULL)
         {/*!!!*/return 0;}
 
-    opnc = (void*)(cp->replybuf->data + replydatasize);
     bzero(opnc, sizeof(*opnc));
     opnc->ck.OpCode   = clnt_u32(cp, info_int);
     opnc->ck.ByteSize = clnt_u32(cp, rpycsize);
@@ -2302,7 +2294,7 @@ static size_t Put_NT_OPEN_nnn_Chunk(v4clnt_t *cp, size_t replydatasize,
     opnc->max_nelems  = clnt_i32(cp, v_max_nelems);
     if (reqlen != 0) memcpy(opnc->name, req->data, reqlen);
 
-    return rpycsize;
+    return +1;
 }
 
 static void MonEvproc(int            uniq,
@@ -2315,10 +2307,6 @@ static void MonEvproc(int            uniq,
   int        id = ptr2lint(privptr2);
   v4clnt_t  *cp = AccessV4connSlot(cd);
   moninfo_t *mp = AccessMonSlot(id, cp);
-
-  int        rpycn;           // RePlY chunk # (total # at end)
-  size_t     rpycsize;        // RePlY chunk size in bytes
-  size_t     replydatasize;
 
     if      (reason == CXSD_HW_CHAN_R_UPDATE)
     {
@@ -2375,10 +2363,6 @@ static void CHNEvproc(int            uniq,
   int        id = ptr2lint(privptr2);
   v4clnt_t  *cp = AccessV4connSlot(cd);
   moninfo_t *mp = AccessMonSlot(id, cp);
-
-  int        rpycn;           // RePlY chunk # (total # at end)
-  size_t     rpycsize;        // RePlY chunk size in bytes
-  size_t     replydatasize;
 
     if      (reason == CXSD_HW_CHAN_R_UPDATE)
     {
@@ -2687,13 +2671,12 @@ static void ServeIORequest(v4clnt_t *cp, CxV4Header *hdr, size_t inpktsize)
   CxV4Chunk *req;
   CxV4Chunk *rpy;
   int        reqcn;           // REQuest chunk # (loop ctl var)
-  int        rpycn;           // RePlY chunk # (total # at end)
   size_t     reqcsize;        // REQuest chunk size in bytes
-  size_t     rpycsize;        // RePlY chunk size in bytes
   size_t     reqlen;          // REQuest *data* LENgth in bytes
-  size_t     replydatasize;
   uint32     OpCode;
   int        peekropc;        // cxc_PEEK Reply OPCode
+
+  size_t     rpycsize;        // RePlY chunk size in bytes; used for PUT_ERROR_CHUNK_REPLY() only
 
   CxV4WriteChunk *wrrq;
   CxV4ReadChunk  *rdrq;
@@ -2733,7 +2716,7 @@ static void ServeIORequest(v4clnt_t *cp, CxV4Header *hdr, size_t inpktsize)
     numrqs = host_u32(cp, hdr->NumChunks);
 
     /* Walk through the request */
-    for (reqcn = 0, ptr = hdr->data, rpycn = 0, replydatasize = 0;
+    for (reqcn = 0, ptr = hdr->data;
          reqcn < numrqs;
          reqcn++,   ptr += reqcsize)
     {
@@ -2779,18 +2762,12 @@ static void ServeIORequest(v4clnt_t *cp, CxV4Header *hdr, size_t inpktsize)
 #endif
                                                               )? CXC_NEWVAL
                                                                : CXC_CURVAL;
-                rpycsize = PutDataChunkReply(cp, replydatasize,
-                                             req->param1, req->param2,
-                                             gcid,
-                                             hdr->Seq,
-                                             peekropc);
-                if (rpycsize == 0)
+                if (PutDataChunkReply(cp,
+                                      req->param1, req->param2,
+                                      gcid,
+                                      hdr->Seq,
+                                      peekropc) == 0)
                     PUT_ERROR_CHUNK_REPLY(0);
-                else
-                {
-                    replydatasize += rpycsize;
-                    rpycn++;
-                }
                 break;
 
             case CXC_RQRDC:
@@ -2851,51 +2828,25 @@ static void ServeIORequest(v4clnt_t *cp, CxV4Header *hdr, size_t inpktsize)
                      for its data to be already cached in cxlib
                      upon arrival of RESOLVE-rpy chunk */
 
-                    rpycsize = PutStrsChunkReply (cp, replydatasize,
-                                                  req->param1, req->param2,
-                                                  cpid, hdr->Seq, 0);
-                    if (rpycsize != 0)
-                    {
-                        replydatasize += rpycsize;
-                        rpycn++;
-                    }
-                    rpycsize = PutRDsChunkReply  (cp, replydatasize,
-                                                  req->param1, req->param2,
-                                                  cpid, hdr->Seq, 0);
-                    if (rpycsize != 0)
-                    {
-                        replydatasize += rpycsize;
-                        rpycn++;
-                    }
-                    rpycsize = PutFrAgChunkReply (cp, replydatasize,
-                                                  req->param1, req->param2,
-                                                  cpid, hdr->Seq, 0);
-                    if (rpycsize != 0)
-                    {
-                        replydatasize += rpycsize;
-                        rpycn++;
-                    }
-                    rpycsize = PutQuantChunkReply(cp, replydatasize,
-                                                  req->param1, req->param2,
-                                                  cpid, hdr->Seq, 0);
-                    if (rpycsize != 0)
-                    {
-                        replydatasize += rpycsize;
-                        rpycn++;
-                    }
-                    rpycsize = PutRangeChunkReply(cp, replydatasize,
-                                                  req->param1, req->param2,
-                                                  cpid, hdr->Seq, 0);
-                    if (rpycsize != 0)
-                    {
-                        replydatasize += rpycsize;
-                        rpycn++;
-                    }
+                    PutStrsChunkReply (cp,
+                                       req->param1, req->param2,
+                                       cpid, hdr->Seq, 0);
+                    PutRDsChunkReply  (cp,
+                                       req->param1, req->param2,
+                                       cpid, hdr->Seq, 0);
+                    PutFrAgChunkReply (cp,
+                                       req->param1, req->param2,
+                                       cpid, hdr->Seq, 0);
+                    PutQuantChunkReply(cp,
+                                       req->param1, req->param2,
+                                       cpid, hdr->Seq, 0);
+                    PutRangeChunkReply(cp,
+                                       req->param1, req->param2,
+                                       cpid, hdr->Seq, 0);
 
                     rpycsize = CXV4_CHUNK_CEIL(sizeof(CxV4CpointPropsChunk));
-                    if (GrowReplyPacket(cp, replydatasize + rpycsize) != 0)
+                    if ((rpy = GrowReplyPacket(cp, rpycsize)) == NULL)
                         {/*!!!*/goto NEXT_CHUNK;}
-                    rpy = (void*)(cp->replybuf->data + replydatasize);
                     bzero(rpy, rpycsize);
                     rpy->OpCode   = clnt_u32(cp, CXC_CVT_TO_RPY(OpCode));
                     rpy->ByteSize = clnt_u32(cp, rpycsize);
@@ -2908,9 +2859,6 @@ static void ServeIORequest(v4clnt_t *cp, CxV4Header *hdr, size_t inpktsize)
                     prps->rw     = clnt_u32(cp, cxsd_hw_channels[gcid].rw);
                     prps->dtype  = clnt_u32(cp, cxsd_hw_channels[gcid].dtype);
                     prps->nelems = clnt_u32(cp, cxsd_hw_channels[gcid].max_nelems);
-
-                    replydatasize += rpycsize;
-                    rpycn++;
                 }
                 else
                 {
@@ -2924,38 +2872,18 @@ static void ServeIORequest(v4clnt_t *cp, CxV4Header *hdr, size_t inpktsize)
                 ////fprintf(stderr, "SETMON %d\n", monr->cpid);
                 if (SetMonitor(cp, monr, hdr->Seq) == 0)
                 {
-                    rpycsize = PutRDsChunkReply  (cp, replydatasize,
-                                                  req->param1, req->param2,
-                                                  cpid, hdr->Seq, 0);
-                    if (rpycsize != 0)
-                    {
-                        replydatasize += rpycsize;
-                        rpycn++;
-                    }
-                    rpycsize = PutFrAgChunkReply (cp, replydatasize,
-                                                  req->param1, req->param2,
-                                                  cpid, hdr->Seq, 0);
-                    if (rpycsize != 0)
-                    {
-                        replydatasize += rpycsize;
-                        rpycn++;
-                    }
-                    rpycsize = PutQuantChunkReply(cp, replydatasize,
-                                                  req->param1, req->param2,
-                                                  cpid, hdr->Seq, 0);
-                    if (rpycsize != 0)
-                    {
-                        replydatasize += rpycsize;
-                        rpycn++;
-                    }
-                    rpycsize = PutRangeChunkReply(cp, replydatasize,
-                                                  req->param1, req->param2,
-                                                  cpid, hdr->Seq, 0);
-                    if (rpycsize != 0)
-                    {
-                        replydatasize += rpycsize;
-                        rpycn++;
-                    }
+                    PutRDsChunkReply  (cp,
+                                       req->param1, req->param2,
+                                       cpid, hdr->Seq, 0);
+                    PutFrAgChunkReply (cp,
+                                       req->param1, req->param2,
+                                       cpid, hdr->Seq, 0);
+                    PutQuantChunkReply(cp,
+                                       req->param1, req->param2,
+                                       cpid, hdr->Seq, 0);
+                    PutRangeChunkReply(cp,
+                                       req->param1, req->param2,
+                                       cpid, hdr->Seq, 0);
                 }
                 else
                 {
@@ -2990,18 +2918,12 @@ static void ServeIORequest(v4clnt_t *cp, CxV4Header *hdr, size_t inpktsize)
                 /* Unfortunately, NO.  We can't reliably find
                    appropriate monitor, because we don't know
                    the "cond" value and can't guess it */
-                rpycsize = PutLkStChunkReply(cp, replydatasize,
-                                             req->param1, req->param2,
-                                             gcid,
-                                             hdr->Seq,
-                                             0);
-                if (rpycsize == 0)
+                if (PutLkStChunkReply(cp,
+                                      req->param1, req->param2,
+                                      gcid,
+                                      hdr->Seq,
+                                      0) == 0)
                     PUT_ERROR_CHUNK_REPLY(0);
-                else
-                {
-                    replydatasize += rpycsize;
-                    rpycn++;
-                }
                 break;
 
 //--------------------------------------------------------------------
@@ -3019,13 +2941,8 @@ static void ServeIORequest(v4clnt_t *cp, CxV4Header *hdr, size_t inpktsize)
                                               NULL, NULL, NULL, NULL)) < 0)
                 {
                     hack_req_info_ptr = &req_info;
-                    rpycsize = Put_NT_OPEN_nnn_Chunk(cp, replydatasize, NULL, CXC_NT_OPEN_NOTFOUND);
+                    Put_NT_OPEN_nnn_Chunk(cp, NULL, CXC_NT_OPEN_NOTFOUND);
                     hack_req_info_ptr = NULL;
-                    if (rpycsize != 0)
-                    {
-                        replydatasize += rpycsize;
-                        rpycn++;
-                    }
                     goto NEXT_CHUNK;
                 }
 
@@ -3048,12 +2965,8 @@ static void ServeIORequest(v4clnt_t *cp, CxV4Header *hdr, size_t inpktsize)
                                                                        : CXC_NT_CURVAL;
 
                     hack_req_info_ptr = &req_info;
-                    rpycsize = chunk_maker(cp, replydatasize, mp, info_int);
+                    chunk_maker(cp, mp, info_int);
                     hack_req_info_ptr = NULL;
-                    if (rpycsize == 0) goto NEXT_CHUNK;
-
-                    replydatasize += rpycsize;
-                    rpycn++;
                 }
 
                 break;
@@ -3087,11 +3000,7 @@ static void ServeIORequest(v4clnt_t *cp, CxV4Header *hdr, size_t inpktsize)
                 if (do_lock) mp->mode |=  MONMODE_RQ_LOCK;
                 else         mp->mode &=~ MONMODE_RQ_LOCK;
 
-                rpycsize = Put_NT_LOCKSTAT_Chunk(cp, replydatasize, mp, 0);
-                if (rpycsize == 0) goto NEXT_CHUNK;
-
-                replydatasize += rpycsize;
-                rpycn++;
+                Put_NT_LOCKSTAT_Chunk(cp, mp, 0);
                 break;
 
             case CXC_CH_PEEK:
@@ -3105,11 +3014,7 @@ static void ServeIORequest(v4clnt_t *cp, CxV4Header *hdr, size_t inpktsize)
                            IsAnUpdate(cxsd_hw_channels + gcid) ? CXC_NT_NEWVAL
                                                                : CXC_NT_CURVAL;
 
-                rpycsize = Put_NT_AVALUE_Chunk(cp, replydatasize, mp, info_int);
-                if (rpycsize == 0) goto NEXT_CHUNK;
-
-                replydatasize += rpycsize;
-                rpycn++;
+                Put_NT_AVALUE_Chunk(cp, mp, info_int);
                 break;
 
             case CXC_CH_RQRD:
@@ -3162,10 +3067,7 @@ static void ServeIORequest(v4clnt_t *cp, CxV4Header *hdr, size_t inpktsize)
  NEXT_CHUNK:;
     }
 
-    cp->replybuf->DataSize  = clnt_u32(cp, replydatasize);
-    cp->replybuf->NumChunks = clnt_u32(cp, rpycn);
-
-    SendReplyPacket(cp, replydatasize);
+    SendReplyPacket(cp);
 }
 
 static void HandleClientRequest(v4clnt_t *cp, CxV4Header *hdr, size_t inpktsize)
@@ -3652,26 +3554,20 @@ static void cx_begin_c(void)
 static int IfMonModifiedPutIt(moninfo_t *mp, void *privptr)
 {
   v4clnt_t  *cp = privptr;
-  size_t     rpycsize;        // RePlY chunk size in bytes
 
     if (!(mp->modified)) return 0;
 
     mp->modified = 0;
 
     if      (mp->in_use == MON_TYPE_OLD)
-        rpycsize = PutDataChunkReply  (cp, cp->replybuf->DataSize,
-                                       mp->param1, mp->param2,
-                                       mp->gcid,
-                                       mp->Seq, CXC_NEWVAL);
+        PutDataChunkReply  (cp,
+                            mp->param1, mp->param2,
+                            mp->gcid,
+                            mp->Seq, CXC_NEWVAL);
     else if (mp->in_use == MON_TYPE_CHN)
-        rpycsize = Put_NT_AVALUE_Chunk(cp, cp->replybuf->DataSize,
-                                       mp, CXC_NT_NEWVAL);
+        Put_NT_AVALUE_Chunk(cp,
+                            mp, CXC_NT_NEWVAL);
     else return 0;
-    if (rpycsize != 0)
-    {
-        cp->replybuf->DataSize += rpycsize;
-        cp->replybuf->NumChunks++;
-    }
 
     return 0;
 }
@@ -3680,22 +3576,16 @@ static int SendEndC(v4clnt_t *cp, void *privptr __attribute__((unused)))
   CxV4Header  hdr;
   int         r;
 
-  size_t      replydatasize;
-
     /* Don't mess with not-yet-handshaken clients */
     if (cp->state < CS_USABLE) return 0;
 
     if (cp->per_cycle_monitors_some_modified)
     {
+        cp->per_cycle_monitors_some_modified = 0;
+
         if (InitReplyPacket(cp, CXT4_DATA_IO, 0) != 0) return 0;
-
         ForeachMonSlot(IfMonModifiedPutIt, cp, cp);
-
-        replydatasize = cp->replybuf->DataSize;
-        cp->replybuf->DataSize  = clnt_u32(cp, cp->replybuf->DataSize);
-        cp->replybuf->NumChunks = clnt_u32(cp, cp->replybuf->NumChunks);
-
-        if (SendReplyPacket(cp, replydatasize) != 0) return 0;
+        if (SendReplyPacket(cp) != 0) return 0;
     }
     
     bzero(&hdr, sizeof(hdr));

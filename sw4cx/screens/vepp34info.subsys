@@ -1,5 +1,5 @@
 sysname       vepp34info
-defserver     vepp4-pult6:0
+defserver     cx4old::vepp4-vm1:11
 wintitle main "VEPP-3/VEPP-4 info"
 winname  main vepp34info
 winclass main VEPP34Info
@@ -10,30 +10,43 @@ define(`ONE', `disp $1 $1 text "" "" %$2f  r:$1 layinfo:horz=right')
 define(`MSG', `mesg $1 $1 text ""          r:$1 layinfo:horz=right')
 
 grouping main vepp34info "VEPP-3/VEPP-4 info" lrtb "" content:2 {
-    container vepp3 "VEPP-3" grid "nocoltitles" base:vepp3 content:11 {
-        ONE(Ibeam,  6.2)
-        ONE(Isep1,  6.2)
-        ONE(Isep2,  6.2)
-        noop "" " " hlabel
-        noop "" " " hlabel
-        ONE(Emag,   7.1)
-        ONE(status, 1.0)
-        MSG(statust)
-        MSG(mode)
+    container vepp3 "VEPP-3" grid "nocoltitles" base:vepp3 content:21 {
+        ONE(SeparatrixCountRequest, 1.0)
+        ONE(StatusRequest, 1.0)
         ONE(polarity, 1.0)
-        MSG(polarityt)
+        noop "" " " hlabel
+        noop "" " " hlabel
+        ONE(status, 1.0)
+        ONE(inflectorStatus, 1.0)
+        ONE(CurrentRequest, 6.2)
+        ONE(StatusStayTime, 6.2)
+        ONE(EnergySet, 6.2)
+        ONE(CurrentTotal, 6.2)
+        ONE(CurrentSep1, 6.2)
+        ONE(CurrentSep2, 6.2)
+        ONE(DiffCurrent, 6.2)
+        ONE(CurrentLifeTime, 6.2)
+        MSG(TableName)
+        MSG(tStatusRequest)
+        MSG(tPolarity)
+        MSG(tStatus)
+        MSG(tInflectorStatus)
+        ONE(Ready, 1.0)
     }
-    container vepp4 "VEPP-4" grid "nocoltitles" base:vepp4 content:11 {
-        ONE(Ibeam,  6.2)
-        ONE(Ieleb1, 5.2)
-        ONE(Ieleb2, 5.2)
-        ONE(Iposb1, 5.2)
-        ONE(Iposb2, 5.2)
-        ONE(Emag,   6.1)
-        ONE(status, 1.0)
-        MSG(statust)
-        MSG(mode)
-        ONE(polarity, 1.0)
-        MSG(polarityt)
+
+
+    container vepp4 "VEPP-4" grid "nocoltitles" base:vepp4 content:12 {
+        ONE(InjPolarityRequest,  1.0)
+        ONE(Status, 1.0)
+        ONE(EnergySet, 5.2)
+        ONE(CurrentTotal, 5.2)
+        ONE(CurrentLifeTime, 5.2)
+        ONE(CurrentE1,   6.2)
+        ONE(CurrentE2,   6.2)
+        ONE(CurrentP1,   6.2)
+        ONE(CurrentP2,   6.2)
+        MSG(TableName)
+        MSG(tInjPolarityRequest)
+        MSG(tStatus)
     }
 }

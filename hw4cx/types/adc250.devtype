@@ -20,6 +20,8 @@ devtype adc250 r1h3132620,r4h783155,r5i,w30i,r100i {
 	trig_type	28
 	trig_input	29
 
+	pll_preset	39
+
 	device_id	40
 	base_sw_ver	41
 	pga_sw_ver	42
@@ -28,6 +30,8 @@ devtype adc250 r1h3132620,r4h783155,r5i,w30i,r100i {
 	pga_var		45
 	base_uniq_id	46
 	pga_uniq_id	47
+
+	pll_locked	48
 
 	elapsed		50
 	# absent in ADC250:	clb_state	51
@@ -50,6 +54,9 @@ devtype adc250 r1h3132620,r4h783155,r5i,w30i,r100i {
 	clb_dyn<0-3>	86
 	clb_zero<0-3>	90
 	clb_gain<0-3>	94
+
+	cur_pll1_ctrl	98
+	cur_pll2_ctrl	99
 
 	min<0-3>	100
 	max<0-3>	104

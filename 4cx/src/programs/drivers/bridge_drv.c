@@ -84,6 +84,22 @@ static void data_evproc(int            devid,
     }
 }
 
+static void GetNameOf(const CxsdDbDcNsp_t *type_nsp, int chn, const char **foreign_name)
+{
+  int         nsline;
+  const char *channame;
+
+    for (nsline = 0,                        channame =  NULL;
+         nsline < type_nsp->items_used  &&  channame == NULL;
+         nsline++)
+    {
+        if (type_nsp->items[nsline].devchan_n == chn)
+            channame = CxsdDbGetStr(cxsd_hw_cur_db,
+                                    type_nsp->items[nsline].name_ofs);
+    }
+
+    *foreign_name = channame;
+}
 static int bridge_init_d(int devid, void *devptr,
                          int businfocount, int businfo[],
                          const char *auxinfo)
@@ -94,10 +110,21 @@ static int bridge_init_d(int devid, void *devptr,
   int             chn;
   size_t          map_size;
 
+  const char     *type_name;
+  int             type_nsp_id;
+  const
+  CxsdDbDcNsp_t  *type_nsp;
+
+  const char     *foreign_base;
+
   const char     *foreign_name;
+  int             is_rw;
   cxdtype_t       dtype;
   int             max_nelems;
   int             is_trusted;
+
+  int             mirror_mode;
+  int             all_trusted;
 
     me->devid = devid;
     GetDevPlace(devid, &dev_first, &(me->numchans));
@@ -117,8 +144,51 @@ static int bridge_init_d(int devid, void *devptr,
     }
     bzero(me->map, map_size);
 
+    foreign_base = auxinfo;
+    mirror_mode = 0;
+    all_trusted = 0;
+    if (foreign_base != NULL)
+    {
+        if (*foreign_base == '@')
+        {
+            foreign_base++;
+            while (1)
+            {
+                if      (*foreign_base == '*') mirror_mode = 1;
+                else if (*foreign_base == '!') all_trusted = 1;
+                else if (*foreign_base == ':') {foreign_base++; goto END_BASE_FLAGS;}
+                else
+                {
+                    DoDriverLog(devid, 0, "bad @-spec for base");
+                    return -CXRF_CFG_PROBL;
+                }
+                foreign_base++;
+            }
+        }
+ END_BASE_FLAGS:;
+    }
+
+    if (mirror_mode)
+    {
+        if ((type_name = GetDevTypename(devid)) == NULL)
+        {
+            DoDriverLog(devid, DRIVERLOG_ERR, "type_name==NULL!");
+            return -CXRF_DRV_PROBL;
+        }
+        if ((type_nsp_id = CxsdDbFindNsp(cxsd_hw_cur_db, type_name)) < 0)
+        {
+            DoDriverLog(devid, DRIVERLOG_ERR, "type_nsp_id<0!");
+            return -CXRF_DRV_PROBL;
+        }
+        if ((type_nsp    = CxsdDbGetNsp (cxsd_hw_cur_db, type_nsp_id)) == NULL)
+        {
+            DoDriverLog(devid, DRIVERLOG_ERR, "type_nsp==NULL!");
+            return -CXRF_DRV_PROBL;
+        }
+    }
+
     if ((me->cid = cda_new_context(devid, devptr,
-                                   auxinfo, 0,
+                                   foreign_base, 0,
                                    NULL,
                                    0, NULL, 0)) < 0)
     {
@@ -129,34 +199,42 @@ static int bridge_init_d(int devid, void *devptr,
     for (chn = 0;  chn < me->numchans;  chn++)
     {
         me->map[chn] = CDA_DATAREF_ERROR;
-        if (CxsdHwGetChanAuxs(dev_first + chn, NULL, &foreign_name) < 0)
+        is_trusted = all_trusted;
+        if (mirror_mode)
         {
-            DoDriverLog(devid, 0, "CxsdHwGetChanAuxs(first:%d+chn:%d=%d)<0",
-                        dev_first, chn, dev_first + chn);
-            goto NEXT_CHANNEL;
+            GetNameOf(type_nsp, chn, &foreign_name);
+            if (foreign_name == NULL) goto NEXT_CHANNEL;
         }
-        if (foreign_name == NULL) goto NEXT_CHANNEL;
-
-        is_trusted = 0;
-        if (*foreign_name == '@')
+        else
         {
-            foreign_name++;
-            while (1)
+            if (CxsdHwGetChanAuxs(dev_first + chn, NULL, &foreign_name) < 0)
             {
-                if (*foreign_name == '!') is_trusted = 1;
-                else if (*foreign_name == ':') {foreign_name++; goto END_FLAGS;}
-                else
-                {
-                    DoDriverLog(devid, 0, "bad @-spec for chn:%d", chn);
-                    goto NEXT_CHANNEL;
-                }
-                foreign_name++;
+                DoDriverLog(devid, 0, "CxsdHwGetChanAuxs(first:%d+chn:%d=%d)<0",
+                            dev_first, chn, dev_first + chn);
+                goto NEXT_CHANNEL;
             }
+            if (foreign_name == NULL) goto NEXT_CHANNEL;
+
+            if (*foreign_name == '@')
+            {
+                foreign_name++;
+                while (1)
+                {
+                    if      (*foreign_name == '!') is_trusted = 1;
+                    else if (*foreign_name == ':') {foreign_name++; goto END_NAME_FLAGS;}
+                    else
+                    {
+                        DoDriverLog(devid, 0, "bad @-spec for chn:%d", chn);
+                        goto NEXT_CHANNEL;
+                    }
+                    foreign_name++;
+                }
+            }
+ END_NAME_FLAGS:;
         }
- END_FLAGS:;
 
         if (CxsdHwGetChanType(dev_first + chn,
-                              NULL, &dtype, &max_nelems) < 0)
+                              &is_rw, &dtype, &max_nelems) < 0)
         {
             DoDriverLog(devid, 0, "CxsdHwGetChanType(first:%d+chn:%d=%d)<0",
                         dev_first, chn, dev_first + chn);
@@ -176,9 +254,10 @@ static int bridge_init_d(int devid, void *devptr,
                         chn, foreign_name, cda_last_err());
             goto NEXT_CHANNEL;
         }
+////fprintf(stderr, "[%d].%d/%d->%s\n", devid, chn, me->map[chn], foreign_name);
 
-        if (is_trusted)
-            SetChanReturnType(devid, chn,  1, IS_AUTOUPDATED_TRUSTED);
+        if (is_rw == 0)
+            SetChanReturnType(devid, chn,  1, is_trusted? IS_AUTOUPDATED_TRUSTED : IS_AUTOUPDATED_YES);
 
  NEXT_CHANNEL:;
     }

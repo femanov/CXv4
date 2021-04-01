@@ -70,17 +70,17 @@ grouping main DL250 "DL250" \
     noop - - hseparator layinfo:horz=fill
 
     container presence "" grid nodecor ncols:3 content:3 {
-        disp capabilities "Capabilities" inttext "withlabel"  r:capabilities dpyfmt:"%#010.0a" tip:capabilities
+        disp capabilities "Capabilities" inttext "withlabel"  r:capabilities dpyfmt:"%#010a" tip:capabilities
         disp front        "Front"        led     "offcol=red" r:front_present
         disp rio          "RIO"          led     "offcol=red" r:rio_present
     }
     container "" "" grid "notitle,noshadow,nocoltitles" nflrs:2 content:6 {
-        disp device_id    "Dev ID"    inttext "" r:device_id    dpyfmt:"%#010.0a"
-        disp uniq_id      "Uniq ID"   inttext "" r:uniq_id      dpyfmt:"%#010.0a"
-        disp hw_version   "HW ver"    inttext "" r:hw_version   dpyfmt:"%#006.0a"
-        disp sw_version   "SW ver"    inttext "" r:sw_version   dpyfmt:"%#006.0a"
-        disp baseaddr     "Base addr" inttext "" r:baseaddr     dpyfmt:"%#010.0a"
-        disp addrspace    "Addr spc"  inttext "" r:addrspace    dpyfmt:"%#010.0a"
+        disp device_id    "Dev ID"    inttext "" r:device_id    dpyfmt:"%#010a"
+        disp uniq_id      "Uniq ID"   inttext "" r:uniq_id      dpyfmt:"%#010a"
+        disp hw_version   "HW ver"    inttext "" r:hw_version   dpyfmt:"%#006a"
+        disp sw_version   "SW ver"    inttext "" r:sw_version   dpyfmt:"%#006a"
+        disp baseaddr     "Base addr" inttext "" r:baseaddr     dpyfmt:"%#010a"
+        disp addrspace    "Addr spc"  inttext "" r:addrspace    dpyfmt:"%#010a"
     }
 }
 

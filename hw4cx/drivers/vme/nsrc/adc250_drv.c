@@ -14,6 +14,24 @@ enum { ADC250_DTYPE = CXDTYPE_INT16};
 /* We allow only as much measurements, not ADC250_MAX_NUMPTS  */
 enum { ADC250_MAX_ALLOWED_NUMPTS = 50000*1 + ADC250_MAX_NUMPTS*0 };
 
+enum
+{
+    PLL_PRESET_NONE         = 0,
+    PLL_PRESET_INTERNAL     = 1,
+    PLL_PRESET_VEPP5_RFMEAS = 2,
+};
+typedef struct
+{
+    uint32  pll1;
+    uint32  pll2;
+} pll_preset_t;
+static pll_preset_t pll_presets_table[] =
+{
+    [0]                       = {0,          0},
+    [PLL_PRESET_INTERNAL]     = {0x0300A002, 0x00040F01},
+    [PLL_PRESET_VEPP5_RFMEAS] = {0x02008004, 0x30030F01},
+};
+
 //--------------------------------------------------------------------
 
 static pzframe_chinfo_t chinfo[] =
@@ -46,6 +64,8 @@ static pzframe_chinfo_t chinfo[] =
     [ADC250_CHAN_TRIG_TYPE]     = {PZFRAME_CHTYPE_VALIDATE,    0},
     [ADC250_CHAN_TRIG_INPUT]    = {PZFRAME_CHTYPE_VALIDATE,    0},
 
+    [ADC250_CHAN_PLL_PRESET]    = {PZFRAME_CHTYPE_INDIVIDUAL,  0},
+
     /* status */
     [ADC250_CHAN_DEVICE_ID]     = {PZFRAME_CHTYPE_AUTOUPDATED, 0},
     [ADC250_CHAN_BASE_SW_VER]   = {PZFRAME_CHTYPE_AUTOUPDATED, 0},
@@ -55,6 +75,8 @@ static pzframe_chinfo_t chinfo[] =
     [ADC250_CHAN_PGA_VAR]       = {PZFRAME_CHTYPE_AUTOUPDATED, 0},
     [ADC250_CHAN_BASE_UNIQ_ID]  = {PZFRAME_CHTYPE_AUTOUPDATED, 0},
     [ADC250_CHAN_PGA_UNIQ_ID]   = {PZFRAME_CHTYPE_AUTOUPDATED, 0},
+
+    [ADC250_CHAN_PLL_LOCKED]    = {PZFRAME_CHTYPE_INDIVIDUAL,  0},
 
     [ADC250_CHAN_ELAPSED]       = {PZFRAME_CHTYPE_PZFRAME_STD, 0},
     [ADC250_CHAN_XS_PER_POINT]  = {PZFRAME_CHTYPE_STATUS,      -1},
@@ -103,6 +125,9 @@ static pzframe_chinfo_t chinfo[] =
     [ADC250_CHAN_CLB_GAIN2]     = {PZFRAME_CHTYPE_AUTOUPDATED, 0},
     [ADC250_CHAN_CLB_GAIN3]     = {PZFRAME_CHTYPE_AUTOUPDATED, 0},
 
+    [ADC250_CHAN_CUR_PLL1_CTRL] = {PZFRAME_CHTYPE_AUTOUPDATED, 0},
+    [ADC250_CHAN_CUR_PLL2_CTRL] = {PZFRAME_CHTYPE_AUTOUPDATED, 0},
+
     [ADC250_CHAN_MIN0]          = {PZFRAME_CHTYPE_AUTOUPDATED, 0},
     [ADC250_CHAN_MIN1]          = {PZFRAME_CHTYPE_AUTOUPDATED, 0},
     [ADC250_CHAN_MIN2]          = {PZFRAME_CHTYPE_AUTOUPDATED, 0},
@@ -141,6 +166,7 @@ typedef struct
     int                handle;
     int                irq_n;
     int                irq_vect;
+int jumpers;
 
     int32              cur_args[ADC250_NUMCHANS];
     int32              nxt_args[ADC250_NUMCHANS];
@@ -196,17 +222,25 @@ static psp_lkp_t adc250_range_lkp[] =
     {NULL, 0}
 };
 
+static psp_lkp_t adc250_pll_preset_lkp[] =
+{
+    {"internal",     PLL_PRESET_INTERNAL},
+    {"vepp5_rfmeas", PLL_PRESET_VEPP5_RFMEAS},
+    {NULL, 0}
+};
+
 static psp_paramdescr_t adc250_params[] =
 {
-    PSP_P_INT    ("ptsofs",   adc250_privrec_t, nxt_args[ADC250_CHAN_PTSOFS],     -1, 0, ADC250_MAX_ALLOWED_NUMPTS-1),
-    PSP_P_INT    ("numpts",   adc250_privrec_t, nxt_args[ADC250_CHAN_NUMPTS],     -1, 1, ADC250_MAX_ALLOWED_NUMPTS),
-    PSP_P_LOOKUP ("timing",   adc250_privrec_t, nxt_args[ADC250_CHAN_TIMING],     -1, adc250_timing_lkp),
-    PSP_P_LOOKUP ("trigger",  adc250_privrec_t, nxt_args[ADC250_CHAN_TRIG_TYPE],  -1, adc250_trig_type_lkp),
-    PSP_P_INT    ("trig_n",   adc250_privrec_t, nxt_args[ADC250_CHAN_TRIG_INPUT], -1, 0, ADC4X250_ADC_TRIG_SOURCE_TTL_INPUT_bits),
-    PSP_P_LOOKUP ("rangeA",   adc250_privrec_t, nxt_args[ADC250_CHAN_RANGE0 + 0], -1, adc250_range_lkp),
-    PSP_P_LOOKUP ("rangeB",   adc250_privrec_t, nxt_args[ADC250_CHAN_RANGE0 + 1], -1, adc250_range_lkp),
-    PSP_P_LOOKUP ("rangeC",   adc250_privrec_t, nxt_args[ADC250_CHAN_RANGE0 + 2], -1, adc250_range_lkp),
-    PSP_P_LOOKUP ("rangeD",   adc250_privrec_t, nxt_args[ADC250_CHAN_RANGE0 + 3], -1, adc250_range_lkp),
+    PSP_P_INT    ("ptsofs",     adc250_privrec_t, nxt_args[ADC250_CHAN_PTSOFS],     -1, 0, ADC250_MAX_ALLOWED_NUMPTS-1),
+    PSP_P_INT    ("numpts",     adc250_privrec_t, nxt_args[ADC250_CHAN_NUMPTS],     -1, 1, ADC250_MAX_ALLOWED_NUMPTS),
+    PSP_P_LOOKUP ("timing",     adc250_privrec_t, nxt_args[ADC250_CHAN_TIMING],     -1, adc250_timing_lkp),
+    PSP_P_LOOKUP ("trigger",    adc250_privrec_t, nxt_args[ADC250_CHAN_TRIG_TYPE],  -1, adc250_trig_type_lkp),
+    PSP_P_INT    ("trig_n",     adc250_privrec_t, nxt_args[ADC250_CHAN_TRIG_INPUT], -1, 0, ADC4X250_ADC_TRIG_SOURCE_TTL_INPUT_bits),
+    PSP_P_LOOKUP ("rangeA",     adc250_privrec_t, nxt_args[ADC250_CHAN_RANGE0 + 0], -1, adc250_range_lkp),
+    PSP_P_LOOKUP ("rangeB",     adc250_privrec_t, nxt_args[ADC250_CHAN_RANGE0 + 1], -1, adc250_range_lkp),
+    PSP_P_LOOKUP ("rangeC",     adc250_privrec_t, nxt_args[ADC250_CHAN_RANGE0 + 2], -1, adc250_range_lkp),
+    PSP_P_LOOKUP ("rangeD",     adc250_privrec_t, nxt_args[ADC250_CHAN_RANGE0 + 3], -1, adc250_range_lkp),
+    PSP_P_LOOKUP ("pll_preset", adc250_privrec_t, nxt_args[ADC250_CHAN_PLL_PRESET],  0, adc250_pll_preset_lkp),
     PSP_P_END()
 };
 
@@ -321,6 +355,14 @@ static int32 ValidateParam(pzframe_drv_t *pdr, int n, int32 v)
     return v;
 }
 
+static void ActivatePLLPreset(adc250_privrec_t *me, int n)
+{
+fprintf(stderr, "[%d] %s %d 0x%08x 0x%08x\n", me->devid, __FUNCTION__, n, pll_presets_table[n].pll1, pll_presets_table[n].pll2);
+    me->lvmt->a32wr32(me->handle, ADC4X250_R_PLL1_CTRL,  pll_presets_table[n].pll1);
+    me->lvmt->a32wr32(me->handle, ADC4X250_R_PLL2_CTRL,  pll_presets_table[n].pll2);
+    me->lvmt->a32wr32(me->handle, ADC4X250_R_PLL_UPDATE, 1);
+}
+
 enum
 {
     HEARTBEAT_FREQ  = 10,
@@ -401,6 +443,10 @@ fprintf(stderr, "\t\t[ADC250_CHAN_TRIG_TYPE]=%d [ADC250_CHAN_TRIG_INPUT]=%d\n", 
         Init1Param(me, ADC250_CHAN_RANGE0 + n,
                    (w >> ADC4X250_PGA_RANGE_shift) & ADC4X250_PGA_RANGE_bits);
     }
+
+    n = me->nxt_args[ADC250_CHAN_PLL_PRESET];
+    if (n > 0  &&  n < countof(pll_presets_table))
+        ActivatePLLPreset(me, n);
 
     /* Device properties */
     Return1Param(me, ADC250_CHAN_XS_FACTOR,  -9);
@@ -722,9 +768,9 @@ ADC250_MAX_VALUE;
     me->pz.retbufs.timestamps = NULL;
 
 #if 0
-fprintf(stderr, "retbufs.count=%d\n", n);
-for (x = 0;  x < me->pz.retbufs.count;  x++)
-    fprintf(stderr, "[%d] #%d dt=%d nel=%d\n", x, me->pz.retbufs.addrs[x], me->pz.retbufs.dtypes[x], me->pz.retbufs.nelems[x]);
+////fprintf(stderr, "retbufs.count=%d\n", n);
+////for (x = 0;  x < me->pz.retbufs.count;  x++)
+////    fprintf(stderr, "[%d] #%d dt=%d nel=%d\n", x, me->pz.retbufs.addrs[x], me->pz.retbufs.dtypes[x], me->pz.retbufs.nelems[x]);
 #endif
 ////fprintf(stderr, "%s EXIT\n", __FUNCTION__);
 }
@@ -740,6 +786,11 @@ static void adc250_rw_p (int devid, void *devptr,
   int               chn;   // channel
   int               ct;
   int32             val;   // Value
+
+  uint32            status;
+
+  uint32            pll1;
+  uint32            pll2;
 
     for (n = 0;  n < count;  n++)
     {
@@ -758,6 +809,7 @@ static void adc250_rw_p (int devid, void *devptr,
             else
                 me->line_rqd[chn-ADC250_CHAN_LINE0] = 1;
 
+if (chn == ADC250_CHAN_LINE0) fprintf(stderr, "%s 0x%02x line0:req_mes\n", strcurtime_msc(), me->jumpers);
             pzframe_drv_req_mes(&(me->pz));
         }
         else if (ct == PZFRAME_CHTYPE_MARKER)
@@ -790,9 +842,32 @@ static void adc250_rw_p (int devid, void *devptr,
             {
                 if      (chn == ADC250_CHAN_CALIBRATE)
                 {
-                     if (action == DRVA_WRITE)
-                          me->nxt_args[chn] = (val != 0);
-                     ReturnInt32Datum(devid, chn, me->nxt_args[chn], 0);
+                    if (action == DRVA_WRITE)
+                         me->nxt_args[chn] = (val != 0);
+                    ReturnInt32Datum(devid, chn, me->nxt_args[chn], 0);
+                }
+                else if (chn == ADC250_CHAN_PLL_LOCKED)
+                {
+                    me->lvmt->a32rd32(me->handle, ADC4X250_R_STATUS, &status);
+                    ReturnInt32Datum(devid, chn, (status & ADC4X250_STATUS_PLL_LOCKED) != 0, 0);
+                }
+                else if (chn == ADC250_CHAN_PLL_PRESET)
+                {
+                    if (action == DRVA_WRITE  &&  
+                        val > 0  &&  val < countof(pll_presets_table))
+                        ActivatePLLPreset(me, val);
+                    // Read current values
+                    me->lvmt->a32rd32(me->handle, ADC4X250_R_PLL1_CTRL, &pll1);
+                    me->lvmt->a32rd32(me->handle, ADC4X250_R_PLL2_CTRL, &pll2);
+                    // Try to find a correspondig line in presets
+                    for (val = countof(pll_presets_table) - 1;  val > 0;  val--)
+                        if (pll1 == pll_presets_table[val].pll1  &&
+                            pll2 == pll_presets_table[val].pll2) break;
+fprintf(stderr, "\t[%d] detectPLL: %d 0x%08x 0x%08x\n", me->devid, val, pll1, pll2);
+                    // Return what's found
+                    ReturnInt32Datum(devid, ADC250_CHAN_PLL_PRESET,    val,  0);
+                    ReturnInt32Datum(devid, ADC250_CHAN_CUR_PLL1_CTRL, pll1, 0);
+                    ReturnInt32Datum(devid, ADC250_CHAN_CUR_PLL2_CTRL, pll2, 0);
                 }
             }
             else /*  ct == PZFRAME_CHTYPE_PZFRAME_STD, which also returns UPSUPPORTED for unknown */
@@ -856,9 +931,11 @@ me->lvmt->a32rd32(me->handle, ADC4X250_R_INT_STATUS, &w);
 ////fprintf(stderr, "zINT_STATUS=%08x\n", w);
 me->lvmt->a32wr32(me->handle, ADC4X250_R_CTRL,       ADC4X250_CTRL_ADC_BREAK_ACK); // Stop (or drop ADC_CMPLT)
 
+fprintf(stderr, "%s 0x%02x IRQ_P(do_return=%d)\n", strcurtime_msc(), me->jumpers, me->do_return);
     /*!!! Here MUST call smth to read ADC4X250_R_INT_STATUS (and, probably, analyze its content) */
     if (me->do_return == 0  &&  me->force_read) ReadMeasurements(&(me->pz));
     pzframe_drv_drdy_p(&(me->pz), me->do_return, 0);
+    pzframe_drv_req_mes(&(me->pz));
 }
 
 static int  FASTADC_INIT_D(int devid, void *devptr, 
@@ -876,6 +953,7 @@ static int  FASTADC_INIT_D(int devid, void *devptr,
     jumpers      = businfo[2]; /*!!!*/
     me->irq_n    = businfo[3] &  0x7;
     me->irq_vect = businfo[4] & 0xFF;
+me->jumpers = jumpers;
 fprintf(stderr, "%s businfo[2]=%08x jumpers=0x%x irq=%d vector=%d\n", strcurtime_msc(), businfo[2], jumpers, me->irq_n, me->irq_vect);
 
     me->lvmt   = GetLayerVMT(devid);

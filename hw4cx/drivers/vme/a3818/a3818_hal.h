@@ -13,6 +13,8 @@
 #include <errno.h>
 #include <string.h>
 
+#include "misclib.h"
+
 #include "vme_hal.h"
 
 #define LINUX // For CAENVMEtypes.h, which uses "#ifdef LINUX" instead of "#ifdef WIN32"
@@ -30,7 +32,7 @@
 
 
 #ifndef USE_SELECT_FOR_IRQ
-  #if 0
+  #ifdef CAENVMELIB_SUPPORTS_POLL
     #define USE_SELECT_FOR_IRQ 1
   #else
     #define USE_SELECT_FOR_IRQ 0
@@ -167,10 +169,101 @@ static void irq2pipe_proc(int uniq, void *privptr1,
                ii->privptr, level, vect);
 }
 #elif USE_SELECT_FOR_IRQ
+#include <unistd.h>
+#include <sys/time.h>
+#include <sys/types.h>
+
+#include "timeval_utils.h"
+
+
+void localSleepBySelect(int usecs)
+{
+  struct timeval  deadline;
+  struct timeval  now;
+  struct timeval  timeout;
+    
+    gettimeofday(&deadline, NULL);
+    timeval_add_usecs(&deadline, &deadline, usecs);
+
+    while (1)
+    {
+        gettimeofday(&now, NULL);
+        if (timeval_subtract(&timeout, &deadline, &now) != 0) return;
+        if (select(0, NULL, NULL, NULL, &timeout) == 0)       return;
+    }
+}
 static void irq_fd_p(int uniq, void *privptr1,
                      sl_fdh_t fdhandle, int fd, int mask,
                      void *privptr2)
 {
+  a3818_hal_bus_info_t *me = privptr2;
+
+  int                   r;
+  CVErrorCodes          err;
+ uint32_t              event_mask;
+  CAEN_BYTE             lit_mask;
+  int                   level;
+  int                   repcount;
+  uint32                vect32; // We use 32-bit with cvD8 just "na vsyakij sluchaj"
+  a3818_hal_irq_info_t *ii;
+
+  static CVIRQLevels level2cvIRQx[8] =
+  {0, cvIRQ1, cvIRQ2, cvIRQ3, cvIRQ4, cvIRQ5, cvIRQ6, cvIRQ7};
+
+
+////    CAENVME_IRQEnable(me->CAENVMElib_handle, 0x7F);
+
+    r = CAENVME_ProcessEvent(me->CAENVMElib_handle, &event_mask, 0);
+    if (r < 0  ||  event_mask == 0) return;
+
+    if ((event_mask & cvConnectionLost)      != 0)
+    {
+        fprintf(stderr, "%s %s(%d,%d) A3818_CONNECTION_LOST\n",      strcurtime_msc(), __FUNCTION__, me->bus_major, me->bus_minor);
+    }
+    if ((event_mask & cvConnectionRecovered) != 0)
+    {
+        fprintf(stderr, "%s %s(%d,%d) A3818_CONNECTION_RECOVERED\n", strcurtime_msc(), __FUNCTION__, me->bus_major, me->bus_minor);
+localSleepBySelect(10*1000000);
+////        err = CAENVME_DeviceReset(me->CAENVMElib_handle);
+////        fprintf(stderr, "%s\treset err=%d\n", strcurtime_msc(), err);
+        vect32=0xdeadbaba;
+        err = CAENVME_IRQCheck(me->CAENVMElib_handle, &lit_mask);
+        fprintf(stderr, "\t\t\t\tcheck: err=%d lit_mask=0x%08x\n", err, lit_mask);
+        err = CAENVME_IRQEnable(me->CAENVMElib_handle, 0x7F);
+        fprintf(stderr, "\t\t\t\tenable: err=%d\n", err);
+        err = CAENVME_ReadCycle(me->CAENVMElib_handle, 0xd6000000, &vect32, 0x09, cvD32);
+        fprintf(stderr, "%s\t\tread: err=%d vect32=0x%08x\n", strcurtime_msc(), err, vect32);
+    }
+
+#if 1
+    lit_mask = event_mask & 0xFF;
+    if ((lit_mask & (me->irq_mask >> 1)) == 0) return;
+#else
+    err = CAENVME_IRQCheck(me->CAENVMElib_handle, &lit_mask);
+    if (err < 0  ||  (lit_mask & (me->irq_mask >> 1)) == 0) return;
+#endif
+
+    for (level = 1;  level <= 7;  level++)
+        if ((lit_mask & (1 << (level - 1))) != 0)
+        {
+            for (repcount = 100;  repcount > 0;  repcount--)
+            {
+                err = CAENVME_IACKCycle(me->CAENVMElib_handle,
+                                        level2cvIRQx[level], &vect32, cvD8);
+////fprintf(stderr, "\tIACKCycle(%d, %d): err=%d vect32=%d\n", me->CAENVMElib_handle, level, err, vect32);
+                if (err < 0) goto NEXT_LEVEL;
+
+                ii = me->irq_info + level;
+                if (ii->cb != NULL)
+                    ii->cb(me - a3818_hal_bus_info /*!!! info2idx() !!! */,
+                           ii->privptr, level, (int)(vect32 & 0xFF));
+            }
+
+    NEXT_LEVEL:;
+        }
+
+    // Re-enable interrupts /*!!! Shouldn't we use event_mask instead of 0x7F? *.
+    CAENVME_IRQEnable(me->CAENVMElib_handle, 0x7F);
 }
 #else
 enum {A3818_HEARTBEAT_USECS = 50*1000*1 + 5000000*0}; // Use 5s for debugging; 50ms<=>20Hz is enough for VEPP5's 10Hz
@@ -271,7 +364,9 @@ static int  vme_hal_open_bus (int bus_major, int bus_minor)
   short                 BdNum;
   CVErrorCodes          err;
 
-#if USE_THREAD_FOR_IRQ
+#if   USE_THREAD_FOR_IRQ
+  int                   saved_errno;
+#elif USE_SELECT_FOR_IRQ
   int                   saved_errno;
 #endif /* USE_THREAD_FOR_IRQ */
 
@@ -320,9 +415,9 @@ static int  vme_hal_open_bus (int bus_major, int bus_minor)
     }
 ////    fprintf(stderr, "@%d/%d: %d/%d,%d\n", bus_major, bus_minor, BdType, Link, BdNum);
 
-fprintf(stderr, "QQQ\n");
+fprintf(stderr, "...CAENVME_Init(BdType=%d, Link=%d, BdNum=%d) start\n", BdType, Link, BdNum);
     err = CAENVME_Init(BdType, Link, BdNum, &(me->CAENVMElib_handle));
-fprintf(stderr, "QQQ\n");
+fprintf(stderr, "...CAENVME_Init() finished err=%d handle=%d\n", err, me->CAENVMElib_handle);
     if (err != cvSuccess)
     {
         errno = 0; // Signifies that vme_hal_strerror(ret) should be used instead of strerror(errno)
@@ -330,9 +425,9 @@ fprintf(stderr, "QQQ\n");
         return err;
     }
 ////fprintf(stderr, "a3818_hal_bus_info[bus_handle].CAENVMElib_handle=%d\n", a3818_hal_bus_info[bus_handle].CAENVMElib_handle);
-#if 0
+#if USE_SELECT_FOR_IRQ
     err = CAENVME_IRQEnable(me->CAENVMElib_handle, 0x7F);
-    fprintf(stderr, "\t####CAENVME_IRQEnable()=%d\n", err);
+    ////fprintf(stderr, "\t####CAENVME_IRQEnable()=%d\n", err);
 #endif
 #if   USE_THREAD_FOR_IRQ
     // Initialize values for cleanup
@@ -365,6 +460,24 @@ fprintf(stderr, "Init(IRQ_handle)=%d\n", err);
     if (pthread_create(&(me->irq_thread), NULL, irq_wait_proc, me) != 0)
         goto ERREXIT;
 #elif USE_SELECT_FOR_IRQ
+    me->handle_fdhandle = -1;  // For ERREXIT cleanup only
+    me->handle_fd       = CAENVME_GetFiledes(me->CAENVMElib_handle);
+    if (me->handle_fd < 0)
+    {
+        saved_errno = errno;
+        fprintf(stderr, "%s::%s(%d,%d): CAENVME_GetFiledes()=%d\n", __FILE__, __FUNCTION__, bus_major, bus_minor, me->handle_fd);
+        errno = saved_errno;
+        goto ERREXIT;
+    }
+    set_fd_flags(me->handle_fd, O_NONBLOCK, 1);
+    if ((me->handle_fdhandle = sl_add_fd(0/*!!!uniq!!!*/, NULL,
+                                         me->handle_fd, SL_EX, irq_fd_p, me)) < 0)
+    {
+        saved_errno = errno;
+        fprintf(stderr, "%s::%s(%d,%d): sl_add_fd()=%d errno=%d/\"%s\"\n", __FILE__, __FUNCTION__, bus_major, bus_minor, me->handle_fd, errno, strerror(errno));
+        errno = saved_errno;
+        goto ERREXIT;
+    }
 #endif /* USE_THREAD_FOR_IRQ */
 
     return bus_handle;
@@ -381,6 +494,15 @@ fprintf(stderr, "Init(IRQ_handle)=%d\n", err);
     errno = saved_errno;
     return -1;
 #endif /* USE_THREAD_FOR_IRQ */
+#if USE_SELECT_FOR_IRQ
+ ERREXIT:
+    saved_errno = errno;
+    CAENVME_End(me->CAENVMElib_handle);
+    if (me->handle_fdhandle >= 0) {sl_del_fd(me->handle_fdhandle); me->handle_fdhandle = -1;}
+    me->in_use = 0;
+    errno = saved_errno;
+    return -1;
+#endif /* USE_SELECT_FOR_IRQ */
 }
 
 static int  vme_hal_close_bus(int bus_handle)
@@ -408,6 +530,8 @@ static int  vme_hal_close_bus(int bus_handle)
     close(me->irq_pipe[PIPE_WR_SIDE]);
     CAENVME_End(me->CAENVMElib_IRQ_handle);
 #elif USE_SELECT_FOR_IRQ
+    sl_del_fd(me->handle_fdhandle);  me->handle_fdhandle = -1;
+    // Note: should NOT do "close(me->handle_fd)", because that fd is in CAENVMElib's responsibility and is taken care of by CAENVME_End()
 #endif /* USE_THREAD_FOR_IRQ */
     CAENVME_End(me->CAENVMElib_handle);
     me->in_use = 0;
@@ -490,23 +614,38 @@ static int  vme_hal_close_irq(int bus_handle __attribute__((unused)),
 }
 
 
+#ifndef DEBUG_A3818_HAL_IO
+  #define DEBUG_A3818_HAL_IO 1
+#endif
+#if DEBUG_A3818_HAL_IO
+  #define A3818_HAL_IO_BEG  int r = 
+  #define A3818_HAL_IO_END  if (r < 0) fprintf(stderr, "%s(0x%02x:%08x)=%d\n", __FUNCTION__, am, addr, r); \
+                            return r;
+#else
+  #define A3818_HAL_IO_BEG  return
+  #define A3818_HAL_IO_END
+#endif
 #define VME_HAL_DEFINE_IO(AS, name, TS)                                          \
 VME_HAL_STORAGE_CLASS int vme_hal_a##AS##wr##TS   (int bus_handle,               \
                                                    int am,                       \
                                                    uint32 addr, uint##TS  value) \
 {                                                                                \
-    return CAENVME_WriteCycle   (a3818_hal_bus_info[bus_handle].CAENVMElib_handle, \
+    A3818_HAL_IO_BEG                                                             \
+           CAENVME_WriteCycle   (a3818_hal_bus_info[bus_handle].CAENVMElib_handle, \
                                  addr, &value,                                   \
                                  am, __CX_CONCATENATE(cvD,TS));                  \
+    A3818_HAL_IO_END;                                                            \
 }                                                                                \
                                                                                  \
 VME_HAL_STORAGE_CLASS int vme_hal_a##AS##rd##TS   (int bus_handle,               \
                                                    int am,                       \
                                                    uint32 addr, uint##TS *val_p) \
 {                                                                                \
-    return CAENVME_ReadCycle    (a3818_hal_bus_info[bus_handle].CAENVMElib_handle, \
+    A3818_HAL_IO_BEG                                                             \
+           CAENVME_ReadCycle    (a3818_hal_bus_info[bus_handle].CAENVMElib_handle, \
                                  addr, val_p,                                    \
                                  am, __CX_CONCATENATE(cvD,TS));                  \
+    A3818_HAL_IO_END;                                                            \
 }                                                                                \
 VME_HAL_STORAGE_CLASS int vme_hal_a##AS##wr##TS##v(int bus_handle,               \
                                                    int am,                       \
@@ -514,12 +653,14 @@ VME_HAL_STORAGE_CLASS int vme_hal_a##AS##wr##TS##v(int bus_handle,              
 {                                                                                \
   int  unused_count_bytes_transferred;                                           \
                                                                                  \
-    return CAENVME_BLTWriteCycle(a3818_hal_bus_info[bus_handle].CAENVMElib_handle, \
+    A3818_HAL_IO_BEG                                                             \
+           CAENVME_BLTWriteCycle(a3818_hal_bus_info[bus_handle].CAENVMElib_handle, \
                                  addr, data,                                     \
                                  count * sizeof(uint##TS),                       \
                           /* Note: "| 2" is valid for A16/A24/A32/A64(?) only, NOT for A40 (cvA40=0x34, cvA40_BLT=0x37) */ \
                                  am | 2, __CX_CONCATENATE(cvD,TS),               \
                                  &unused_count_bytes_transferred);               \
+    A3818_HAL_IO_END;                                                            \
 }                                                                                \
                                                                                  \
 VME_HAL_STORAGE_CLASS int vme_hal_a##AS##rd##TS##v(int bus_handle,               \
@@ -528,12 +669,14 @@ VME_HAL_STORAGE_CLASS int vme_hal_a##AS##rd##TS##v(int bus_handle,              
 {                                                                                \
   int  unused_count_bytes_transferred;                                           \
                                                                                  \
-    return CAENVME_BLTReadCycle (a3818_hal_bus_info[bus_handle].CAENVMElib_handle, \
+    A3818_HAL_IO_BEG                                                             \
+           CAENVME_BLTReadCycle (a3818_hal_bus_info[bus_handle].CAENVMElib_handle, \
                                  addr, data,                                     \
                                  count * sizeof(uint##TS),                       \
                           /* Note: "| 2" is valid for A16/A24/A32/A64(?) only, NOT for A40 (cvA40=0x34, cvA40_BLT=0x37) */ \
                                  am | 2, __CX_CONCATENATE(cvD,TS),               \
                                  &unused_count_bytes_transferred);               \
+    A3818_HAL_IO_END;                                                            \
 }
 
 VME_HAL_DEFINE_IO(16, byte,  8)

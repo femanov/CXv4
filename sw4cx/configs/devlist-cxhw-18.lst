@@ -18,8 +18,8 @@ cpoint e_diss.RFphase.set	diss208.out0
 cpoint e_diss.light.swc		diss208.outrb0
 
 # Beam Loss Monitor
-dev adc200_blm1 adc200/remdrv ~ 10 b:ppc-blm:8002
-dev adc200_blm2 adc200/remdrv ~ 12 b:ppc-blm:8002
+dev adc200_blm1 adc200/remdrv ~ 10 b:ppc-blm:8002 timing=195
+dev adc200_blm2 adc200/remdrv ~ 12 b:ppc-blm:8002 timing=195
 dev  v0308_blm1  v0308/remdrv ~ 2  b:ppc-blm:8002
 dev  v0308_blm2  v0308/remdrv ~ 5  b:ppc-blm:8002
 
@@ -44,8 +44,8 @@ ONE_BLM_PS(blm_2_1, v0308_blm2, 0)
 ONE_BLM_PS(blm_2_2, v0308_blm2, 1)
 
 # Kickers
-dev adc200_kkr1 adc200/remdrv ~ 17 b:ppc-blm:8002
-dev adc200_kkr2 adc200/remdrv ~ 19 b:ppc-blm:8002
+dev adc200_kkr1 adc200/remdrv ~ 17 b:ppc-blm:8002 timing=195
+dev adc200_kkr2 adc200/remdrv ~ 19 b:ppc-blm:8002 timing=195
 dev kkr_comm1   frolov_k4x1_2x2x1/remdrv ~ 6 b:ppc-blm:8002
 dev kkr_comm2   frolov_k4x1_2x2x1/remdrv ~ 8 b:ppc-blm:8002
 

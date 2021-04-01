@@ -37,6 +37,8 @@ enum
 // !!! Future "TRIG_LEVEL"?
 // !!! Future "TRIG_MODE" (single/multi/recorder) and TRIG_MULTI_NUM?
 
+    ADC250_CHAN_PLL_PRESET    = 39,
+
     /* 40-139: status */
     ADC250_CHAN_DEVICE_ID     = 40,  ADC250_CHAN_HWINFO_first = ADC250_CHAN_DEVICE_ID,
     ADC250_CHAN_BASE_SW_VER   = 41,
@@ -48,7 +50,10 @@ enum
     ADC250_CHAN_PGA_UNIQ_ID   = 47,  ADC250_CHAN_HWINFO_last  = ADC250_CHAN_PGA_UNIQ_ID,
                                      ADC250_CHAN_HWINFO_count = ADC250_CHAN_HWINFO_last  -
                                                                 ADC250_CHAN_HWINFO_first + 1,
-    // unused 48,49
+
+    ADC250_CHAN_PLL_LOCKED    = 48,
+
+    // unused 49
 
     ADC250_CHAN_ELAPSED       = 50,
     // absent in ADC250: ADC250_CHAN_CLB_STATE     = 51,
@@ -100,6 +105,9 @@ enum
     ADC250_CHAN_CLB_GAIN2     = 96,
     ADC250_CHAN_CLB_GAIN3     = 97,
     // unused 98,99
+
+    ADC250_CHAN_CUR_PLL1_CTRL = 98,
+    ADC250_CHAN_CUR_PLL2_CTRL = 99,
 
     ADC250_CHAN_MIN0          = 100, ADC250_CHAN_STATS_first = ADC250_CHAN_MIN0,
     ADC250_CHAN_MIN1          = 101,

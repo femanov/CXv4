@@ -133,7 +133,7 @@ grouping main LINMAGX_grouping "Linac Magnetic System Control" lrtb \
        #OLD_V1000_LINE(Coil2)
         MAGX_IST_CDAC20_LINE(psol,      "pSol",  "\nISTR: IST-2",    1800, 1, icd_psol,  1, 0)
        #OLD_V1000_LINE(QL15, `"\nV1000: V300-4"')
-        MAGX_IST_CDAC20_LINE(ql15,      "QL15", "\nV1000: V500-4",   300,  1, icd_ql15,  1, 0, 1)
+        MAGX_IST_CDAC20_LINE(ql15,      "QL15", "\nroom 7-11a: VCh500-4",   300,  1, icd_ql15,  1, 0, 1)
 
         MAGX_VCH300_LINE(QL16, "QL16", "\nIP2: IIIrST VCh300", 1000, 1, v3h0, 0)
         MAGX_VCH300_LINE(QL17, "QL17", "\nIP2: IIIrST VCh300", 1000, 1, v3h0, 1)

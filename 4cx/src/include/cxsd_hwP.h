@@ -35,6 +35,7 @@ typedef struct
     int                  state;         // One of DEVSTATE_NNN
     int                  logmask;       // Mask for logging of various classes of events
     int                  is_simulated;  // Per-device simulation flag
+    int                  is_readonly;   // Per-device readonliness flag
     struct timeval       stattime;      // Time of last state change
     rflags_t             statrflags;    // Flags of current state/error
 
@@ -82,7 +83,7 @@ typedef struct
     int8            is_autoupdated;
     int8            is_internal;
     int8            do_ignore_upd_cycle;
-    int8            res3;
+    int8            rw_readonly;       // is internally a rw-channel, but device is readonly
 
     int             devid;             // "Backreference" -- device this channel belongs to
     cxsd_gchnid_t   boss;              // if >= 0
@@ -193,34 +194,34 @@ cxsd_cpntid_t  CxsdHwResolveChan(const char    *name,
                                  int           *phys_count_p,
                                  double        *rds_buf,
                                  int            rds_buf_cap,
-                                 char         **ident_p,
-                                 char         **label_p,
-                                 char         **tip_p,
-                                 char         **comment_p,
-                                 char         **geoinfo_p,
-                                 char         **rsrvd6_p,
-                                 char         **units_p,
-                                 char         **dpyfmt_p);
+                                 const char   **ident_p,
+                                 const char   **label_p,
+                                 const char   **tip_p,
+                                 const char   **comment_p,
+                                 const char   **geoinfo_p,
+                                 const char   **rsrvd6_p,
+                                 const char   **units_p,
+                                 const char   **dpyfmt_p);
 int            CxsdHwGetCpnProps(cxsd_cpntid_t  cpid,
                                  cxsd_gchnid_t *gcid_p,
                                  int           *phys_count_p,
                                  double        *rds_buf,
                                  int            rds_buf_cap,
-                                 char         **ident_p,
-                                 char         **label_p,
-                                 char         **tip_p,
-                                 char         **comment_p,
-                                 char         **geoinfo_p,
-                                 char         **rsrvd6_p,
-                                 char         **units_p,
-                                 char         **dpyfmt_p);
+                                 const char   **ident_p,
+                                 const char   **label_p,
+                                 const char   **tip_p,
+                                 const char   **comment_p,
+                                 const char   **geoinfo_p,
+                                 const char   **rsrvd6_p,
+                                 const char   **units_p,
+                                 const char   **dpyfmt_p);
 int            CxsdHwGetChanType(cxsd_gchnid_t  gcid,
                                  int           *is_rw_p,
                                  cxdtype_t     *dtype_p,
                                  int           *max_nelems_p);
 int            CxsdHwGetChanAuxs(cxsd_gchnid_t  gcid,
-                                 char         **dbprops_p,
-                                 char         **drvinfo_p);
+                                 const char   **dbprops_p,
+                                 const char   **drvinfo_p);
 
 /* Note: CxsdHwDoIO MAY modify contents of dtypes[], nelems[] and values[] */
 int  CxsdHwDoIO         (int  requester,

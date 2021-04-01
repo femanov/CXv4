@@ -48,6 +48,7 @@ static int mqtt_mapping_init_d(int devid, void *devptr,
 
   const char     *type_name;
   int             type_nsp_id;
+  const
   CxsdDbDcNsp_t  *type_nsp;
   const char     *inst_name;
   size_t          inst_name_len;
