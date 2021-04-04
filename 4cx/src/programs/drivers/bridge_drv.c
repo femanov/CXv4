@@ -122,9 +122,11 @@ static int bridge_init_d(int devid, void *devptr,
   cxdtype_t       dtype;
   int             max_nelems;
   int             is_trusted;
+  int             is_on_cycle;
 
   int             mirror_mode;
   int             all_trusted;
+  int             all_on_cycle;
 
     me->devid = devid;
     GetDevPlace(devid, &dev_first, &(me->numchans));
@@ -145,8 +147,9 @@ static int bridge_init_d(int devid, void *devptr,
     bzero(me->map, map_size);
 
     foreign_base = auxinfo;
-    mirror_mode = 0;
-    all_trusted = 0;
+    mirror_mode  = 0;
+    all_trusted  = 0;
+    all_on_cycle = 0;
     if (foreign_base != NULL)
     {
         if (*foreign_base == '@')
@@ -154,8 +157,9 @@ static int bridge_init_d(int devid, void *devptr,
             foreign_base++;
             while (1)
             {
-                if      (*foreign_base == '*') mirror_mode = 1;
-                else if (*foreign_base == '!') all_trusted = 1;
+                if      (*foreign_base == '*') mirror_mode  = 1;
+                else if (*foreign_base == '!') all_trusted  = 1;
+                else if (*foreign_base == '~') all_on_cycle = 1;
                 else if (*foreign_base == ':') {foreign_base++; goto END_BASE_FLAGS;}
                 else
                 {
@@ -199,7 +203,8 @@ static int bridge_init_d(int devid, void *devptr,
     for (chn = 0;  chn < me->numchans;  chn++)
     {
         me->map[chn] = CDA_DATAREF_ERROR;
-        is_trusted = all_trusted;
+        is_trusted  = all_trusted;
+        is_on_cycle = all_on_cycle;
         if (mirror_mode)
         {
             GetNameOf(type_nsp, chn, &foreign_name);
@@ -220,7 +225,8 @@ static int bridge_init_d(int devid, void *devptr,
                 foreign_name++;
                 while (1)
                 {
-                    if      (*foreign_name == '!') is_trusted = 1;
+                    if      (*foreign_name == '!') is_trusted  = 1;
+                    if      (*foreign_name == '~') is_on_cycle = 1;
                     else if (*foreign_name == ':') {foreign_name++; goto END_NAME_FLAGS;}
                     else
                     {
@@ -242,7 +248,7 @@ static int bridge_init_d(int devid, void *devptr,
         }
 
         if ((me->map[chn] = cda_add_chan(me->cid, NULL, foreign_name,
-                                         CDA_DATAREF_OPT_ON_UPDATE |
+                                         (is_on_cycle? 0 : CDA_DATAREF_OPT_ON_UPDATE) |
                                            CDA_DATAREF_OPT_NO_RD_CONV*0,
                                          dtype, max_nelems,
                                          CDA_REF_EVMASK_UPDATE     |
