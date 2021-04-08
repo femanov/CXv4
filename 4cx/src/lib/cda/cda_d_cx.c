@@ -270,7 +270,8 @@ static int  cda_d_cx_new_chan(cda_dataref_t ref, const char *name,
     w_srv = determine_name_type(name, srvrspec, sizeof(srvrspec), &channame);
     ////fprintf(stderr, "\t%s(%d, \"%s\")\n\t\t[%s]%s\n", __FUNCTION__, ref, name, srvrspec, channame);
 
-    if (strcasecmp(srvrspec, "unknown") == 0)
+    if (strcasecmp(srvrspec, "unknown")   == 0  ||
+        strcasecmp(srvrspec, "unknown:0") == 0)
     {
         srvrspec[0] = '\0';
         w_srv = 0;

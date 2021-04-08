@@ -274,6 +274,7 @@ int  ParseDatarefSpec(const char    *argv0,
                 else if (*cp == '.') options |= CDA_DATAREF_OPT_NO_RD_CONV;
                 else if (*cp == '/') options |= CDA_DATAREF_OPT_SHY;
                 else if (*cp == '!') options |= CDA_DATAREF_OPT_EXCLUSIVE;
+                else if (*cp == '~') options &=~CDA_DATAREF_OPT_ON_UPDATE;
                 else if (*cp == '+') is_unsigned_mask = CXDTYPE_USGN_MASK;
                 else if (*cp == ':') {cp++; goto NEXT_FLAG;}
                 else break;

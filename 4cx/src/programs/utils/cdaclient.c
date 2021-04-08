@@ -5,6 +5,10 @@
 #include <ctype.h>
 #include <math.h>
 #include <errno.h>
+// For fstat()
+#include <sys/types.h>
+#include <sys/stat.h>
+#include <unistd.h>
 
 #include "misc_macros.h"
 #include "misclib.h"
@@ -620,6 +624,8 @@ static int  ActivateChannel(refrec_t *rp, void *privptr)
 static void ReadFromFile(const char *argv0, const char *filename)
 {
   FILE *fp;
+  int   fd;
+  struct stat stat_buf;
   char  line[1000];
   char *p;
 
@@ -630,6 +636,11 @@ static void ReadFromFile(const char *argv0, const char *filename)
                 strcurtime(), argv0, filename, strerror(errno));
         exit(EC_ERR);
     }
+    if ((fd = fileno(fp)) >= 0     &&
+        fstat(fd, &stat_buf) == 0  &&
+        S_ISDIR(stat_buf.st_mode))
+        fprintf(stderr, "%s %s: WARNING: \"%s\" seems to be a directory; its reading is senseless\n",
+                strcurtime(), argv0, filename);
 
     while (fgets(line, sizeof(line) - 1, fp) != NULL)
     {
@@ -863,6 +874,8 @@ int main(int argc, char *argv[])
                " @.:              turn on CDA_DATAREF_OPT_NO_RD_CONV flag\n"
                " @/:              turn on CDA_DATAREF_OPT_SHY flag\n"
                " @#:              turn on CDA_DATAREF_OPT_PRIV_SRV flag (quote '#' in shell!)\n"
+               " @!:              turn on CDA_DATAREF_OPT_EXCLUSIVE flag (quote '!'!)\n"
+               " @~:              turn off CDA_DATAREF_OPT_ON_UPDATE flag (quote '~'!)\n"
                " @+:              following integer dtype is unsigned (add CXDTYPE_USGN_MASK)\n"
                " @T[MAX_NELEMS]:  dtype and optional maximum nelems; T is one of:\n"
                "                   b  INT8  (Byte)\n"

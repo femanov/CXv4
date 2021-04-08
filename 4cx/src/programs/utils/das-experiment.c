@@ -5,6 +5,10 @@
 #include <string.h>
 #include <ctype.h>
 #include <math.h>
+// For fstat()
+#include <sys/types.h>
+#include <sys/stat.h>
+#include <unistd.h>
 
 #include "misc_macros.h"
 #include "misclib.h"
@@ -236,6 +240,8 @@ static int  ActivateChannel(refrec_t *rp, void *privptr)
 static void ReadFromFile(const char *argv0, const char *filename)
 {
   FILE *fp;
+  int   fd;
+  struct stat stat_buf;
   char  line[1000];
   char *p;
 
@@ -246,6 +252,11 @@ static void ReadFromFile(const char *argv0, const char *filename)
                 strcurtime(), argv0, filename, strerror(errno));
         exit(EC_ERR);
     }
+    if ((fd = fileno(fp)) >= 0     &&
+        fstat(fd, &stat_buf) == 0  &&
+        S_ISDIR(stat_buf.st_mode))
+        fprintf(stderr, "%s %s: WARNING: \"%s\" seems to be a directory; its reading is senseless\n",
+                strcurtime(), argv0, filename);
 
     while (fgets(line, sizeof(line) - 1, fp) != NULL)
     {

@@ -104,7 +104,7 @@ static void PzframeDataEvproc(int            uniq,
   cxdtype_t            dtype;
   int                  max_nelems;
 
-////fprintf(stderr, "%s %s %p\n", strcurtime(), __FUNCTION__, pfr);
+////fprintf(stderr, "%s %s reason=%d pfr=%p info_ptr=%p\n", strcurtime(), __FUNCTION__, reason, pfr, info_ptr);
     if      (reason == CDA_REF_R_RSLVSTAT)
     {
         if (ptr2lint(info_ptr) != CDA_RSLVSTAT_FOUND)
@@ -229,7 +229,7 @@ static void PzframeDevSEvproc(int            uniq,
     PzframeDataCallCBs(pfr, PZFRAME_REASON_DEVSTATE, val);
 }
 
-static void PzframeRDsCEvproc(int            uniq,
+static void PzframePrpCEvproc(int            uniq,
                               void          *privptr1,
                               cda_dataref_t  ref,
                               int            reason,
@@ -240,9 +240,22 @@ static void PzframeRDsCEvproc(int            uniq,
   pzframe_data_t      *pfr = dpl->p;
   int                  cn  = dpl->n;
 
-    /*!!! Remember for info_changed somehow? */
-    /* Call upstream */
-    PzframeDataCallCBs(pfr, PZFRAME_REASON_RDSCHG, cn);
+    if      (reason == CDA_REF_R_RDSCHG)
+    {
+        /*!!! Remember for info_changed somehow? */
+        /* Call upstream */
+        PzframeDataCallCBs(pfr, PZFRAME_REASON_RDSCHG, cn);
+    }
+    else if (reason == CDA_REF_R_RSLVSTAT)
+    {
+        if (ptr2lint(info_ptr) != CDA_RSLVSTAT_FOUND)
+        {
+            cda_get_ref_stat(pfr->refs[cn],
+                             &(pfr->cur_data[cn].rflags),
+                             NULL);
+            PzframeDataCallCBs(pfr, PZFRAME_REASON_PARAM, cn);
+        }
+    }
 }
 
 static void PzframeChanEvproc(int            uniq,
@@ -256,9 +269,22 @@ static void PzframeChanEvproc(int            uniq,
   pzframe_data_t      *pfr = dpl->p;
   int                  cn  = dpl->n;
 
-    ProcessOneChanUpdate(pfr, cn, ref, NULL, NULL);
-    /* Call upstream */
-    PzframeDataCallCBs(pfr, PZFRAME_REASON_PARAM, cn);
+    if      (reason == CDA_REF_R_UPDATE)
+    {
+        ProcessOneChanUpdate(pfr, cn, ref, NULL, NULL);
+        /* Call upstream */
+        PzframeDataCallCBs(pfr, PZFRAME_REASON_PARAM, cn);
+    }
+    else if (reason == CDA_REF_R_RSLVSTAT)
+    {
+        if (ptr2lint(info_ptr) != CDA_RSLVSTAT_FOUND)
+        {
+            cda_get_ref_stat(pfr->refs[cn],
+                             &(pfr->cur_data[cn].rflags),
+                             NULL);
+            PzframeDataCallCBs(pfr, PZFRAME_REASON_PARAM, cn);
+        }
+    }
 }
 
 
@@ -412,7 +438,7 @@ int  PzframeDataRealize   (pzframe_data_t *pfr,
             }
             else if ((ftd->chan_dscrs[cn].chan_type & PZFRAME_CHAN_IMMEDIATE_MASK) != 0)
             {
-                evmask   = CDA_REF_EVMASK_UPDATE;
+                evmask   = CDA_REF_EVMASK_UPDATE | CDA_REF_EVMASK_RSLVSTAT;
                 evproc   = PzframeChanEvproc;
                 privptr2 = pfr->dpls + cn;
 
@@ -421,8 +447,8 @@ int  PzframeDataRealize   (pzframe_data_t *pfr,
             }
             else
             {
-                evmask   = CDA_REF_EVMASK_RDSCHG;
-                evproc   = PzframeRDsCEvproc;
+                evmask   = CDA_REF_EVMASK_RDSCHG | CDA_REF_EVMASK_RSLVSTAT;
+                evproc   = PzframePrpCEvproc;
                 privptr2 = pfr->dpls + cn;
             }
 

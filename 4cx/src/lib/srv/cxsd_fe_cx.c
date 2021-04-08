@@ -360,7 +360,7 @@ static int sanitize_strzcpy(char *dst, size_t dst_size,
 
 static int   InitReplyPacket (v4clnt_t *cp, int32 code, int32 Seq)
 {
-    if (cp->replybuf->Type != 0) {fprintf(stderr, "cp->replybuf->Type=%d\n", cp->replybuf->Type); return +1;}
+    if (cp->replybuf->Type != 0) {/*fprintf(stderr, "cp->replybuf->Type=%d, code=%d\n", cp->replybuf->Type, code);*/ return +1;}
 
     bzero(cp->replybuf, sizeof(CxV4Header));
 

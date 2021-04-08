@@ -157,7 +157,7 @@ static void PzframeGuiEventProc(pzframe_data_t *pfr,
   static char          roller_chars[4] = "/-\\|";
   char                 buf[100];
 
-////fprintf(stderr, "%s %s\n", strcurtime(), __FUNCTION__);
+////fprintf(stderr, "%s %s reason=%d info_int=%d\n", strcurtime(), __FUNCTION__, reason, info_int);
     if      (reason == PZFRAME_REASON_DATA)
     {
         fps_frme(&(gui->fps_ctr));

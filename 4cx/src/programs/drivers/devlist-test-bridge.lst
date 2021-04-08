@@ -4,4 +4,4 @@ devtype target10 r5i,w5i {
 }
 
 dev target target10/noop   ~ -
-dev bridge target10/bridge ~ - @*:cx::localhost:5.target
+dev bridge target10/bridge ~ - @*~:cx::localhost:5.target
