@@ -24,6 +24,9 @@ enum
     // absent in ADC250: ADC250_CHAN_VISIBLE_CLB   = 16,
     ADC250_CHAN_CALC_STATS    = 17,
 
+    ADC250_CHAN_RUN_MODE      = 18,
+    ADC250_CHAN_RUN           = 19,
+
     ADC250_CHAN_PTSOFS        = 20,
     ADC250_CHAN_NUMPTS        = 21,
     ADC250_CHAN_TIMING        = 22,

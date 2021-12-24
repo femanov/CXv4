@@ -23,7 +23,7 @@ grouping main V5CNV_grouping "VEPP5 Conversion System" canvas "nodecor" content:
 
 sysname   v5cnv
 defserver canhw:19
-wintitle  main "VEPP5 Conversion System"
+wintitle  main "Conversion System"
 winname   main v5cnv
 winclass  main V5Cnv
 winopts   main "resizable"

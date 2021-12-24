@@ -35,15 +35,15 @@ dev comm24_phs1 sukh_comm24/remdrv ~ 5  b:ppc-sukhphase:8002
 dev comm24_phs2 sukh_comm24/remdrv ~ 20 b:ppc-sukhphase:8002
 
 # ADC250s
-dev adc250_8a adc250/remdrv ~ 0,0,0x8a,5,0x8a b:bivme2-rfmeas
-dev adc250_8c adc250/remdrv ~ 0,0,0x8c,5,0x8c b:bivme2-rfmeas
-dev adc250_8e adc250/remdrv ~ 0,0,0x8e,5,0x8e b:bivme2-rfmeas
-dev adc250_90 adc250/remdrv ~ 0,0,0x90,5,0x90 b:bivme2-rfmeas
-dev adc250_92 adc250/remdrv ~ 0,0,0x92,5,0x92 b:bivme2-rfmeas
-dev adc250_94 adc250/remdrv ~ 0,0,0x94,5,0x94 b:bivme2-rfmeas
-dev adc250_96 adc250/remdrv ~ 0,0,0x96,5,0x96 b:bivme2-rfmeas
-dev adc250_98 adc250/remdrv ~ 0,0,0x98,5,0x98 b:bivme2-rfmeas
-dev adc250_9a adc250/remdrv ~ 0,0,0x9a,5,0x9a b:bivme2-rfmeas
-dev adc250_9c adc250/remdrv ~ 0,0,0x9c,5,0x9c b:bivme2-rfmeas
+dev adc250_8a adc250/remdrv ~ 0,0,0x8a,5,0x8a b:bivme2-rfmeas run_mode=auto_re_run
+dev adc250_8c adc250/remdrv ~ 0,0,0x8c,5,0x8c b:bivme2-rfmeas run_mode=auto_re_run
+dev adc250_8e adc250/remdrv ~ 0,0,0x8e,5,0x8e b:bivme2-rfmeas run_mode=auto_re_run
+dev adc250_90 adc250/remdrv ~ 0,0,0x90,5,0x90 b:bivme2-rfmeas run_mode=auto_re_run
+dev adc250_92 adc250/remdrv ~ 0,0,0x92,5,0x92 b:bivme2-rfmeas run_mode=auto_re_run
+dev adc250_94 adc250/remdrv ~ 0,0,0x94,5,0x94 b:bivme2-rfmeas run_mode=auto_re_run
+dev adc250_96 adc250/remdrv ~ 0,0,0x96,5,0x96 b:bivme2-rfmeas run_mode=auto_re_run
+dev adc250_98 adc250/remdrv ~ 0,0,0x98,5,0x98 b:bivme2-rfmeas run_mode=auto_re_run
+dev adc250_9a adc250/remdrv ~ 0,0,0x9a,5,0x9a b:bivme2-rfmeas run_mode=auto_re_run
+dev adc250_9c adc250/remdrv ~ 0,0,0x9c,5,0x9c b:bivme2-rfmeas run_mode=auto_re_run
 
 dev l_timer rfmeas_l_timer/remdrv ~ 0,0,0x80 b:bivme2-rfmeas

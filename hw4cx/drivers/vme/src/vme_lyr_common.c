@@ -202,6 +202,7 @@ static void vme_lyr_irq_cb(int bus_handle, void *privptr,
         if (dp->irq_proc != NULL)
             dp->irq_proc(dp->devid, dp->devptr, irq_n, irq_vect);
     }
+    else fprintf(stderr, "%s %s() unknown level=%d.vector=%d\n", strcurtime(), __FUNCTION__, irq_n, irq_vect);
 }
 static int vme_add(int devid, void *devptr,
                    int    bus_major, int    bus_minor,
@@ -270,6 +271,8 @@ static int vme_add(int devid, void *devptr,
         /* Yes! */
         bus_idx = first_free_idx;
         busi[bus_idx].in_use = 1;
+        busi[bus_idx].bus_major  = bus_major;
+        busi[bus_idx].bus_minor  = bus_minor;
         busi[bus_idx].bus_handle = vme_hal_open_bus(bus_major, bus_minor);
         if (busi[bus_idx].bus_handle < 0)
         {

@@ -25,6 +25,9 @@ static pzframe_chan_dscr_t ottcam_chan_dscrs[] =
     [OTTCAM_CHAN_SYNC]          = {"sync"},
     [OTTCAM_CHAN_RRQ_MSECS]     = {"rrq_msecs"},
 
+    [OTTCAM_CHAN_RUN_MODE]     = {"run_mode",     0, PZFRAME_CHAN_IMMEDIATE_MASK},
+    [OTTCAM_CHAN_RUN]          = {"run",          0, PZFRAME_CHAN_IS_PARAM | PZFRAME_CHAN_RW_ONLY_MASK},
+
     [OTTCAM_CHAN_MISS]          = {"miss"},
     [OTTCAM_CHAN_ELAPSED]       = {"elapsed",      0, PZFRAME_CHAN_IMMEDIATE_MASK | PZFRAME_CHAN_ON_CYCLE_MASK},
 

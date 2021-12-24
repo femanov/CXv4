@@ -1,8 +1,9 @@
-SRCDIR=		../nsrc
+SRCDIR=		../src
 VME_HAL_PFX=	a3818
 include		$(SRCDIR)/ShadowRules.mk
 
-MONO_C_FILES=	$(VME_HAL_PFX)vme_lyr.so $(VME_HAL_PFX)_test
+MONO_C_FILES=	$(VME_HAL_PFX)vme_lyr.so $(VME_HAL_PFX)_test $(VME_HAL_PFX)_lab6_vme_firmware
+MONO_C_FILES+=	a3818_u
 
 #---------------------------------------------------------------------
 #  CAENVMElibDefs.mk
@@ -44,8 +45,10 @@ endif
 
 #---------------------------------------------------------------------
 
-$(VME_HAL_PFX)_test:	$(LIBMISC)
+$(VME_HAL_PFX)_test $(VME_HAL_PFX)_lab6_vme_firmware:	$(LIBMISC)
 
 LOCAL_INCLUDES=		$(CAENVMElib_INCLUDES)
 LOCAL_DEFINES=		-DVME_BUS_COMPONENTS_SENSIBLE=2 $(A3818_HAL_DEFINES)
 SPECIFIC_LDFLAGS=	$(CAENVMElib_LIB_PARAMS) $(A3818_HAL_LDFLAGS)
+
+#---------------------------------------------------------------------

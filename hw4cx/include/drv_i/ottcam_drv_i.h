@@ -23,6 +23,9 @@ enum
     OTTCAM_CHAN_SYNC          = 20,
     OTTCAM_CHAN_RRQ_MSECS     = 21,
 
+    OTTCAM_CHAN_RUN_MODE      = 28,
+    OTTCAM_CHAN_RUN           = 29,
+
     /* 30-49: status */
     OTTCAM_CHAN_MISS          = 30,
     OTTCAM_CHAN_ELAPSED       = 31,

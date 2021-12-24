@@ -82,6 +82,9 @@ static pzframe_chan_dscr_t adc333_chan_dscrs[] =
     [ADC333_CHAN_WAITTIME]     = {"waittime"},
     [ADC333_CHAN_CALC_STATS]   = {"calc_stats"},
 
+    [ADC333_CHAN_RUN_MODE]     = {"run_mode",     0, PZFRAME_CHAN_IMMEDIATE_MASK},
+    [ADC333_CHAN_RUN]          = {"run",          0, PZFRAME_CHAN_IS_PARAM | PZFRAME_CHAN_RW_ONLY_MASK},
+
     [ADC333_CHAN_PTSOFS]       = {"ptsofs"},
     [ADC333_CHAN_NUMPTS]       = {"numpts"},
     [ADC333_CHAN_TIMING]       = {"timing"},

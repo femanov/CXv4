@@ -48,6 +48,9 @@ static pzframe_chinfo_t chinfo[] =
     [F4226_CHAN_WAITTIME]      = {PZFRAME_CHTYPE_PZFRAME_STD, 0},
     [F4226_CHAN_CALC_STATS]    = {PZFRAME_CHTYPE_VALIDATE,    0},
 
+    [F4226_CHAN_RUN_MODE]      = {PZFRAME_CHTYPE_PZFRAME_STD, 0},
+    [F4226_CHAN_RUN]           = {PZFRAME_CHTYPE_PZFRAME_STD, 0},
+
     [F4226_CHAN_PTSOFS]        = {PZFRAME_CHTYPE_VALIDATE,    0},
     [F4226_CHAN_NUMPTS]        = {PZFRAME_CHTYPE_VALIDATE,    0},
     [F4226_CHAN_TIMING]        = {PZFRAME_CHTYPE_VALIDATE,    0},
@@ -155,6 +158,7 @@ static psp_paramdescr_t f4226_params[] =
     PSP_P_LOOKUP("range",   f4226_privrec_t, nxt_args[F4226_CHAN_RANGE],     -1, f4226_timing_lkp),
     PSP_P_LOOKUP("prehist", f4226_privrec_t, nxt_args[F4226_CHAN_PREHIST64], -1, f4226_prehist64_lkp),
     PSP_P_FLAG("calcstats", f4226_privrec_t, nxt_args[F4226_CHAN_CALC_STATS], 1, 0),
+    PSP_P_LOOKUP("run_mode",f4226_privrec_t, nxt_args[F4226_CHAN_RUN_MODE],  -1, pzframe_drv_run_mode_lkp),
     PSP_P_END()
 };
 
@@ -484,6 +488,8 @@ enum
     PARAM_WAITTIME = F4226_CHAN_WAITTIME,
     PARAM_STOP     = F4226_CHAN_STOP,
     PARAM_ELAPSED  = F4226_CHAN_ELAPSED,
+    PARAM_RUN_MODE = F4226_CHAN_RUN_MODE,
+    PARAM_RUN      = F4226_CHAN_RUN,
 
     PARAM_DATA     = F4226_CHAN_DATA,
     PARAM_LINE0    = -1,

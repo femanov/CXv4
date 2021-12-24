@@ -9,6 +9,9 @@ devtype adc200 r1i256000,r2i128000,r7i,w20i,r50i {
 	waittime	13
 	calc_stats	14
 
+	run_mode	18
+	run		19
+
 	ptsofs		20
 	numpts		21
 	timing		22

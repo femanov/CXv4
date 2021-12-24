@@ -40,6 +40,8 @@ typedef struct
     int  N;
     int  devid;
 
+    int  v0307;
+
     int              num_isc;
 
     int              val_cache[2];
@@ -47,6 +49,14 @@ typedef struct
     advdac_out_ch_t  out      [2];
 } v0308_privrec_t;
 typedef v0308_privrec_t privrec_t;
+
+static psp_paramdescr_t v0308_params[] =
+{
+    PSP_P_FLAG("v0308", v0308_privrec_t, v0307, 0, 1),
+    PSP_P_FLAG("b0307", v0308_privrec_t, v0307, 1, 0),
+    PSP_P_END()
+};
+
 
 //////////////////////////////////////////////////////////////////////
 static void SendWrRq(privrec_t *me, int l, int32 val);
@@ -101,6 +111,7 @@ static void SendRdRq(privrec_t *me, int l)
   rflags_t         rflags;
 
     rflags  = status2rflags(DO_NAF(CAMAC_REF, me->N, l, 0, &c));
+    if (me->v0307) rflags &=~ CXRF_CAMAC_NO_Q;
     value   = c & 0xFFF;
     HandleSlowmoREADDAC_in(me, l, value, rflags);
 }
@@ -138,6 +149,12 @@ static void v0308_rw_p(int devid, void *devptr,
         rflags = 0;
 
         A = chn & 1;
+        if (me->v0307  &&  A != 0)
+        {
+            value = 0;
+            rflags = CXRF_UNSUPPORTED;
+        }
+        else
         switch (chn &~ 1)
         {
             case V0308_CHAN_VOLTS_base:
@@ -198,6 +215,7 @@ static void v0308_rw_p(int devid, void *devptr,
                 value = 0;
                 rflags = CXRF_UNSUPPORTED;
         }
+        if (me->v0307) rflags &=~ CXRF_CAMAC_NO_Q;
         ReturnInt32Datum(devid, chn, value, rflags);
 
  NEXT_CHANNEL:;
@@ -206,7 +224,7 @@ static void v0308_rw_p(int devid, void *devptr,
 
 DEFINE_CXSD_DRIVER(v0308, "V0308",
                    NULL, NULL,
-                   sizeof(v0308_privrec_t), NULL,
+                   sizeof(v0308_privrec_t), v0308_params,
                    1, 1,
                    NULL, 0,
                    NULL,

@@ -1,4 +1,5 @@
 #include <stdio.h>
+#include <stdarg.h>
 
 #include "timeval_utils.h"
 
@@ -65,8 +66,31 @@ static inline void SndCVal(privrec_t *me, int sodc, int32 val)
 
 //--------------------------------------------------------------------
 
-static void DoStop (privrec_t *me)
+static void ReportStopReason(privrec_t *me, const char *reason)
 {
+  int   len;
+  void *vp;
+
+  static cxdtype_t dt_text        = CXDTYPE_TEXT;
+  static int       ch_stop_reason = LEBEDEV_TURNMAG_CHAN_STOP_REASON;
+  static rflags_t  zero_rflags    = 0;
+
+    if (reason == NULL) reason = "";
+    len = strlen(reason);
+    vp  = reason;
+
+    ReturnDataSet(me->devid,
+                  1,
+                  &ch_stop_reason, &dt_text, &len,
+                  &vp, &zero_rflags, NULL);
+}
+
+static void DoStop (privrec_t *me, const char *format, ...) __attribute__((format (printf, 2, 3)));
+static void DoStop (privrec_t *me, const char *format, ...)
+{
+  va_list  ap;
+  char     buf[100];
+
     if (me->tid >= 0)
     {
         sl_deq_tout(me->tid);
@@ -80,6 +104,16 @@ static void DoStop (privrec_t *me)
     SndCVal(me, C_GO_RING, 0);
     ReturnInt32Datum(me->devid, LEBEDEV_TURNMAG_CHAN_GO_TIME_LEFT, 0, 0);
     ReturnInt32Datum(me->devid, LEBEDEV_TURNMAG_CHAN_GOING_DIR,    0, 0);
+
+    // Take care of a message
+    if (format == NULL) format = "";
+    va_start(ap, format);
+    vsnprintf(buf, sizeof(buf), format, ap);
+    va_end(ap);
+    buf[sizeof(buf) - 1] = '\0';
+
+    DoDriverLog(me->devid, DRIVERLOG_NOTICE, "DoStop: %s", buf);
+    ReportStopReason(me, buf);
 }
 
 static void tout_p(int devid, void *devptr,
@@ -88,7 +122,7 @@ static void tout_p(int devid, void *devptr,
 {
   privrec_t      *me = (privrec_t *)devptr;
 
-    DoStop(me);
+    DoStop(me, "time has passed");
 }
 
 static void DoStart(privrec_t *me, int duration, int dir)
@@ -119,6 +153,7 @@ static void DoStart(privrec_t *me, int duration, int dir)
     SndCVal(me, C_GO_BURY, dir == 0? 1 : 0);
     SndCVal(me, C_GO_RING, dir == 1? 1 : 0);
     ReturnInt32Datum(me->devid, LEBEDEV_TURNMAG_CHAN_GOING_DIR, me->target, 0);
+    ReportStopReason(me, "");
 }
 
 static void lebedev_turnmag_sodc_cb(int devid, void *devptr,
@@ -148,7 +183,7 @@ static void lebedev_turnmag_sodc_cb(int devid, void *devptr,
 
         if ((lim_bury  &&  me->target < 0)  ||
             (lim_ring  &&  me->target > 0))
-            DoStop(me);
+            DoStop(me, "%s limit switch reached", me->target < 0? "BURY" : "RING");
     }
     else if (sodc == C_I_MOTOR)
     {
@@ -168,7 +203,7 @@ static void lebedev_turnmag_sodc_cb(int devid, void *devptr,
                 limit.tv_sec  =  me->i_lim_time / CHAN_TIME_R;
                 limit.tv_usec = (me->i_lim_time % CHAN_TIME_R) * (1000000 / CHAN_TIME_R);
                 if (TV_IS_AFTER(delta, limit))
-                    DoStop(me);
+                    DoStop(me, "Ilim exceeded: abs(%duV)>%duV", abs(val), me->i_lim);
             }
             else
             {
@@ -309,7 +344,7 @@ static void lebedev_turnmag_rw_p(int devid, void *devptr,
         else if (chn == LEBEDEV_TURNMAG_CHAN_STOP)
         {
             if (action == DRVA_WRITE  &&  val == CX_VALUE_COMMAND)
-                DoStop(me);
+                DoStop(me, "STOP command");
             ReturnInt32Datum(devid, chn, 0, 0);
         }
         else if (chn == LEBEDEV_TURNMAG_CHAN_I_EXC_TIME)

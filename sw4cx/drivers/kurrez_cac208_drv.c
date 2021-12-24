@@ -378,6 +378,8 @@ static void SetErr(privrec_t *me, const char *str, int force)
     if (len > 0) memcpy(me->errdescr, str, len);
     me->errdescr[len] = '\0';
 
+    vp = &str;
+    if (len > 0) DoDriverLog(me->devid, DRIVERLOG_NOTICE, "%s", str);
     ReturnDataSet(me->devid,
                   1,
                   &ch_errdescr, &dt_text, &len,
@@ -419,6 +421,9 @@ static int kurrez_cac208_init_d(int devid, void *devptr,
 
     for (x = 0;  x < countof(chan_rs);  x++)
         SetChanRDs(devid, chan_rs[x].chn, 1, chan_rs[x].r, 0.0);
+    SetChanQuant     (devid, KURREZ_CAC208_CHAN_USET,     1, (CxAnyVal_t){.i32=305}, CXDTYPE_INT32);
+    SetChanQuant     (devid, KURREZ_CAC208_CHAN_IEXC,     1, (CxAnyVal_t){.i32=305}, CXDTYPE_INT32);
+    SetChanQuant     (devid, KURREZ_CAC208_CHAN_FINJ,     1, (CxAnyVal_t){.i32=305}, CXDTYPE_INT32);
     SetChanReturnType(devid, KURREZ_CAC208_CHAN_UMES, 24, IS_AUTOUPDATED_YES);
     SetChanReturnType(devid, KURREZ_CAC208_CHAN_USET_MIN, 1, IS_AUTOUPDATED_TRUSTED);
     SetChanReturnType(devid, KURREZ_CAC208_CHAN_IEXC_MIN, 1, IS_AUTOUPDATED_TRUSTED);
@@ -479,6 +484,7 @@ static void kurrez_cac208_sodc_cb(int devid, void *devptr,
     {
         SndCVal(me, SODC_USET,   0);
         SndCVal(me, SODC_IEXC,   0);
+        SetErr(me, "IS_ON disappeared while in ON state, switching to INTERLOCK", 0);
         vdev_set_state(&(me->ctx), REZ_STATE_INTERLOCK);
     }
     else if (sodc >= SODC_UINCD1  &&

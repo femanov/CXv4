@@ -1,21 +1,25 @@
 .PHONY:		firsttarget
 firsttarget:	all
 
-LISTOFDRIVERS=	$(SRCDIR)/ListOfVmeDrivers.mk
-MAKEFILE_PARTS+=$(LISTOFDRIVERS)
-include		$(LISTOFDRIVERS)
+ifeq "$(VME_HAL_DESCR)" ""
+  VME_HAL_DESCR=	$(VME_HAL_PFX)
+endif
 
-DIRECTDRIVERSSOURCES=	$(addprefix $(VME_PFX)_, \
-			  $(addsuffix _drv.c, $(VMEDRIVERS)) \
-			 )
-VMEDRIVERSSYMLINKS=	$(DIRECTDRIVERSSOURCES)
-$(VMEDRIVERSSYMLINKS):	$(VME_PFX)_%:	$(SRCDIR)/%
+SHD_SYMLINKS=	$(VME_HAL_PFX)vme_lyr.c $(VME_HAL_PFX)_test.c $(VME_HAL_PFX)_lab6_vme_firmware.c
 
-# General symlinks' management
-SHD_SYMLINKS=	$(VMEDRIVERSSYMLINKS)
-SHD_GNTDFILES=	$(SHD_SYMLINKS)
+$(VME_HAL_PFX)vme_lyr.c:		$(SRCDIR)/vme_lyr_common.c
+$(VME_HAL_PFX)_test.c:			$(SRCDIR)/vme_test_common.c
+$(VME_HAL_PFX)_lab6_vme_firmware.c:	$(SRCDIR)/lab6_vme_firmware_common.c
+
+$(VME_HAL_PFX)vme_lyr.% $(VME_HAL_PFX)_test.% $(VME_HAL_PFX)_lab6_vme_firmware.%:	\
+	SPECIFIC_DEFINES=-DVME_HAL_FILE_H='"$(VME_HAL_PFX)_hal.h"' -DVME_LYR_NAME=$(VME_HAL_PFX)vme -DVME_HAL_DESCR="$(VME_HAL_DESCR)"
 
 $(SHD_SYMLINKS):
 		$(SCRIPTSDIR)/ln-sf_safe.sh $< $@
 
+SHD_GNTDFILES=	$(SHD_SYMLINKS)
+
 SHD_INCLUDES=	-I$(SRCDIR)
+
+# Declare ourself as "important"
+MAKEFILE_PARTS+=$(SRCDIR)/ShadowRules.mk

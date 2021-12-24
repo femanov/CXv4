@@ -113,7 +113,7 @@ grouping main V5IE_grouping "VEPP5 Injection/Extraction" lrtb "vertical" \
 
 sysname   v5ie
 defserver canhw:19
-wintitle  main "VEPP5 Injection/Extraction"
+wintitle  main "Injection/Extraction"
 winname   main v5ie
 winclass  main V5IE
 winopts   main ""

@@ -463,6 +463,8 @@ static int v1k_cdac20_init_d(int devid, void *devptr,
     SetChanRDs       (devid, V1K_CDAC20_CHAN_ISET_RATE, 1, 1000000.0, 0.0);
     SetChanRDs       (devid, V1K_CDAC20_CHAN_ISET_CUR,  1, 1000000.0, 0.0);
     SetChanRDs/*!!!*/(devid, V1K_CDAC20_CHAN_RD_base,   8, 1000000.0, 0.0);
+    SetChanQuant     (devid, V1K_CDAC20_CHAN_ISET,      1, (CxAnyVal_t){.i32=305}, CXDTYPE_INT32);
+    SetChanQuant     (devid, V1K_CDAC20_CHAN_ISET_CUR,  1, (CxAnyVal_t){.i32=305}, CXDTYPE_INT32);
     SetChanReturnType(devid, V1K_CDAC20_CHAN_ISET_CUR,  1, IS_AUTOUPDATED_TRUSTED);
     SetChanReturnType(devid, V1K_CDAC20_CHAN_ILK_base,
                               V1K_CDAC20_CHAN_ILK_count,   IS_AUTOUPDATED_YES);

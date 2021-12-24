@@ -19,6 +19,9 @@ enum
     ADC200_CHAN_WAITTIME      = 13, 
     ADC200_CHAN_CALC_STATS    = 14,
 
+    ADC200_CHAN_RUN_MODE      = 18,
+    ADC200_CHAN_RUN           = 19,
+
     ADC200_CHAN_PTSOFS        = 20,
     ADC200_CHAN_NUMPTS        = 21,
     ADC200_CHAN_TIMING        = 22,

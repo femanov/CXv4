@@ -212,7 +212,7 @@ grouping main V5RFSYN_grouping "VEPP5 RFSyn, Injection/Extraction" lrtb "vertica
 
 sysname   v5rfsyn
 defserver canhw:19
-wintitle  main "VEPP5 RFSyn, Injection/Extraction"
+wintitle  main "RFSyn, Injection/Extraction"
 winname   main v5rfsyn
 winclass  main V5RFSyn
 winopts   main "with_tbar_loggia"

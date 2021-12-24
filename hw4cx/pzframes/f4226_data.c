@@ -52,6 +52,9 @@ static pzframe_chan_dscr_t f4226_chan_dscrs[] =
     [F4226_CHAN_WAITTIME]      = {"waittime"},
     [F4226_CHAN_CALC_STATS]    = {"calc_stats"},
 
+    [F4226_CHAN_RUN_MODE]      = {"run_mode",     0, PZFRAME_CHAN_IMMEDIATE_MASK},
+    [F4226_CHAN_RUN]           = {"run",          0, PZFRAME_CHAN_IS_PARAM | PZFRAME_CHAN_RW_ONLY_MASK},
+
     [F4226_CHAN_PTSOFS]        = {"ptsofs"},
     [F4226_CHAN_NUMPTS]        = {"numpts"},
     [F4226_CHAN_TIMING]        = {"timing"},

@@ -28,7 +28,7 @@ grouping main blm "VEPP5 kickers ADC200s" \
 
 sysname   v5adc200_kkrs
 defserver cxhw:18
-wintitle  main "VEPP5 kickers ADC200s"
+wintitle  main "Kickers ADC200s"
 winname   main v5adc200_kkrs
 winclass  main v5adc200_kkrs
 winopts   main resizable,compact,notoolbar

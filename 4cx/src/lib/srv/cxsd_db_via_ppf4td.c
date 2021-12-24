@@ -406,6 +406,7 @@ static int ParseSomeProps(const char *argv0,  ppf4td_ctx_t *ctx, CxsdDb db,
                     if (ch != '-')
                         return BARK("'-' expected before \"%s\"%s value",
                                     table[idx].name, subfield_name);
+                    ppf4td_nextc(ctx, &ch);
 #else
                     if (*p != '-')
                         return BARK("'-' expected before \"%s\"%s value",

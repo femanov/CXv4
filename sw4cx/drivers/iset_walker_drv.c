@@ -92,6 +92,7 @@ static void SwchToSTOPPED(void *devptr, int prev_state __attribute__((unused)))
 
     me->cur_step = -1;
 
+DoDriverLog(me->devid, DRIVERLOG_C_DEFAULT | DRIVERLOG_NOTICE, "STOP");
     ReturnInt32Datum(me->devid, ISET_WALKER_CHAN_CUR_STEP, me->cur_step, 0);
     ReturnCommandChannels(me);
 }
@@ -101,6 +102,20 @@ static void SwchToWALKING(void *devptr, int prev_state __attribute__((unused)))
   privrec_t *me = devptr;
 
 ////fprintf(stderr, "%s count=%d\n", __FUNCTION__, me->steps_count);
+if (1)
+{
+  char buf[1000];
+  char nbf[100];
+  int  i;
+
+    buf[0] = '\0';
+    for (i = 0;  i < me->steps_count  &&  i < 10;  i++)
+    {
+        sprintf(nbf, "%s%d", i>0? ", " : "", me->steps[i]);
+        strcat(buf, nbf);
+    }
+    DoDriverLog(me->devid, DRIVERLOG_C_DEFAULT | DRIVERLOG_NOTICE, "WALK [%d]={%s}", me->steps_count, buf);
+}
     if (me->steps_count <= 0)
     {
         vdev_set_state(&(me->ctx), WLK_STATE_STOPPED);
@@ -193,8 +208,11 @@ static void iset_walker_sodc_cb(int devid, void *devptr,
 
     if (sodc == C_OUT_CUR  &&  me->ctx.cur_state == WLK_STATE_WALKING)
     {
+ReturnInt32Datum(me->devid, ISET_WALKER_CHAN_STOP, val, 0);
+
         if (abs(val - me->steps[me->cur_step]) <= me->q)
         {
+DoDriverLog(devid, DRIVERLOG_C_DEFAULT | DRIVERLOG_NOTICE, "_sodc_cb(val=%d) steps[%d]=%d", val, me->cur_step, me->steps[me->cur_step]);
             me->cur_step++;
             if (me->cur_step < me->steps_count)
                 StartStep(me);

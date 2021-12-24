@@ -1,12 +1,12 @@
 # cxhw:25 -- klystrons
 
-include(`g0401.devtype')
+#include(`g0401.devtype')
 include(`g0603.devtype')
 include(`v06xx.devtype')
 include(`c0642.devtype')
 include(`r0601.devtype')
-include(`adc200.devtype')
-include(`f4226.devtype')
+#include(`adc200.devtype')
+#include(`f4226.devtype')
 include(`v5k5045.devtype')
 include(`v5phaseconv.devtype')
 
@@ -22,23 +22,23 @@ dev phasectl v5phaseconv  ~ - phasedac
 define(`ONE_KLS', `
     # a. Devices
     dev k$1_pks g0603/remdrv  ~ 2  b:v5-l-kls$1 spd0=200 unipolar
-    dev k$1_gvi g0401/remdrv  ~ 4  b:v5-l-kls$1 $4
+#    dev k$1_gvi g0401/remdrv  ~ 4  b:v5-l-kls$1 $4
     dev k$1_urr v06xx/remdrv  ~ 6  b:v5-l-kls$1
     dev k$1_dac c0642/remdrv  ~ 8  b:v5-l-kls$1
     dev k$1_in1 r0601/remdrv  ~ 10 b:v5-l-kls$1
     dev k$1_in2 r0601/remdrv  ~ 11 b:v5-l-kls$1
-    dev k$1_osc adc200/remdrv ~ 13 b:v5-l-kls$1
+#    dev k$1_osc adc200/remdrv ~ 13 b:v5-l-kls$1
 ifelse(eval($2 >= 1), `0', `', `
-    dev k$1_f_1 f4226/remdrv  ~ 15 b:v5-l-kls$1
+#    dev k$1_f_1 f4226/remdrv  ~ 15 b:v5-l-kls$1
 ')
 ifelse(eval($2 >= 2), `0', `', `
-    dev k$1_f_2 f4226/remdrv  ~ 16 b:v5-l-kls$1
+#    dev k$1_f_2 f4226/remdrv  ~ 16 b:v5-l-kls$1
 ')
 
     # b. A common hierarchy for v5k5045-required devices
     cpoint kls$1_devs {
         pks k$1_pks
-        gvi k$1_gvi
+#        gvi k$1_gvi
         urr k$1_urr
         dac k$1_dac
         in1 k$1_in1
@@ -64,5 +64,5 @@ ifelse(eval($2 >= 2), `0', `', `
 
 ONE_KLS(1, 0, 45500, t_quant=100)
 ONE_KLS(2, 1, 44500, t_quant=100)
-ONE_KLS(3, 2, 44500, t_quant=100)
-ONE_KLS(4, 0, 45900, t_quant=100)
+ONE_KLS(3, 2, 42500, t_quant=100)
+ONE_KLS(4, 0, 45500, t_quant=100)

@@ -226,11 +226,11 @@ static int bridge_init_d(int devid, void *devptr,
                 while (1)
                 {
                     if      (*foreign_name == '!') is_trusted  = 1;
-                    if      (*foreign_name == '~') is_on_cycle = 1;
+                    else if (*foreign_name == '~') is_on_cycle = 1;
                     else if (*foreign_name == ':') {foreign_name++; goto END_NAME_FLAGS;}
                     else
                     {
-                        DoDriverLog(devid, 0, "bad @-spec for chn:%d", chn);
+                        DoDriverLog(devid, 0, "bad @-spec for chn:%d <%s>", chn, foreign_name);
                         goto NEXT_CHANNEL;
                     }
                     foreign_name++;

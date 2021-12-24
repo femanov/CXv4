@@ -1,0 +1,12 @@
+devtype lhebw_catctl w50i,r50i {
+	Iset		0
+	Ilim		1
+
+	enable		40
+
+	Iset_ctl	50
+	Ilim_ctl	51
+	Ivip_ctl	52
+
+	vdev_state	99
+}

@@ -8,6 +8,9 @@ devtype c061621 r1i4096,r9i,w20i,r19i,r1t20 {
 	waittime	13
 	calc_stats	14
 
+	run_mode	18
+	run		19
+
 	ptsofs		20
 	numpts		21
 	timing		22

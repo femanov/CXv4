@@ -8,9 +8,9 @@ else
 endif
 
 # VME
-SRCDIR=		../src
+SRCDIR=		../old-src
 VME_PFX=	bivme2
-include		$(DIR_PATH)/../src/ShadowRules.mk
+include		$(DIR_PATH)/../old-src/ShadowRules.mk
 
 GIVEN_DIR=	$(HW4DIR)/given/bivme2
 

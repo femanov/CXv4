@@ -1,0 +1,4 @@
+include(`vadc16.devtype')
+
+dev a0 vadc16@a3818vme ~ 1,0,0,6,50    adc_timecode=0
+dev a2 vadc16@a3818vme ~ 1,0,2,7,52    adc_timecode=0

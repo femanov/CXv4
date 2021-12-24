@@ -263,6 +263,7 @@ static void ParseDevSpec (const char *argv0, const char *spec,
         p++;
     }
 
+    if (tolower(*p) == 'a') p++; // Optional prefix, for "A32" to be valid alongside "32"
     dev_p->addr_size        = strtol(p, &errp, 0);
     if (errp == p  ||  *errp != ':') goto ERR;
     p = errp + 1;
@@ -302,9 +303,13 @@ static int              was_irq;
 static vme_rw_params_t  onclose_params[10];
 static int              onclose_count = 0;
 
-static int              option_binary   = 0;
-static int              option_hex_data = 0;
-static int              option_quiet    = 0;
+static int              option_binary     = 0;
+#ifdef VME_HAL_DO_PARSE_BUS_CONFIG
+static const char      *option_bus_config = NULL;
+#endif
+static int              option_hex_data   = 0;
+static int              option_keep_going = 0;
+static int              option_quiet      = 0;
 static enum
 {
     TIMES_OFF,
@@ -564,6 +569,7 @@ static void PerformIO (const char *argv0, const char *spec)
     if (r < 0)
     {
         fprintf(stderr, "%s: IO(\"%s\") error: %s\n", argv0, spec, vme_hal_strerror(r));
+        if (option_keep_going) return;
         exit(2);
     }
 
@@ -626,7 +632,11 @@ int main(int argc, char *argv[])
     /* Make stdout ALWAYS line-buffered */
     setvbuf(stdout, NULL, _IOLBF, 0);
 
-    while ((c = getopt(argc, argv, "Bc:hi:qtTx")) > 0)
+    while ((c = getopt(argc, argv, "Bc:hi:KqtTx"
+#ifdef VME_HAL_DO_PARSE_BUS_CONFIG
+                                   "C:"
+#endif
+           )) > 0)
     {
         switch (c)
         {
@@ -668,7 +678,20 @@ int main(int argc, char *argv[])
                     }
                 }
                 break;
-            
+
+#ifdef VME_HAL_DO_PARSE_BUS_CONFIG
+            case 'C':
+                // Note: we do NOT forbid multiple "-C" options (otherwise an "option_bus_config != NULL" could check for duplicates)
+                option_bus_config = optarg;
+                if (VME_HAL_DO_PARSE_BUS_CONFIG(option_bus_config) < 0)
+                {
+                    fprintf(stderr, "%s: error in \"%s\" bus_config-spec: %s\n",
+                            argv[0], option_bus_config, psp_error());
+                    exit(1);
+                }
+                break;
+#endif
+
             case 'h': goto PRINT_HELP;
 
             case 'i':
@@ -731,11 +754,12 @@ int main(int argc, char *argv[])
                 }
                 break;
 
-            case 'q': option_quiet    = 1;            break;
-            case 't': option_times    = TIMES_REL;    break;
-            case 'T': option_times    = TIMES_ISO;    break;
+            case 'K': option_keep_going = 1;          break;
+            case 'q': option_quiet      = 1;          break;
+            case 't': option_times      = TIMES_REL;  break;
+            case 'T': option_times      = TIMES_ISO;  break;
 
-            case 'x': option_hex_data = 1;            break;
+            case 'x': option_hex_data   = 1;          break;
             
             case '?':
             default:
@@ -753,6 +777,15 @@ int main(int argc, char *argv[])
 
     ParseDevSpec(argv[0], argv[optind++], &dev);
 
+#if defined(VME_HAL_DO_PARSE_BUS_CONFIG)  &&  defined(VME_HAL_DEFAULT_BUS_CONFIG_FOR_VMETEST)
+    if (option_bus_config == NULL) // Parse default config if "-C" wasn't specified AND default spec IS defined (condition above)
+        if (VME_HAL_DO_PARSE_BUS_CONFIG(VME_HAL_DEFAULT_BUS_CONFIG_FOR_VMETEST) < 0)
+        {
+            fprintf(stderr, "%s: error in \"%s\" bus_config-spec: %s\n",
+                    argv[0], VME_HAL_DEFAULT_BUS_CONFIG_FOR_VMETEST, psp_error());
+            exit(1);
+        }
+#endif
     r = vme_hal_init(0);
     if (r < 0)
     {
@@ -811,8 +844,12 @@ int main(int argc, char *argv[])
     fprintf(stderr, "    OPTIONS:\n");
     fprintf(stderr, "        -B            binary output (implies -q)\n");
     fprintf(stderr, "        -c OP1[,OP2]  operations to perform upon close\n");
+#ifdef VME_HAL_DO_PARSE_BUS_CONFIG
+    fprintf(stderr, "        -C BUS_CONFIG specify bus configuration parameters\n");
+#endif
     fprintf(stderr, "        -h            display this help and exit\n");
     fprintf(stderr, "        -i IRQSPEC    IRQ handling spec (see below)\n");
+    fprintf(stderr, "        -K            keep going after VME errors (do NOT exit)\n");
     fprintf(stderr, "        -q            quiet operation\n");
     fprintf(stderr, "        -t            print relative timestamps\n");
     fprintf(stderr, "        -T            print ISO8601 timestamps\n");

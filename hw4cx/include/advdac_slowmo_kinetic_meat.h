@@ -91,6 +91,56 @@ static int DoCalcMovement(int32 trg, advdac_out_ch_t *ci, advdac_out_ch_t *rp)
 }
 
 // c. privrec-related
+static void ReportOUT_Ranges(privrec_t *me)
+{
+  int        l;       // Line #
+  int        first, count;
+  int32      f_min, f_max;
+  int32      l_min, l_max;
+
+    for (l = 0, first = 0, count = 0;
+         l < countof(me->out);
+         l++)
+    {
+        l_min = me->out[l].min;
+        l_max = me->out[l].max;
+        if (l_min >= l_max)
+        {
+            l_min = MIN_ALWD_VAL;
+            l_max = MAX_ALWD_VAL;
+        }
+
+        if      (count == 0)
+        {
+            first = l;
+            count = 1;
+            f_min = l_min;
+            f_max = l_max;
+        }
+        else if (l_min != f_min  ||
+                 l_max != f_max)
+        {
+            SetChanRange(me->devid, DEVSPEC_CHAN_OUT_n_base     + first, count, (CxAnyVal_t){.i32=f_min}, (CxAnyVal_t){.i32=f_max}, CXDTYPE_INT32);
+            SetChanRange(me->devid, DEVSPEC_CHAN_OUT_CUR_n_base + first, count, (CxAnyVal_t){.i32=f_min}, (CxAnyVal_t){.i32=f_max}, CXDTYPE_INT32);
+            if                     (DEVSPEC_CHAN_OUT_IMM_n_base > 0)
+            SetChanRange(me->devid, DEVSPEC_CHAN_OUT_IMM_n_base + first, count, (CxAnyVal_t){.i32=f_min}, (CxAnyVal_t){.i32=f_max}, CXDTYPE_INT32);
+            first = l;
+            count = 1;
+            f_min = l_min;
+            f_max = l_max;
+        }
+        else
+            count++;
+    }
+    if (count > 0)
+    {
+        SetChanRange    (me->devid, DEVSPEC_CHAN_OUT_n_base     + first, count, (CxAnyVal_t){.i32=f_min}, (CxAnyVal_t){.i32=f_max}, CXDTYPE_INT32);
+        SetChanRange    (me->devid, DEVSPEC_CHAN_OUT_CUR_n_base + first, count, (CxAnyVal_t){.i32=f_min}, (CxAnyVal_t){.i32=f_max}, CXDTYPE_INT32);
+        if                         (DEVSPEC_CHAN_OUT_IMM_n_base > 0)
+        SetChanRange    (me->devid, DEVSPEC_CHAN_OUT_IMM_n_base + first, count, (CxAnyVal_t){.i32=f_min}, (CxAnyVal_t){.i32=f_max}, CXDTYPE_INT32);
+    }
+}
+
 static void HandleSlowmoHbt(privrec_t *me)
 {
   int         l;       // Line #

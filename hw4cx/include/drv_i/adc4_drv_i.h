@@ -21,6 +21,9 @@ enum
     ADC4_CHAN_WAITTIME      = 13, 
     ADC4_CHAN_CALC_STATS    = 14,
 
+    ADC4_CHAN_RUN_MODE      = 18,
+    ADC4_CHAN_RUN           = 19,
+
     ADC4_CHAN_PTSOFS        = 20,
     ADC4_CHAN_NUMPTS        = 21,
     ADC4_CHAN_ZERO0         = 22,

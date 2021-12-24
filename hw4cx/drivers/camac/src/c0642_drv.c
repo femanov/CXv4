@@ -35,6 +35,7 @@ static int c0642_init_d(int devid, void *devptr,
     SetChanRDs  (devid, C0642_CHAN_OUT_n_base, C0642_CHAN_OUT_n_count, 1000000.0, 0.0);
     q.i32 = me->SCALE;
     SetChanQuant(devid, C0642_CHAN_OUT_n_base, C0642_CHAN_OUT_n_count, q, CXDTYPE_INT32);
+    SetChanRange(devid, C0642_CHAN_OUT_n_base, C0642_CHAN_OUT_n_count, (CxAnyVal_t){.i32=-32767*me->SCALE}, (CxAnyVal_t){.i32=+32767*me->SCALE}, CXDTYPE_INT32);
 
     return DEVSTATE_OPERATING;
 }

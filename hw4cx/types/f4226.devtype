@@ -8,6 +8,9 @@ devtype f4226 r1i1024,r9i,w20i,r20i {
 	waittime	13
 	calc_stats	14
 
+	run_mode	18
+	run		19
+
 	ptsofs		20
 	numpts		21
 	timing		22

@@ -93,6 +93,9 @@ static pzframe_chinfo_t chinfo[] =
     [ADC200ME_CHAN_VISIBLE_CLB]   = {PZFRAME_CHTYPE_VALIDATE,    0},
     [ADC200ME_CHAN_CALC_STATS]    = {PZFRAME_CHTYPE_VALIDATE,    0},
 
+    [ADC200ME_CHAN_RUN_MODE]      = {PZFRAME_CHTYPE_PZFRAME_STD, 0},
+    [ADC200ME_CHAN_RUN]           = {PZFRAME_CHTYPE_PZFRAME_STD, 0},
+
     [ADC200ME_CHAN_PTSOFS]        = {PZFRAME_CHTYPE_VALIDATE,    0},
     [ADC200ME_CHAN_NUMPTS]        = {PZFRAME_CHTYPE_VALIDATE,    0},
     [ADC200ME_CHAN_TIMING]        = {PZFRAME_CHTYPE_VALIDATE,    0},
@@ -215,6 +218,7 @@ static psp_paramdescr_t adc200me_params[] =
     PSP_P_FLAG("noistart",   adc200me_privrec_t, nxt_args[ADC200ME_CHAN_ISTART],     0, 0),
     PSP_P_FLAG("calcstats",  adc200me_privrec_t, nxt_args[ADC200ME_CHAN_CALC_STATS], 1, 0),
     PSP_P_FLAG("nocalcstats",adc200me_privrec_t, nxt_args[ADC200ME_CHAN_CALC_STATS], 0, 1),
+    PSP_P_LOOKUP("run_mode", adc200me_privrec_t, nxt_args[ADC200ME_CHAN_RUN_MODE],   -1, pzframe_drv_run_mode_lkp),
 
     PSP_P_FLAG("fbd_timing", adc200me_privrec_t, timing_alwd, 0, 1),
     PSP_P_FLAG("alw_timing", adc200me_privrec_t, timing_alwd, 1, 0),
@@ -857,6 +861,8 @@ enum
     PARAM_WAITTIME = ADC200ME_CHAN_WAITTIME,
     PARAM_STOP     = ADC200ME_CHAN_STOP,
     PARAM_ELAPSED  = ADC200ME_CHAN_ELAPSED,
+    PARAM_RUN_MODE = ADC200ME_CHAN_RUN_MODE,
+    PARAM_RUN      = ADC200ME_CHAN_RUN,
 };
 
 #define FASTADC_NAME adc200me

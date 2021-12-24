@@ -41,6 +41,9 @@ static pzframe_chinfo_t chinfo[] =
     [ADC333_CHAN_WAITTIME]      = {PZFRAME_CHTYPE_PZFRAME_STD, 0},
     [ADC333_CHAN_CALC_STATS]    = {PZFRAME_CHTYPE_VALIDATE,    0},
 
+    [ADC333_CHAN_RUN_MODE]      = {PZFRAME_CHTYPE_PZFRAME_STD, 0},
+    [ADC333_CHAN_RUN]           = {PZFRAME_CHTYPE_PZFRAME_STD, 0},
+
     [ADC333_CHAN_PTSOFS]        = {PZFRAME_CHTYPE_VALIDATE,    0},
     [ADC333_CHAN_NUMPTS]        = {PZFRAME_CHTYPE_VALIDATE,    0},
     [ADC333_CHAN_TIMING]        = {PZFRAME_CHTYPE_VALIDATE,    0},
@@ -171,6 +174,7 @@ static psp_paramdescr_t adc333_params[] =
     PSP_P_FLAG("noistart",     adc333_privrec_t, nxt_args[ADC333_CHAN_ISTART],     0, 0),
     PSP_P_FLAG("calcstats",    adc333_privrec_t, nxt_args[ADC333_CHAN_CALC_STATS], 1, 0),
     PSP_P_FLAG("nocalcstats",  adc333_privrec_t, nxt_args[ADC333_CHAN_CALC_STATS], 0, 0),
+    PSP_P_LOOKUP ("run_mode",  adc333_privrec_t, nxt_args[ADC333_CHAN_RUN_MODE],   -1, pzframe_drv_run_mode_lkp),
 
     PSP_P_END()
 };
@@ -576,6 +580,8 @@ enum
     PARAM_WAITTIME = ADC333_CHAN_WAITTIME,
     PARAM_STOP     = ADC333_CHAN_STOP,
     PARAM_ELAPSED  = ADC333_CHAN_ELAPSED,
+    PARAM_RUN_MODE = ADC333_CHAN_RUN_MODE,
+    PARAM_RUN      = ADC333_CHAN_RUN,
 
     PARAM_DATA     = ADC333_CHAN_DATA,
     PARAM_LINE0    = ADC333_CHAN_LINE0,

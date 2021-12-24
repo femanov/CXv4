@@ -387,6 +387,8 @@ static int mps20_ceac124_init_d(int devid, void *devptr,
     SetChanRDs       (devid, MPS20_CEAC124_CHAN_ISET,      1, 1000000.0, 0.0);
     SetChanRDs       (devid, MPS20_CEAC124_CHAN_ISET_RATE, 1, 1000000.0, 0.0);
     SetChanRDs       (devid, MPS20_CEAC124_CHAN_ISET_CUR,  1, 1000000.0, 0.0);
+    SetChanQuant     (devid, MPS20_CEAC124_CHAN_ISET,      1, (CxAnyVal_t){.i32=305}, CXDTYPE_INT32);
+    SetChanQuant     (devid, MPS20_CEAC124_CHAN_ISET_CUR,  1, (CxAnyVal_t){.i32=305}, CXDTYPE_INT32);
     SetChanRDs/*!!!*/(devid, MPS20_CEAC124_CHAN_RD_base,  16, 1000000.0, 0.0);
     SetChanReturnType(devid, MPS20_CEAC124_CHAN_ISET_CUR,  1, IS_AUTOUPDATED_TRUSTED);
     SetChanReturnType(devid, MPS20_CEAC124_CHAN_ILK,       1, IS_AUTOUPDATED_YES);

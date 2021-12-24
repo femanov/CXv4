@@ -17,6 +17,9 @@ enum
     C061621_CHAN_WAITTIME      = 13, 
     C061621_CHAN_CALC_STATS    = 14,
 
+    C061621_CHAN_RUN_MODE      = 18,
+    C061621_CHAN_RUN           = 19,
+
     C061621_CHAN_PTSOFS        = 20,
     C061621_CHAN_NUMPTS        = 21,
     C061621_CHAN_TIMING        = 22,

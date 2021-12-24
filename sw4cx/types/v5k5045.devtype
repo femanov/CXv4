@@ -11,6 +11,7 @@ devtype v5k5045 w20i,r80i {
 	delay2		9
 	delay3		10
 	hvset_nominal	11
+	ignore_ilks	12
 
 	hvset_cur	20
 	is_on		21

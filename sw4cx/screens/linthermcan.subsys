@@ -57,7 +57,7 @@ define(`AVGCELL',
 grouping main LINTHERMCAN_grouping "Thermostabilization" grid \
         str1:"Input\tSet, °C\tOutput\tAlarm\tGoodVal" \
         at_init:"_all_code; push 0; putchan %silent;" \
-        param1:5 param3:5 content:eval(5+5*19+5) {
+        param1:5 param3:5 content:eval(5+5*19+1) {
 
     container -plot1 "~1" subwin "resizable,compact,noclsbtn" \
         str3:"Thermostabilization plots 1" content:1 {
@@ -70,7 +70,7 @@ grouping main LINTHERMCAN_grouping "Thermostabilization" grid \
         str3:"Thermostabilization plots 2" content:1 {
         noop plot "" histplot \
                 "width=500 height=400 \
-                 foreach(`x', `(s6,s7,s8,s9,s10,s11,s12,s13,s14)', ` add=.x`'_out') add=.inA \
+                 foreach(`x', `(s6,s7,s8,s9,s10,s11,s12,s13,s14)', ` add=.x`'_out') add=.Tchill add=.Tkram \
                  fixed"
     }
 
@@ -108,7 +108,19 @@ grouping main LINTHERMCAN_grouping "Thermostabilization" grid \
     THERMLINE(s11,   "SEC_11")
     THERMLINE(s12,   "SEC_12")
     THERMLINE(s13,   "SEC_13")
+ifelse(`', FALSE, `
     THERMLINE(s14,   "SEC_14")
+', `
+    disp Tchill "Tchill" text "" "°C" "%5.2f" tip:"T chiller" disprange:+20-+40 \
+            r:"_all_code;
+               getchan adc1.adc18; getchan adc1.adc8; div; sub 1.0;
+               div 0.00385; ret;"
+    noop
+    noop
+    noop
+    noop
+')
+ifelse(`
     AVGCELL(inA,  AVG,    in)  \
             c:"_all_code;
             getchan t_in_lim; push 0;           cmp_if_le; ret 0;
@@ -125,4 +137,9 @@ grouping main LINTHERMCAN_grouping "Thermostabilization" grid \
     disp -limit "Tinput_max" text ""        "°C" "%5.2f" -limit \
             r:t_in_lim \
             tip:"Alarm when Tinput_avg>Tinput_max"
+')
+    disp Tkram "Tkram" text "" "°C" "%5.2f" tip:"T Kramarov" disprange:+20-+40 \
+            r:"_all_code;
+               getchan adc1.adc19; getchan adc1.adc9; div; sub 1.0;
+               div 0.00385; ret;"
 }

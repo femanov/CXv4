@@ -3,6 +3,16 @@
 #include "pzframe_drv.h"
 
 
+psp_lkp_t pzframe_drv_run_mode_lkp[] =
+{
+    {"on_request",  PZFRAME_RUN_MODE_ON_REQUEST},
+    {"on_run",      PZFRAME_RUN_MODE_ON_RUN},
+    {"auto_re_run", PZFRAME_RUN_MODE_AUTO_RE_RUN},
+    {"disabled",    PZFRAME_RUN_MODE_DISABLED},
+    {NULL, 0}
+};
+
+
 static void pzframe_tout_p(int devid, void *devptr,
                            sl_tid_t tid,
                            void *privptr);
@@ -38,7 +48,7 @@ static void SetDeadline(pzframe_drv_t *pdr)
 
 static void PerformTimeoutActions(pzframe_drv_t *pdr, int do_return)
 {
-    pdr->measuring_now = 0;
+    pdr->measuring_now = PZFRAME_MEASURING_NOT;
     if (pdr->tid >= 0)
     {
         sl_deq_tout(pdr->tid);
@@ -51,6 +61,25 @@ static void PerformTimeoutActions(pzframe_drv_t *pdr, int do_return)
         pzframe_drv_req_mes(pdr);
 }
 
+static void  RunMeasurements(pzframe_drv_t *pdr)
+{
+  int  r;
+
+    r = pdr->start_measurements(pdr);
+    if (r == PZFRAME_R_READY)
+        ReturnMeasurements(pdr, 1, 0);
+    else
+    {
+        pdr->measuring_now = PZFRAME_MEASURING_RUN;
+        gettimeofday(&(pdr->measurement_start), NULL);
+        SetDeadline(pdr);
+
+        if (pdr->param_istart >= 0  &&
+            (pdr->value_istart & CX_VALUE_LIT_MASK) != 0)
+            pdr->trggr_measurements(pdr);
+    }
+}
+
 static void pzframe_tout_p(int devid, void *devptr __attribute__((unused)),
                            sl_tid_t tid __attribute__((unused)),
                            void *privptr)
@@ -58,7 +87,7 @@ static void pzframe_tout_p(int devid, void *devptr __attribute__((unused)),
   pzframe_drv_t *pdr = (pzframe_drv_t *)privptr;
 
     pdr->tid = -1;
-    if (pdr->measuring_now  == 0  ||
+    if (pdr->measuring_now  != PZFRAME_MEASURING_RUN  ||
         pdr->param_waittime <  0  ||
         pdr->value_waittime <= 0)
     {
@@ -80,11 +109,17 @@ void  pzframe_drv_init(pzframe_drv_t *pdr, int devid,
                        int                           param_waittime,
                        int                           param_stop,
                        int                           param_elapsed,
+                       int                           param_run_mode,
+                       int                           param_run,
+                       int                           reserved_param1,
+                       int                           reserved_param2,
                        pzframe_start_measurements_t  start_measurements,
                        pzframe_trggr_measurements_t  trggr_measurements,
                        pzframe_abort_measurements_t  abort_measurements,
                        pzframe_read_measurements_t   read_measurements,
-                       pzframe_prepare_retbufs_t     prepare_retbufs)
+                       pzframe_prepare_retbufs_t     prepare_retbufs,
+                       void                         *reserved_func_ptr1,
+                       void                         *reserved_func_ptr2)
 {
     pdr->devid              = devid;
 
@@ -93,14 +128,20 @@ void  pzframe_drv_init(pzframe_drv_t *pdr, int devid,
     pdr->param_waittime     = param_waittime;
     pdr->param_stop         = param_stop;
     pdr->param_elapsed      = param_elapsed;
+    pdr->param_run_mode     = param_run_mode;
+    pdr->param_run          = param_run;
+    pdr->reserved_param1    = reserved_param1;
+    pdr->reserved_param2    = reserved_param2;
     pdr->start_measurements = start_measurements;
     pdr->trggr_measurements = trggr_measurements;
     pdr->abort_measurements = abort_measurements;
     pdr->read_measurements  = read_measurements;
     pdr->prepare_retbufs    = prepare_retbufs;
+    pdr->reserved_func_ptr1 = reserved_func_ptr1;
+    pdr->reserved_func_ptr2 = reserved_func_ptr2;
 
     pdr->state              = 0; // In fact, unused
-    pdr->measuring_now      = 0;
+    pdr->measuring_now      = PZFRAME_MEASURING_NOT;
     pdr->tid                = -1;
 }
 
@@ -122,14 +163,15 @@ void  pzframe_drv_rw_p   (pzframe_drv_t *pdr,
     {
         ////DoDriverLog(pdr->devid, 0, "SHOT!");
         if (action == DRVA_WRITE  &&
-            pdr->measuring_now    &&  val == CX_VALUE_COMMAND)
+            pdr->measuring_now == PZFRAME_MEASURING_RUN  &&
+            val == CX_VALUE_COMMAND)
             pdr->trggr_measurements(pdr);
         ReturnInt32Datum(pdr->devid, chan, 0, 0);
     }
     else if (chan == pdr->param_stop)
     {
         if (action == DRVA_WRITE  &&
-            pdr->measuring_now    &&
+            pdr->measuring_now == PZFRAME_MEASURING_RUN  &&
             (val &~ CX_VALUE_DISABLED_MASK) == CX_VALUE_COMMAND)
             PerformTimeoutActions(pdr,
                                   (val & CX_VALUE_DISABLED_MASK) == 0);
@@ -140,7 +182,7 @@ void  pzframe_drv_rw_p   (pzframe_drv_t *pdr,
         if (action == DRVA_WRITE)
         {
             pdr->value_istart = (val & CX_VALUE_LIT_MASK);
-            if (pdr->measuring_now  &&
+            if (pdr->measuring_now == PZFRAME_MEASURING_RUN  &&
                 pdr->value_istart)
                 pdr->trggr_measurements(pdr);
         }
@@ -156,7 +198,7 @@ void  pzframe_drv_rw_p   (pzframe_drv_t *pdr,
         ReturnInt32Datum(pdr->devid, chan, pdr->value_waittime, 0);
         /* Adapt to new waittime */
         if (action == DRVA_WRITE  &&
-            pdr->measuring_now)
+            pdr->measuring_now == PZFRAME_MEASURING_RUN)
         {
             if (pdr->tid >= 0)
             {
@@ -168,7 +210,7 @@ void  pzframe_drv_rw_p   (pzframe_drv_t *pdr,
     }
     else if (chan == pdr->param_elapsed)
     {
-        if (!pdr->measuring_now)
+        if (pdr->measuring_now != PZFRAME_MEASURING_RUN)
             val = -1;
         else
         {
@@ -178,42 +220,67 @@ void  pzframe_drv_rw_p   (pzframe_drv_t *pdr,
         }
         ReturnInt32Datum(pdr->devid, chan, val, 0);
     }
+    else if (chan == pdr->param_run_mode)
+    {
+        if (action == DRVA_WRITE)
+        {
+            if (val != PZFRAME_RUN_MODE_ON_REQUEST   &&
+                val != PZFRAME_RUN_MODE_ON_RUN       &&
+                val != PZFRAME_RUN_MODE_AUTO_RE_RUN  &&
+                val != PZFRAME_RUN_MODE_DISABLED)
+                val = PZFRAME_RUN_MODE_ON_REQUEST;
+            pdr->run_mode = val;
+            // Force start if now-current mode doesn't require RUN'ning
+            if (pdr->measuring_now == PZFRAME_MEASURING_RQD  &&
+                (val == PZFRAME_RUN_MODE_ON_REQUEST  ||
+                 val == PZFRAME_RUN_MODE_AUTO_RE_RUN))
+                RunMeasurements(pdr);
+        }
+        ReturnInt32Datum(pdr->devid, chan, pdr->run_mode, 0);
+    }
+    else if (chan == pdr->param_run)
+    {
+        if (action == DRVA_WRITE  &&
+            pdr->measuring_now == PZFRAME_MEASURING_RQD  &&
+            val == CX_VALUE_COMMAND)
+        {
+            RunMeasurements(pdr);
+        }
+        ReturnInt32Datum(pdr->devid, chan, 0, 0);
+    }
     else
         ReturnInt32Datum(pdr->devid, chan, 0, CXRF_UNSUPPORTED);
 }
 
 void  pzframe_drv_req_mes(pzframe_drv_t *pdr)
 {
-  int  r;
+    if (pdr->measuring_now != PZFRAME_MEASURING_NOT) return;
 
-    if (pdr->measuring_now) return;
-
-    r = pdr->start_measurements(pdr);
-    if (r == PZFRAME_R_READY)
-        ReturnMeasurements(pdr, 1, 0);
-    else
+    if (pdr->run_mode == PZFRAME_RUN_MODE_ON_RUN  ||
+        pdr->run_mode == PZFRAME_RUN_MODE_DISABLED)
     {
-        pdr->measuring_now = 1;
-        gettimeofday(&(pdr->measurement_start), NULL);
-        SetDeadline(pdr);
-
-        if (pdr->param_istart >= 0  &&
-            (pdr->value_istart & CX_VALUE_LIT_MASK) != 0)
-            pdr->trggr_measurements(pdr);
+        pdr->measuring_now = PZFRAME_MEASURING_RQD;
+        return;
     }
+
+    RunMeasurements(pdr);
 }
 
 void  pzframe_drv_drdy_p (pzframe_drv_t *pdr, int do_return, rflags_t rflags)
 {
-    if (pdr->measuring_now == 0) return;
-    pdr->measuring_now = 0;
+    if (pdr->measuring_now != PZFRAME_MEASURING_RUN) return;
+    pdr->measuring_now = PZFRAME_MEASURING_NOT;
     if (pdr->tid >= 0)
     {
         sl_deq_tout(pdr->tid);
         pdr->tid = -1;
     }
     if (do_return)
+    {
         ReturnMeasurements (pdr, 1, rflags);
+        if (pdr->run_mode == PZFRAME_RUN_MODE_AUTO_RE_RUN)
+            pzframe_drv_req_mes(pdr);
+    }
     else
         pzframe_drv_req_mes(pdr);
 }

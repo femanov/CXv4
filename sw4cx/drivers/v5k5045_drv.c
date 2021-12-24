@@ -6,6 +6,8 @@
 #include "drv_i/v5k5045_drv_i.h"
 
 
+#define USE_GVI 0
+
 enum
 {
     PKS_SET,
@@ -13,9 +15,11 @@ enum
     PKS_SET_IMM,
     PKS_SET_CUR,
 
+#if USE_GVI
     GVI_DELAY1,
     GVI_DELAY2,
     GVI_DELAY3,
+#endif
 
     URR_RST_ILKS_B0,
     URR_RST_ILKS_B1,
@@ -41,7 +45,9 @@ enum
 enum
 {
     SUBDEV_PKS,
+#if USE_GVI
     SUBDEV_GVI,
+#endif
     SUBDEV_URR,
     SUBDEV_DAC,
     SUBDEV_IN1,
@@ -55,9 +61,11 @@ static vdev_sodc_dsc_t sodc2ourc_mapping[SUBORD_NUMCHANS] =
     [PKS_SET_IMM]     = {"pks.code_imm0",  VDEV_PRIV,             -1},
     [PKS_SET_CUR]     = {"pks.code_cur0",  VDEV_IMPR | VDEV_TUBE, V5K5045_CHAN_HVSET_CUR,  SUBDEV_PKS},
 
+#if USE_GVI
     [GVI_DELAY1]      = {"gvi.quant0",                 VDEV_TUBE, V5K5045_CHAN_DELAY1,     SUBDEV_GVI},
     [GVI_DELAY2]      = {"gvi.quant1",                 VDEV_TUBE, V5K5045_CHAN_DELAY2,     SUBDEV_GVI},
     [GVI_DELAY3]      = {"gvi.quant2",                 VDEV_TUBE, V5K5045_CHAN_DELAY3,     SUBDEV_GVI},
+#endif
 
     [URR_RST_ILKS_B0] = {"urr.bit0",       VDEV_PRIV,             -1,                      SUBDEV_URR},
     [URR_RST_ILKS_B1] = {"urr.bit1",       VDEV_PRIV,             -1,                      SUBDEV_URR},
@@ -82,7 +90,9 @@ static int ourc2sodc[V5K5045_NUMCHANS];
 static const char *devstate_names[] =
 {
     [SUBDEV_PKS] = "pks._devstate",
+#if USE_GVI
     [SUBDEV_GVI] = "gvi._devstate",
+#endif
     [SUBDEV_URR] = "urr._devstate",
     [SUBDEV_DAC] = "dac._devstate",
     [SUBDEV_IN1] = "in1._devstate",
@@ -116,6 +126,8 @@ typedef struct
     int32               out_val;
     int                 out_val_set;
     rflags_t            out_val_rflags;
+
+    int32               ignore_ilks;
 
     int32               c_ilks_vals[V5K5045_CHAN_ILK_count];
 } privrec_t;
@@ -499,6 +511,7 @@ static void v5k5045_sodc_cb(int devid, void *devptr,
              me->ctx.cur_state != KLS_STATE_RST_ILK_SET  &&
              me->ctx.cur_state != KLS_STATE_RST_ILK_DRP
             )
+            && me->ignore_ilks == 0
            )
             vdev_set_state(&(me->ctx), KLS_STATE_INTERLOCK);
     }
@@ -594,6 +607,14 @@ static void v5k5045_rw_p(int devid, void *devptr,
             }
             ReturnInt32Datum(devid, chn, me->out_val_nominal, 0);
             ReturnHVSetRange(me);
+        }
+        else if (chn == V5K5045_CHAN_IGNORE_ILKS)
+        {
+            if (action == DRVA_WRITE)
+            {
+                me->ignore_ilks = (val != 0);
+            }
+            ReturnInt32Datum(devid, chn, me->ignore_ilks, 0);
         }
         else if ((sdp = find_sdp(chn)) != NULL  &&
                  sdp->state >= 0                &&

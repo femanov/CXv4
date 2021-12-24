@@ -59,6 +59,9 @@ static pzframe_chan_dscr_t adc4_chan_dscrs[] =
     [ADC4_CHAN_WAITTIME]     = {"waittime"},
     [ADC4_CHAN_CALC_STATS]   = {"calc_stats"},
 
+    [ADC4_CHAN_RUN_MODE]     = {"run_mode",     0, PZFRAME_CHAN_IMMEDIATE_MASK},
+    [ADC4_CHAN_RUN]          = {"run",          0, PZFRAME_CHAN_IS_PARAM | PZFRAME_CHAN_RW_ONLY_MASK},
+
     [ADC4_CHAN_PTSOFS]       = {"ptsofs"},
     [ADC4_CHAN_NUMPTS]       = {"numpts"},
     DSCR_X4   (ZERO,,           "zero","",       0, 0, 0, 0),

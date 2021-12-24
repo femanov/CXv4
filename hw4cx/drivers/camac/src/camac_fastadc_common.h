@@ -44,9 +44,10 @@ static int  FASTADC_INIT_D(int devid, void *devptr,
 
     pzframe_drv_init(&(me->pz), devid,
                      PARAM_SHOT, PARAM_ISTART, PARAM_WAITTIME, PARAM_STOP, PARAM_ELAPSED,
+                     PARAM_RUN_MODE, PARAM_RUN, -1, -1,
                      StartMeasurements, TrggrMeasurements,
                      AbortMeasurements, ReadMeasurements,
-                     PrepareRetbufs);
+                     PrepareRetbufs, NULL, NULL);
 
     if ((errstr = WATCH_FOR_LAM(devid, devptr, me->N_DEV, FASTADC_LAM_CB)) != NULL)
     {

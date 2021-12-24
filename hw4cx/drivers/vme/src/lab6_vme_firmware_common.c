@@ -1,0 +1,499 @@
+// A common source for *_test.c
+
+#include <stdlib.h>
+#include <stdio.h>
+#include <unistd.h>
+#include <fcntl.h>
+#include <string.h>
+#include <ctype.h>
+#include <errno.h>
+#include <sys/types.h>
+#include <sys/stat.h>
+#include <sys/ioctl.h>
+#include <sys/select.h>
+#include <sys/time.h>
+
+#include "misc_types.h"
+#include "misc_macros.h"
+#include "misc_sleepbyselect.h"
+#include "timeval_utils.h"
+
+#include "cxscheduler.h"
+
+#ifndef VME_HAL_FILE_H
+  #error The "VME_HAL_FILE_H" macro is undefined
+#else
+  #include VME_HAL_FILE_H
+#endif /* VME_HAL_FILE_H */
+
+
+enum
+{
+    EPCS_OFS_EPCS_SIZE         = 0x00,
+    EPCS_OFS_EPCS_SECTOR_SIZE  = 0x04,
+    EPCS_OFS_BUFF_WORD_NUM     = 0x08,
+    EPCS_OFS_EPCS_ADDR         = 0x0C,
+    EPCS_OFS_EPCS_BUFF_RD_ADDR = 0x10,
+    EPCS_OFS_EPCS_BUFF_WR_ADDR = 0x14,
+    EPCS_OFS_EPCS_BUFF_DATA    = 0x18,
+    EPCS_OFS_EPCS_CMD          = 0x1C,
+};
+
+enum
+{
+    EPCS_CMD_RD        = 1 << 0,
+    EPCS_CMD_WR        = 1 << 1,
+    EPCS_CMD_RD_ERR    = 1 << 2,
+    EPCS_CMD_WR_ERR    = 1 << 3,
+    EPCS_CMD_EPCS_FAIL = 1 << 4,
+};
+
+enum
+{
+   ARG_NONE    = 0,
+   ARG_INFILE  = 1,
+   ARG_OUTFILE = 2,
+   ARG_TEXT    = 3,
+};
+
+typedef int (*fw_action_t)(const char *arg, int fd);
+
+typedef struct
+{
+    const char   *name;
+    fw_action_t   action;
+    int           arg_type;
+} fw_command_desc_t;
+
+typedef struct _vme_devspec_t_struct
+{
+    int     bus_major;
+    int     bus_minor;
+    int     addr_size;
+    int     data_size;
+    int     am;
+    uint32  base_addr;
+    uint32  epcs_offs;
+} vme_devspec_t;
+
+//////////////////////////////////////////////////////////////////////
+
+static void ParseDevSpec (const char *argv0, const char *spec,
+                          vme_devspec_t *dev_p)
+{
+  const char *p = spec;
+  char       *errp;
+
+    if (*p == '@')
+    {
+        p++;
+        dev_p->bus_major     = strtol(p, &errp, 0);
+        if (errp == p)               goto ERR;
+        p = errp;
+
+        if (*p == '/')
+        {
+            p++;
+            dev_p->bus_minor = strtol(p, &errp, 0);
+            if (errp == p)           goto ERR;
+            p = errp;
+        }
+
+        if (*p != ':')               goto ERR;
+        p++;
+    }
+
+    if (tolower(*p) == 'a') p++; // Optional prefix, for "A32" to be valid alongside "32"
+    dev_p->addr_size        = strtol(p, &errp, 0);
+    if (errp == p  ||
+        (*errp != ':'  &&
+         *errp != '/'  &&  
+         tolower(*errp) != 'd'))     goto ERR;
+    p = errp + 1;
+    if (dev_p->addr_size != 16  &&
+        dev_p->addr_size != 24  &&
+        dev_p->addr_size != 32) // For VME64: also 40 and 64
+    {
+        fprintf(stderr, "%s: bad ADDRESS_SIZE=%d (should be one of 16,24,32) in device spec \"%s\"\n",
+                argv0, dev_p->addr_size, spec);
+        exit(1);
+    }
+    if (*p == '/') p++;
+    if (*p == 'd') p++;
+    if (*p != ':')
+    {
+        dev_p->data_size    = strtol(p, &errp, 0);
+        if (errp == p  ||  *errp != ':') goto ERR;
+        p = errp + 1;
+        if (dev_p->data_size != 16  &&
+            dev_p->data_size != 32)
+        {
+            fprintf(stderr, "%s: bad DATA_SIZE=%d (should be one of 16,32) in device spec \"%s\"\n",
+                    argv0, dev_p->data_size, spec);
+            exit(1);
+        }
+    }
+    else
+        dev_p->data_size    = 32;
+
+    dev_p->am               = strtol(p, &errp, 0);
+    if (errp == p  ||  *errp != ':') goto ERR;
+    p = errp + 1;
+
+    dev_p->base_addr        = strtoul(p, &errp, 0);
+    if (errp == p  ||  *errp != '+') goto ERR;
+//fprintf(stderr, "%s p=<%s> base_addr=%08x\n", __FUNCTION__, p, dev_p->base_addr);
+    p = errp + 1;
+
+    dev_p->epcs_offs        = strtoul(p, &errp, 0);
+    if (errp == p)                   goto ERR;
+
+    return;
+    
+ ERR:
+    fprintf(stderr, "%s: error in device spec \"%s\"\n", argv0, spec);
+    exit(1);
+}
+
+//////////////////////////////////////////////////////////////////////
+
+static int              the_bus_handle;
+
+static vme_devspec_t    dev;
+
+static int              option_verbose = 0;
+#ifdef VME_HAL_DO_PARSE_BUS_CONFIG
+static const char      *option_bus_config = NULL;
+#endif
+
+//////////////////////////////////////////////////////////////////////
+
+static int read4b (uint32 offs, uint32 *v_p)
+{
+  int  r;
+
+    r = vme_hal_a32rd32(the_bus_handle, dev.am, dev.base_addr + dev.epcs_offs + offs, v_p);
+
+    return 0;
+}
+
+static int write4b(uint32 offs, uint32  v)
+{
+  int  r;
+
+    r = vme_hal_a32wr32(the_bus_handle, dev.am, dev.base_addr + dev.epcs_offs + offs, v);
+
+    return 0;
+}
+
+static uint32 mirror32bits(uint32 val)
+{
+  register uint32  v;
+  register uint32  m;
+  register int     i;
+
+    for (i = 32, v = val, m = 0;
+         i > 0;  
+         i--,    v >>= 1)
+    {
+        m <<= 1;
+        if (v & 1) m |= 1;
+    }
+
+    return m;
+}
+
+//////////////////////////////////////////////////////////////////////
+
+static int readflash_proc(const char *arg __attribute__((unused)), int fd)
+{
+  uint32  v_EPCS_SIZE;
+  uint32  v_EPCS_SECTOR_SIZE;
+  uint32  v_BUFF_WORD_NUM;
+
+  uint32  read_offs;
+
+  int     try_n;
+  uint32  v_CMD;
+
+  int     read_w_n;
+  uint32  w;
+  uint8   bytes[4];
+
+  enum {MAX_TRIES = 100};
+
+    read4b(EPCS_OFS_EPCS_SIZE,        &v_EPCS_SIZE);
+    read4b(EPCS_OFS_EPCS_SECTOR_SIZE, &v_EPCS_SECTOR_SIZE);
+    read4b(EPCS_OFS_BUFF_WORD_NUM,    &v_BUFF_WORD_NUM);
+
+    for (read_offs = 0;  read_offs < v_EPCS_SIZE; /* NO-INCREMENT */)
+    {
+        if (option_verbose) fprintf(stderr, "Reading from offset 0x%08x\r", read_offs);
+
+        // Set current read address
+        write4b(EPCS_OFS_EPCS_ADDR, read_offs);
+
+        // Request reading...
+        write4b(EPCS_OFS_EPCS_CMD, EPCS_CMD_RD);
+        // ...and check that this request was confirmed
+        for (try_n = 0;  try_n < MAX_TRIES;  try_n++)
+        {
+//            if (option_verbose) fprintf(stderr, "Checking (EPCS_CMD & EPCS_CMD_RD) try %d\r", try_n);
+            read4b(EPCS_OFS_EPCS_CMD, &v_CMD);
+            if ((v_CMD & EPCS_CMD_RD) == 0) break;
+            SleepBySelect(10000);
+        }
+        if (try_n >= MAX_TRIES)
+        {
+            if (option_verbose) fprintf(stderr, "\n");
+            fprintf(stderr, "(EPCS_CMD & EPCS_CMD_RD) != 0 more than %d retries\n", MAX_TRIES);
+            return -1;
+        }
+
+        // 
+        write4b(EPCS_OFS_EPCS_BUFF_RD_ADDR, 0);
+        //
+        for (read_w_n = 0;  read_w_n < v_BUFF_WORD_NUM;  read_w_n++, read_offs += 4)
+        {
+            read4b(EPCS_OFS_EPCS_BUFF_DATA, &w);
+            w = mirror32bits(w);
+            bytes[0] = (w >> 24) & 0xFF;
+            bytes[1] = (w >> 16) & 0xFF;
+            bytes[2] = (w >>  8) & 0xFF;
+            bytes[3] =  w        & 0xFF;
+            write(fd, bytes, sizeof(bytes));
+        }
+    }
+
+    if (option_verbose) fprintf(stderr, "\n");
+
+    return 0;
+};
+
+static int devinfo_proc(const char *arg __attribute__((unused)), int fd __attribute__((unused)) )
+{
+  uint32  v_EPCS_SIZE;
+  uint32  v_EPCS_SECTOR_SIZE;
+  uint32  v_BUFF_WORD_NUM;
+
+    read4b(EPCS_OFS_EPCS_SIZE,        &v_EPCS_SIZE);
+    read4b(EPCS_OFS_EPCS_SECTOR_SIZE, &v_EPCS_SECTOR_SIZE);
+    read4b(EPCS_OFS_BUFF_WORD_NUM,    &v_BUFF_WORD_NUM);
+
+    printf("devinfo: EPCS_SIZE=0x%08x EPCS_SECTOR_SIZE=0x%08x BUFF_WORD_NUM=0x%08x\n", v_EPCS_SIZE, v_EPCS_SECTOR_SIZE, v_BUFF_WORD_NUM);
+
+    return 0;
+};
+
+static fw_command_desc_t commands[] =
+{
+    {"devinfo",   devinfo_proc,   ARG_NONE},
+    {"readflash", readflash_proc, ARG_OUTFILE},
+};
+
+//////////////////////////////////////////////////////////////////////
+
+sl_fdh_t  sl_add_fd     (int uniq, void *privptr1,
+                         int fd, int mask, sl_fd_proc cb, void *privptr2)
+{
+    return 0;
+}
+int       sl_del_fd     (sl_fdh_t fdh)
+{
+    return 0;
+}
+sl_tid_t  sl_enq_tout_after(int uniq, void *privptr1,
+                            int             usecs,
+                            sl_tout_proc cb, void *privptr2)
+{
+    return 0;
+}
+int       sl_deq_tout      (sl_tid_t        tid)
+{
+    return 0;
+}
+
+//////////////////////////////////////////////////////////////////////
+
+static void exitproc(void)
+{
+    vme_hal_term();
+}
+
+int main(int argc, char *argv[])
+{
+  int                      c;              /* Option character */
+  int                      err       = 0;  /* ++'ed on errors */
+
+  int                      r;
+
+  int                      ncmd;
+  const char              *arg;
+  int                      fd;
+  int                      should_close_fd;
+
+    /* Make stdout ALWAYS line-buffered */
+    setvbuf(stdout, NULL, _IOLBF, 0);
+
+    while ((c = getopt(argc, argv, "hv"
+#ifdef VME_HAL_DO_PARSE_BUS_CONFIG
+                                   "C:"
+#endif
+           )) > 0)
+    {
+        switch (c)
+        {
+#ifdef VME_HAL_DO_PARSE_BUS_CONFIG
+            case 'C':
+                // Note: we do NOT forbid multiple "-C" options (otherwise an "option_bus_config != NULL" could check for duplicates)
+                option_bus_config = optarg;
+                if (VME_HAL_DO_PARSE_BUS_CONFIG(option_bus_config) < 0)
+                {
+                    fprintf(stderr, "%s: error in \"%s\" bus_config-spec: %s\n",
+                            argv[0], option_bus_config, psp_error());
+                    exit(1);
+                }
+                break;
+#endif
+
+            case 'h': goto PRINT_HELP;
+
+            case 'v': option_verbose++;
+                break;
+            
+            case '?':
+            default:
+                err++;
+        }
+    }
+
+    if (err) goto ADVICE_HELP;
+
+    if (optind >= argc)
+    {
+        fprintf(stderr, "%s: device reference is required\n", argv[0]);
+        goto ADVICE_HELP;
+    }
+
+    ParseDevSpec(argv[0], argv[optind++], &dev);
+
+#if defined(VME_HAL_DO_PARSE_BUS_CONFIG)  &&  defined(VME_HAL_DEFAULT_BUS_CONFIG_FOR_VMETEST)
+    if (option_bus_config == NULL) // Parse default config if "-C" wasn't specified AND default spec IS defined (condition above)
+        if (VME_HAL_DO_PARSE_BUS_CONFIG(VME_HAL_DEFAULT_BUS_CONFIG_FOR_VMETEST) < 0)
+        {
+            fprintf(stderr, "%s: error in \"%s\" bus_config-spec: %s\n",
+                    argv[0], VME_HAL_DEFAULT_BUS_CONFIG_FOR_VMETEST, psp_error());
+            exit(1);
+        }
+#endif
+    r = vme_hal_init(0);
+    if (r < 0)
+    {
+        fprintf(stderr, "%s: vhe_hal_init() failed: %s\n",
+                argv[0],
+                errno != 0? strerror(errno) : vme_hal_strerror(r));
+        exit(1);
+    }
+
+    the_bus_handle = vme_hal_open_bus(dev.bus_major, dev.bus_minor);
+    if (the_bus_handle < 0)
+    {
+        fprintf(stderr, "%s: vhe_hal_open_bus(%d/%d) failed: %s\n",
+                argv[0], dev.bus_major, dev.bus_minor,
+                errno != 0? strerror(errno) : vme_hal_strerror(the_bus_handle));
+        exit(1);
+    }
+
+    atexit(exitproc);
+
+    for (;  optind < argc;  optind++)
+    {
+        for (ncmd = 0;  ncmd < countof(commands);  ncmd++)
+            if (strcasecmp(argv[optind], commands[ncmd].name) == 0) break;
+
+        if (ncmd >= countof(commands))
+        {
+            fprintf(stderr, "%s: unknown command \"%s\"\n", argv[0], argv[optind]);
+            exit(1);
+        }
+
+        arg = NULL;
+        fd  = -1;
+        should_close_fd = 0;
+        if (commands[ncmd].arg_type != 0)
+        {
+            optind++;
+            if (optind >= argc)
+            {
+                fprintf(stderr, "%s: the \"%s\" command requires a parameter\n", argv[0], commands[ncmd].name);
+                exit(1);
+            }
+            arg = argv[optind];
+
+            if      (commands[ncmd].arg_type == ARG_INFILE)
+            {
+                if (strcmp(arg, "-") == 0) fd = STDIN_FILENO;
+                else
+                {
+                    fd = open(arg, O_RDONLY | O_NOCTTY);
+                    if (fd < 0)
+                    {
+                        fprintf(stderr, "%s: error opening \"%s\" for reading: %s\n", argv[0], arg, strerror(errno));
+                        exit(2);
+                    }
+                    should_close_fd = 1;
+                }
+            }
+            else if (commands[ncmd].arg_type == ARG_OUTFILE)
+            {
+                if (strcmp(arg, "-") == 0) fd = STDOUT_FILENO;
+                else
+                {
+                    fd = open(arg, O_CREAT|O_WRONLY|O_TRUNC, 0644);
+                    if (fd < 0)
+                    {
+                        fprintf(stderr, "%s: error opening \"%s\" for writing: %s\n", argv[0], arg, strerror(errno));
+                        exit(2);
+                    }
+                    should_close_fd = 1;
+                }
+            }
+        }
+
+        commands[ncmd].action(arg, fd);
+        if (should_close_fd) close(fd);
+    }
+
+    return 0;
+
+ ADVICE_HELP:
+    fprintf(stderr, "Try `%s -h' for more information.\n", argv[0]);
+    exit(1);
+
+ PRINT_HELP:   
+    fprintf(stderr, "Usage: %s [OPTIONS] DEVSPEC [COMMAND...]\n", argv[0]);
+    fprintf(stderr, "    OPTIONS:\n");
+#ifdef VME_HAL_DO_PARSE_BUS_CONFIG
+    fprintf(stderr, "        -C BUS_CONFIG specify bus configuration parameters\n");
+#endif
+    fprintf(stderr, "        -h            display this help and exit\n");
+    fprintf(stderr, "        -v            be more verbose (explain what is being done)\n");
+    fprintf(stderr, "    DEVSPEC is %sADDR_SIZE/DATA_SIZE:ADDRESS_MODIFIER:BASE_ADDR+EPCS_OFFS\n",
+#if VME_BUS_COMPONENTS_SENSIBLE
+                    "[@BUS_MJR[/BUS_MNR]:]"
+#else
+                    ""
+#endif
+            );
+    fprintf(stderr, "       (all are decimal; may be in hex, with 0x prefix)\n");
+    fprintf(stderr, "       EPCS_OFFS is 0xC0 for ADC4x250,DL250,S-Timer,ADCx32\n");
+    fprintf(stderr, "                    0x01FFFF40 for VsDC3/4\n");
+    fprintf(stderr, "    COMMAND is one of:\n");
+    fprintf(stderr, "        info\n");
+    fprintf(stderr, "        devinfo\n");
+    fprintf(stderr, "        writeflash FILENAME.rpd\n");
+    fprintf(stderr, "        readflash  FILENAME.rpd\n");
+    fprintf(stderr, "        compare    FILENAME.rpd\n");
+
+    exit(0);
+}

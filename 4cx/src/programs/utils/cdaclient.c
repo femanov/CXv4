@@ -711,7 +711,7 @@ int main(int argc, char *argv[])
     BUILTINS_REGISTRATION_CODE
 #endif /* BUILTINS_REGISTRATION_CODE */
 
-    while ((c = getopt(argc, argv, "1b:Bd:D:f:hmNo:rT:w")) != EOF)
+    while ((c = getopt(argc, argv, "1b:Bd:D:f:hKmNo:rT:w")) != EOF)
         switch (c)
         {
             case '1':
@@ -747,6 +747,7 @@ int main(int argc, char *argv[])
                                   print_timestamp  =
                                   print_rflags     =
                                   print_fresh_ages =
+                                  print_strings    =
                                   print_hwinfos    =
                                   print_quants     =
                                   print_ranges     =
@@ -794,6 +795,7 @@ int main(int argc, char *argv[])
                 break;
 
             case 'N':
+            case 'K': // "Keep going" -- for unification with various *_test/*mon utilities
                 option_ignore_nf = 1;
 
             case 'o':

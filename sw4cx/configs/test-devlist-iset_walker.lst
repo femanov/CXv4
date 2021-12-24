@@ -1,0 +1,12 @@
+# A devlist for iset_walker_drv testing
+
+include(`iset_walker.devtype')
+
+
+devtype pseudo_ist w1i {
+	iset		0	1000000.0
+	iset_cur	0	1000000.0
+}
+
+dev	ist	pseudo_ist/noop	~	-
+dev	wlk	iset_walker	~	-	ist

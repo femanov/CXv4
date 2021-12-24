@@ -19,14 +19,17 @@ else
 endif
 
 ifeq ":$(MAY_BUILD_BIVME2):" ":YES:"
-  SUBDIRS+=	bivme2 mbivme2
+  SUBDIRS+=	old-bivme2 bivme2
 endif
 ifeq ":$(MAY_BUILD_A3818):" ":YES:"
   SUBDIRS+=	a3818
+endif
+ifeq ":$(MAY_BUILD_MVME3100):" ":YES:"
+  SUBDIRS+=	mvme3100
 endif
 
 ######################################################################
 include		$(TOPDIR)/TopRules.mk
 ######################################################################
 
-LOCAL_BCKPFILES=src/*\~ nsrc/*\~ mbivme2/*\~ a3818/*\~
+LOCAL_BCKPFILES=old-src/*\~ old-bivme2/*\~ src/*\~ bivme2/*\~ a3818/*\~ mvme3100/*\~

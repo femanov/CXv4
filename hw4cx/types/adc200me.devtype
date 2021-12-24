@@ -12,6 +12,9 @@ devtype adc200me r1i2097150,r2i1048575,r7i,w20i,r50i {
         visible_clb	16
         calc_stats	17
 
+	run_mode	18
+	run		19
+
 	ptsofs		20
         numpts		21
         timing		22

@@ -113,6 +113,9 @@ static pzframe_chinfo_t chinfo[] =
     [C061621_CHAN_WAITTIME]      = {PZFRAME_CHTYPE_PZFRAME_STD, 0},
     [C061621_CHAN_CALC_STATS]    = {PZFRAME_CHTYPE_VALIDATE,    0},
 
+    [C061621_CHAN_RUN_MODE]      = {PZFRAME_CHTYPE_PZFRAME_STD, 0},
+    [C061621_CHAN_RUN]           = {PZFRAME_CHTYPE_PZFRAME_STD, 0},
+
     [C061621_CHAN_PTSOFS]        = {PZFRAME_CHTYPE_VALIDATE,    0},
     [C061621_CHAN_NUMPTS]        = {PZFRAME_CHTYPE_VALIDATE,    0},
     [C061621_CHAN_TIMING]        = {PZFRAME_CHTYPE_VALIDATE,    0},
@@ -182,6 +185,7 @@ static psp_paramdescr_t c061621_params[] =
     PSP_P_FLAG("noistart",   c061621_privrec_t, nxt_args[C061621_CHAN_ISTART],     0, 0),
     PSP_P_FLAG("calcstats",  c061621_privrec_t, nxt_args[C061621_CHAN_CALC_STATS], 1, 0),
     PSP_P_FLAG("nocalcstats",c061621_privrec_t, nxt_args[C061621_CHAN_CALC_STATS], 0, 0),
+    PSP_P_LOOKUP("run_mode", c061621_privrec_t, nxt_args[C061621_CHAN_RUN_MODE],   -1, pzframe_drv_run_mode_lkp),
     PSP_P_END()
 };
 
@@ -523,6 +527,8 @@ enum
     PARAM_WAITTIME = C061621_CHAN_WAITTIME,
     PARAM_STOP     = C061621_CHAN_STOP,
     PARAM_ELAPSED  = C061621_CHAN_ELAPSED,
+    PARAM_RUN_MODE = C061621_CHAN_RUN_MODE,
+    PARAM_RUN      = C061621_CHAN_RUN,
 
     PARAM_DATA     = C061621_CHAN_DATA,
     PARAM_LINE0    = -1,

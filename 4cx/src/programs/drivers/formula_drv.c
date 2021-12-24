@@ -12,12 +12,14 @@ typedef struct
     cda_dataref_t  wr_ref;
     const char    *rd_src;
     const char    *wr_src;
+    int            force_restart;
 } privrec_t;
 
 static psp_paramdescr_t formula_params[] =
 {
-    PSP_P_MSTRING("r", privrec_t, rd_src, NULL, 1000),
-    PSP_P_MSTRING("w", privrec_t, wr_src, NULL, 1000),
+    PSP_P_MSTRING("r",             privrec_t, rd_src,        NULL, 1000),
+    PSP_P_MSTRING("w",             privrec_t, wr_src,        NULL, 1000),
+    PSP_P_FLAG   ("force_restart", privrec_t, force_restart, 1, 0),
     PSP_P_END()
 };
 
@@ -124,6 +126,7 @@ static void formula_rw_p(int devid, void *devptr,
     ////fprintf(stderr, "%s (%d %d) %d %f\n", __FUNCTION__, me->rd_ref, me->wr_ref, action, action==DRVA_WRITE?*((double*)(values[0])):NAN);
     if (action == DRVA_WRITE  &&  count > 0  &&  dtypes[0] == CXDTYPE_DOUBLE)
     {
+        if (me->force_restart) cda_stop_formula(me->wr_ref);
         cda_set_dcval(me->wr_ref, *((double*)(values[0])));
         if (!cda_ref_is_sensible(me->rd_ref))
             ReturnDataSet(me->devid, 1,

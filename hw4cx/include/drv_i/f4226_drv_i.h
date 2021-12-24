@@ -17,6 +17,9 @@ enum
     F4226_CHAN_WAITTIME      = 13, 
     F4226_CHAN_CALC_STATS    = 14,
 
+    F4226_CHAN_RUN_MODE      = 18,
+    F4226_CHAN_RUN           = 19,
+
     F4226_CHAN_PTSOFS        = 20,
     F4226_CHAN_NUMPTS        = 21,
     F4226_CHAN_TIMING        = 22,

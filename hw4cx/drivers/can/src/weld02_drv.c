@@ -140,11 +140,11 @@ static void weld02_ff (int devid, void *devptr, int is_a_reset)
   int        sw_ver;
 
     me->lvmt->get_dev_ver(me->handle, NULL, &sw_ver, NULL);
-    me->supports_adc9 = (sw_ver >= 9);
-    me->supports_out9 = (sw_ver >= 9);
+    me->supports_adc9 = (sw_ver == 9);
+    me->supports_out9 = (sw_ver == 9);
 
     SetChanRDs(devid, WELD02_CHAN_MES_UN, 1,
-               (sw_ver <= 8)? 4095.0/125 : 4095.0/25, 
+               (sw_ver != 9)? 4095.0/125 : 4095.0/25, 
                0.0);
 
     if (is_a_reset)

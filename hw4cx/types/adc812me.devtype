@@ -12,6 +12,9 @@ devtype adc812me r1i2097144,r8i262143,r1i,w30i,r110i {
         visible_clb	16
         calc_stats	17
 
+	run_mode	18
+	run		19
+
 	ptsofs		20
         numpts		21
         timing		22

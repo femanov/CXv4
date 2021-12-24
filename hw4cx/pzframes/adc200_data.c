@@ -55,6 +55,9 @@ static pzframe_chan_dscr_t adc200_chan_dscrs[] =
     [ADC200_CHAN_WAITTIME]     = {"waittime"},
     [ADC200_CHAN_CALC_STATS]   = {"calc_stats"},
 
+    [ADC200_CHAN_RUN_MODE]     = {"run_mode",     0, PZFRAME_CHAN_IMMEDIATE_MASK},
+    [ADC200_CHAN_RUN]          = {"run",          0, PZFRAME_CHAN_IS_PARAM | PZFRAME_CHAN_RW_ONLY_MASK},
+
     [ADC200_CHAN_PTSOFS]       = {"ptsofs"},
     [ADC200_CHAN_NUMPTS]       = {"numpts"},
     [ADC200_CHAN_TIMING]       = {"timing"},

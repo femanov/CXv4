@@ -172,7 +172,7 @@ static int PspSetParameter(psp_paramdescr_t *descr, void *rec, void *vp, int ini
                     RET_ERR(r,
                             "Error initializing '%s' parameter%s%s",
                             descr->name,
-                            plugin_errstr == NULL? "" : ":",
+                            plugin_errstr == NULL? "" : ": ",
                             plugin_errstr == NULL? "" : plugin_errstr);
             }
             break;
@@ -415,7 +415,7 @@ int psp_parse_v (const char *str, const char **endptr,
                     RET_ERR(nested_r,
                             "Error in '%s' parameter%s%s",
                             item->name,
-                            plugin_errstr == NULL? "" : ":",
+                            plugin_errstr == NULL? "" : ": ",
                             plugin_errstr == NULL? "" : plugin_errstr);
 
                 srcp = nested_endptr;

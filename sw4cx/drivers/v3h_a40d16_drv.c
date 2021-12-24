@@ -515,6 +515,8 @@ static int v3h_a40d16_init_d(int devid, void *devptr,
     SetChanRDs       (devid, V3H_A40D16_CHAN_ISET_RATE, 1, 1000000.0, 0.0);
     SetChanRDs       (devid, V3H_A40D16_CHAN_ISET_CUR,  1, 1000000.0, 0.0);
     SetChanRDs/*!!!*/(devid, V3H_A40D16_CHAN_RD_base,   5, 1000000.0, 0.0);
+    SetChanQuant     (devid, V3H_A40D16_CHAN_ISET,      1, (CxAnyVal_t){.i32=305}, CXDTYPE_INT32);
+    SetChanQuant     (devid, V3H_A40D16_CHAN_ISET_CUR,  1, (CxAnyVal_t){.i32=305}, CXDTYPE_INT32);
     SetChanReturnType(devid, V3H_A40D16_CHAN_ISET_CUR,  1, IS_AUTOUPDATED_TRUSTED);
     SetChanReturnType(devid, V3H_A40D16_CHAN_ILK,       1, IS_AUTOUPDATED_YES);
     SetChanReturnType(devid, V3H_A40D16_CHAN_C_ILK,     1, IS_AUTOUPDATED_TRUSTED);

@@ -15,6 +15,9 @@ devtype ottcam r1h361440,r9i,w20i,r20i {
 	sync		20
 	rrq_msecs	21
 
+	run_mode	28
+	run		29
+
 	miss		30
 	elapsed		31
 

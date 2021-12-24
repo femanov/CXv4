@@ -859,9 +859,10 @@ fprintf(stderr, "%s businfo[0]=%08x jumpers=0x%x irq=%d vector=%d\n", strcurtime
 
     pzframe_drv_init(&(me->pz), devid,
                      PARAM_SHOT, PARAM_ISTART, PARAM_WAITTIME, PARAM_STOP, PARAM_ELAPSED,
+                     -1, -1, -1, -1,
                      StartMeasurements, TrggrMeasurements,
                      AbortMeasurements, ReadMeasurements,
-                     PrepareRetbufs);
+                     PrepareRetbufs, NULL, NULL);
 
 InterceptSignals();
     return InitParams(&(me->pz));

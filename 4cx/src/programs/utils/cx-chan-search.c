@@ -25,6 +25,8 @@ enum
 static int   option_help    = 0;
 static int   option_numeric = 0;
 
+static int   print_time     = 0;
+
 static char *chan_name;
 static int   seeker;
 
@@ -58,6 +60,7 @@ static void evproc(int uniq, void *privptr1,
             srv = hp->h_name;
     }
 
+    if (print_time) fprintf(stdout, "@%s  ", strcurtime_msc());
     fprintf(stdout, "INFO: \"%s\" param1=%d param2=%d %s:%d\n",
             sip->name, sip->param1, sip->param2, srv, sip->srv_n);
 }
@@ -74,9 +77,19 @@ int main(int argc, char *argv[])
 
     set_signal(SIGPIPE, SIG_IGN);
 
-    while ((c = getopt(argc, argv, "hn")) != EOF)
+    while ((c = getopt(argc, argv, "D:hn")) != EOF)
         switch (c)
         {
+            case 'D':
+                if (strcmp(optarg, "T") == 0) print_time = 1;
+                else
+                {
+                    fprintf(stderr, "%s %s: unknown print-option '%s'\n",
+                            strcurtime(), argv[0], optarg);
+                    exit(EC_USR_ERR);
+                }
+                break;
+
             case 'h':
                 option_help = 1;
                 break;
@@ -93,8 +106,9 @@ int main(int argc, char *argv[])
     if (option_help)
     {
         printf("Usage: %s [OPTIONS] CHANNEL_NAME\n"
-               "    -n  don't resolve names\n"
-               "    -h  show this help\n",
+               "    -DT  prefix events with current Times\n"
+               "    -n   don't resolve names\n"
+               "    -h   show this help\n",
                argv[0]);
         exit(EC_HELP);
     }

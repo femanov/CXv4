@@ -7,7 +7,8 @@ include(`ceac124.devtype')
 include(`frolov_bfp.devtype')
 include(`frolov_bfp2.devtype')
 include(`dds300.devtype')
-include(`dds500.devtype')
+#include(`dds500.devtype')
+include(`v0308.devtype')
 include(`weldproc.devtype')
 
 
@@ -22,15 +23,20 @@ dev mag2_b ceac124@sktcankoz     ~ 0,63
 
 dev o_m    frolov_bfp/remdrv  ~ 2    b:192.168.8.205
 dev mod    frolov_bfp2/remdrv ~ 7    b:192.168.8.205
-dev o_d    dds300/remdrv      ~ 4    b:192.168.8.205
-dev dds    dds500/remdrv      ~ 12   b:192.168.8.205
+dev d3_1   dds300/remdrv      ~ 4    b:192.168.8.205
+dev d3_2   dds300/remdrv      ~ 8    b:192.168.8.205
+#dev dds    dds500/remdrv      ~ 12   b:192.168.8.205
 
-cpoint o_d.amp1   o_d.amp1   6.825 #!!!FLOAT: (4095/600.0)
-cpoint o_d.amp2   o_d.amp2   6.825 #!!!FLOAT: (4095/600.0)
-cpoint dds.ftw0   dds.ftw0   143   #!!!FLOAT: (4294967296/30000000)
-cpoint dds.ftw1   dds.ftw1   143   #!!!FLOAT: (4294967296/30000000)
-cpoint dds.phase0 dds.phase0 45.51 #!!!FLOAT: (1<<14) / 360.0
-cpoint dds.phase1 dds.phase1 45.51 #!!!FLOAT: (1<<14) / 360.0
+dev vvi    v0308/remdrv       ~ 16   b:192.168.8.205 b0307
+
+cpoint d3_1.amp1   d3_1.amp1   6.825 #!!!FLOAT: (4095/600.0)
+cpoint d3_1.amp2   d3_1.amp2   6.825 #!!!FLOAT: (4095/600.0)
+cpoint d3_2.amp1   d3_2.amp1   6.825 #!!!FLOAT: (4095/600.0)
+cpoint d3_2.amp2   d3_2.amp2   6.825 #!!!FLOAT: (4095/600.0)
+#cpoint dds.ftw0   dds.ftw0   143   #!!!FLOAT: (4294967296/30000000)
+#cpoint dds.ftw1   dds.ftw1   143   #!!!FLOAT: (4294967296/30000000)
+#cpoint dds.phase0 dds.phase0 45.51 #!!!FLOAT: (1<<14) / 360.0
+#cpoint dds.phase1 dds.phase1 45.51 #!!!FLOAT: (1<<14) / 360.0
 
 ##dev wproc1 weldproc           ~ -    weldtree1/4 at_beg="_all_code; print_str BEG; push 1; putchan mag1.outrb6; ret;" at_end="_all_code; print_str END; push 0; putchan mag1.outrb6; ret;"
 dev wproc1 weldproc           ~ -    weldtree1/4 \

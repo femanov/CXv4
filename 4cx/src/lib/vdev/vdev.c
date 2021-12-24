@@ -187,6 +187,9 @@ static void stat_evproc(int            devid,
     DoDriverLog(ctx->devid, DRIVERLOG_C_ENTRYPOINT,
                 "%s subord=%d our=%d", __FUNCTION__, subord_state, our_state);
     SetDevState(devid, our_state, 0, NULL); // Here should try to make some description
+////---- The following strange clause was probably added somewhen around March-2016,
+////---- probably just for debugging.
+////---- Thus, it was commented out on 20.10.2016
 ////    if (our_state == DEVSTATE_OPERATING  &&
 ////        ctx->chan_state_n >= 0  &&  ctx->chan_state_n < our_numchans)
 ////        ReturnInt32Datum(ctx->devid, ctx->chan_state_n, our_state, 0);
@@ -359,7 +362,8 @@ int  vdev_init(vdev_context_t *ctx,
         /*!!! cda_get_ref_data() for insrv:: channel to have current value?  */
     }
 
-    if (ctx->chan_state_n >= 0  &&  ctx->chan_state_n < ctx->our_numchans)
+    if (ctx->state_count > 0  &&  // A bit redundant check (because stateless drivers also have their our_numchans==0), but is added for future-proofness (in case our_numchans will somewhen become used in stateless drivers too)
+        ctx->chan_state_n >= 0  &&  ctx->chan_state_n < ctx->our_numchans)
         SetChanReturnType(ctx->devid, ctx->chan_state_n, 1, IS_AUTOUPDATED_TRUSTED);
 
     if (work_hbt_period > 0  &&  ctx->state_count > 0)
@@ -396,7 +400,8 @@ void vdev_set_state(vdev_context_t *ctx, int nxt_state)
     prev_state = ctx->cur_state;
     ctx->cur_state = nxt_state;
     val = ctx->cur_state;
-    if (ctx->chan_state_n >= 0  &&  ctx->chan_state_n < ctx->our_numchans)
+    if (ctx->state_count > 0  &&  // A bit redundant check (because stateless drivers also have their our_numchans==0), but is added for future-proofness (in case our_numchans will somewhen become used in stateless drivers too)
+        ctx->chan_state_n >= 0  &&  ctx->chan_state_n < ctx->our_numchans)
         ReturnInt32Datum(ctx->devid, ctx->chan_state_n, val, 0);
     DoDriverLog(ctx->devid, DRIVERLOG_C_ENTRYPOINT*1, "state:=%d", val);
 

@@ -9,6 +9,9 @@ devtype adc4 r1i131044,r4i32761,r5i,w20i,r70i {
 	waittime	13
 	calc_stats	14
 
+	run_mode	18
+	run		19
+
 	ptsofs		20
 	numpts		21
 	zero<0-3>	22

@@ -65,7 +65,7 @@ static void CanutilCloseDev (int fd)
     can_hal_close_line(fd);
 }
 
-static void CanutilReadFrame(int fd, int *id_p, int *dlc_p, uint8 *data)
+static int  CanutilReadFrame(int fd, int *id_p, int *dlc_p, uint8 *data, int option_keep_going_arg)
 {
   int     r;
   fd_set  fds;                                                    \
@@ -85,16 +85,17 @@ static void CanutilReadFrame(int fd, int *id_p, int *dlc_p, uint8 *data)
                 if      (r == CAN_HAL_ZERO)   err = "ZERO";
                 else if (r == CAN_HAL_BUSOFF) err = "BUSOFF";
                 else                          err = strerror(errno);
-                fprintf(stderr, "%s: recv_frame: %s\n",
-                        "argv0", err);
+                fprintf(stderr, "%s %s: recv_frame: %s\n",
+                        strcurtime_msc(), "argv0", err);
+                if (option_keep_going_arg) return -1;
                 exit (2);
             }
-            return;
+            return 0;
         }
     }
 }
 
-static void CanutilSendFrame(int fd, int id,    int  dlc,   uint8 *data)
+static void CanutilSendFrame(int fd, int id,    int  dlc,   uint8 *data, int option_keep_going_arg)
 {
   int     r;
   char   *err;
@@ -105,22 +106,24 @@ static void CanutilSendFrame(int fd, int id,    int  dlc,   uint8 *data)
         if      (r == CAN_HAL_ZERO)   err = "ZERO";
         else if (r == CAN_HAL_BUSOFF) err = "BUSOFF";
         else                          err = strerror(errno);
-        fprintf(stderr, "%s: send_frame(id=%d=0x%x, dlc=%d, [0]=0x%02x): %s\n",
-                "argv0", id, id, dlc, 
+        fprintf(stderr, "%s %s: send_frame(id=%d=0x%x, dlc=%d, [0]=0x%02x): %s\n",
+                strcurtime_msc(), "argv0", id, id, dlc, 
                 dlc > 0? data[0] : 0xFFFFFFFF,
                 err);
+        if (option_keep_going_arg) return;
         exit (2);
     }
 }
 
 //////////////////////////////////////////////////////////////////////
 
-static const char *linespec        = NULL;
-static const char *option_baudrate = NULL;
-static int         option_kozak    = 0;
-static int         option_numbers  = 0;
-static int         option_hex_data = 0;
-static int         option_hex_ids  = 0;
+static const char *linespec          = NULL;
+static const char *option_baudrate   = NULL;
+static int         option_keep_going = 0;
+static int         option_kozak      = 0;
+static int         option_numbers    = 0;
+static int         option_hex_data   = 0;
+static int         option_hex_ids    = 0;
 static enum
 {
     TIMES_OFF,
@@ -256,7 +259,7 @@ static void DoSend(const char *argv0, const char *spec)
             break;
     }
 
-    CanutilSendFrame(can_fd, id, dlc, data);
+    CanutilSendFrame(can_fd, id, dlc, data, option_keep_going);
 }
 
 
@@ -348,7 +351,7 @@ static void DoRecv(const char *argv0, const char *spec)
         }
         else
         {
-            CanutilReadFrame(can_fd, &can_id, &can_dlc, can_data);
+            if (CanutilReadFrame(can_fd, &can_id, &can_dlc, can_data, option_keep_going) < 0) goto NEXT_RECV;
             gettimeofday(&timenow, NULL);
             if (!time1st_got) 
             {
@@ -416,6 +419,7 @@ static void DoRecv(const char *argv0, const char *spec)
 
             printf("\n");
         }
+ NEXT_RECV:;
     }
 }
 
@@ -429,18 +433,19 @@ int main (int argc, char *argv[])
     /* Make stdout ALWAYS line-buffered */
     setvbuf(stdout, NULL, _IOLBF, 0);
     
-    while ((c = getopt(argc, argv, "b:hkNxXtT")) > 0)
+    while ((c = getopt(argc, argv, "b:hKkNxXtT")) > 0)
     {
         switch (c)
         {
-            case 'b': option_baudrate = optarg;       break;
+            case 'b': option_baudrate   = optarg;     break;
             case 'h': goto PRINT_HELP;
-            case 'k': option_kozak    = 1;            break;
-            case 'N': option_numbers  = 1;            break;
-            case 'x': option_hex_data = 1;            break;
-            case 'X': option_hex_ids  = 1;            break;
-            case 't': option_times    = TIMES_REL;    break;
-            case 'T': option_times    = TIMES_ISO;    break;
+            case 'K': option_keep_going = 1;          break;
+            case 'k': option_kozak      = 1;          break;
+            case 'N': option_numbers    = 1;          break;
+            case 'x': option_hex_data   = 1;          break;
+            case 'X': option_hex_ids    = 1;          break;
+            case 't': option_times      = TIMES_REL;  break;
+            case 'T': option_times      = TIMES_ISO;  break;
             
             case '?':
             default:
@@ -493,6 +498,7 @@ int main (int argc, char *argv[])
     fprintf(stderr, "Usage: %s [options] CAN_LINE COMMAND...\n", argv[0]);
     fprintf(stderr, "    -b BAUDS  set baudrate (125/250/500/1000)\n");
     fprintf(stderr, "    -h        display this help and exit\n");
+    fprintf(stderr, "    -K        keep going after I/O errors (do NOT exit)\n");
     fprintf(stderr, "    -k        print IDs in kozak notation\n");
     fprintf(stderr, "    -N        print packet numbers (0, 1, 2, ...)\n");
     fprintf(stderr, "    -x        print data in hex\n");

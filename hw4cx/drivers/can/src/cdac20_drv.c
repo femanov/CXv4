@@ -442,6 +442,7 @@ fprintf(stderr, "[%d] add=%d\n", devid, me->handle);
     SetChanQuant     (devid, KOZDEV_CHAN_OUT_n_base,      countof(me->out), (CxAnyVal_t){.i32=THE_QUANT}, CXDTYPE_INT32);
     SetChanQuant     (devid, KOZDEV_CHAN_OUT_CUR_n_base,  countof(me->out), (CxAnyVal_t){.i32=THE_QUANT}, CXDTYPE_INT32);
     SetChanQuant     (devid, DEVSPEC_CHAN_OUT_IMM_n_base, countof(me->out), (CxAnyVal_t){.i32=THE_QUANT}, CXDTYPE_INT32);
+    ReportOUT_Ranges(me);
 
     /* Note: times are in MICROseconds */
     SetChanRDs       (devid, KOZDEV_CHAN_OUT_TAB_TIMES,   1,                        1000000.0, 0.0);

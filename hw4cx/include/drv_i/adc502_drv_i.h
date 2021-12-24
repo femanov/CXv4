@@ -19,6 +19,9 @@ enum
     ADC502_CHAN_WAITTIME      = 13, 
     ADC502_CHAN_CALC_STATS    = 14,
 
+    ADC502_CHAN_RUN_MODE      = 18,
+    ADC502_CHAN_RUN           = 19,
+
     ADC502_CHAN_PTSOFS        = 20,
     ADC502_CHAN_NUMPTS        = 21,
     ADC502_CHAN_TIMING        = 22,

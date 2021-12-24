@@ -53,6 +53,9 @@ static pzframe_chinfo_t chinfo[] =
     [ADC250_CHAN_CALIBRATE]     = {PZFRAME_CHTYPE_INDIVIDUAL,  0},
     [ADC250_CHAN_CALC_STATS]    = {PZFRAME_CHTYPE_VALIDATE,    0},
 
+    [ADC250_CHAN_RUN_MODE]      = {PZFRAME_CHTYPE_PZFRAME_STD, 0},
+    [ADC250_CHAN_RUN]           = {PZFRAME_CHTYPE_PZFRAME_STD, 0},
+
     [ADC250_CHAN_PTSOFS]        = {PZFRAME_CHTYPE_VALIDATE,    0},
     [ADC250_CHAN_NUMPTS]        = {PZFRAME_CHTYPE_VALIDATE,    0},
     [ADC250_CHAN_TIMING]        = {PZFRAME_CHTYPE_VALIDATE,    0},
@@ -80,7 +83,7 @@ static pzframe_chinfo_t chinfo[] =
 
     [ADC250_CHAN_ELAPSED]       = {PZFRAME_CHTYPE_PZFRAME_STD, 0},
     [ADC250_CHAN_XS_PER_POINT]  = {PZFRAME_CHTYPE_STATUS,      -1},
-    [ADC250_CHAN_XS_DIVISOR]    = {PZFRAME_CHTYPE_AUTOUPDATED, 0},
+    [ADC250_CHAN_XS_DIVISOR]    = {PZFRAME_CHTYPE_STATUS,      -1},
     [ADC250_CHAN_XS_FACTOR]     = {PZFRAME_CHTYPE_AUTOUPDATED, 0},
     [ADC250_CHAN_CUR_PTSOFS]    = {PZFRAME_CHTYPE_STATUS,      ADC250_CHAN_PTSOFS},
     [ADC250_CHAN_CUR_NUMPTS]    = {PZFRAME_CHTYPE_STATUS,      ADC250_CHAN_NUMPTS},
@@ -168,6 +171,8 @@ typedef struct
     int                irq_vect;
 int jumpers;
 
+    int                BASE_SW_VER;
+
     int32              cur_args[ADC250_NUMCHANS];
     int32              nxt_args[ADC250_NUMCHANS];
     int32              prv_args[ADC250_NUMCHANS];
@@ -241,6 +246,7 @@ static psp_paramdescr_t adc250_params[] =
     PSP_P_LOOKUP ("rangeC",     adc250_privrec_t, nxt_args[ADC250_CHAN_RANGE0 + 2], -1, adc250_range_lkp),
     PSP_P_LOOKUP ("rangeD",     adc250_privrec_t, nxt_args[ADC250_CHAN_RANGE0 + 3], -1, adc250_range_lkp),
     PSP_P_LOOKUP ("pll_preset", adc250_privrec_t, nxt_args[ADC250_CHAN_PLL_PRESET],  0, adc250_pll_preset_lkp),
+    PSP_P_LOOKUP ("run_mode",   adc250_privrec_t, nxt_args[ADC250_CHAN_RUN_MODE],   -1, pzframe_drv_run_mode_lkp),
     PSP_P_END()
 };
 
@@ -260,6 +266,8 @@ static void ReturnDevInfo(adc250_privrec_t *me)
     me->lvmt->a32rd32(me->handle, ADC4X250_R_DEVICE_ID, &v_devid);
     me->lvmt->a32rd32(me->handle, ADC4X250_R_VERSION,   &v_ver);
     me->lvmt->a32rd32(me->handle, ADC4X250_R_UNIQ_ID,   &v_uniq);
+
+    me->BASE_SW_VER =                           v_ver         & 0xFF;
 
     Return1Param(me, ADC250_CHAN_DEVICE_ID,     v_devid);
 
@@ -467,6 +475,12 @@ fprintf(stderr, "\t\t[ADC250_CHAN_TRIG_TYPE]=%d [ADC250_CHAN_TRIG_INPUT]=%d\n", 
     sl_enq_tout_after(me->devid, me, HEARTBEAT_USECS, adc250_hbt, NULL);
 #endif
 
+    //pzframe_drv_rw_p(&(me->pz), ADC250_CHAN_RUN_MODE, me->nxt_args[ADC250_CHAN_RUN_MODE], DRVA_WRITE);
+    for (n = 0;  n < countof(chinfo);  n++)
+        if (chinfo[n].chtype == PZFRAME_CHTYPE_PZFRAME_STD  &&
+            me->nxt_args[n] >= 0)
+            pzframe_drv_rw_p(&(me->pz), n, me->nxt_args[n], DRVA_WRITE);
+
     return DEVSTATE_OPERATING;
 }
 
@@ -620,19 +634,29 @@ static rflags_t ReadMeasurements(pzframe_drv_t *pdr)
         n = me->lvmt->a32rd32v(me->handle, ro, (uint32*)dp, numduplets);
 ////fprintf(stderr, "[%d] a32rd32v=%d err=%d/<%s>\n", me->devid, n, errno, strerror(errno));
         // 2. Swap even and odd 16-bit halfwords (those arrive swapped because of big-endian)
-        for (n = numduplets;  n > 0;  n--)
-        {
-            tmpv  = dp[0];
-            dp[0] = dp[1]; dp++;
-            dp[0] = tmpv;  dp++;
-        }
+        // ...but only for firmvare older than version 7, when word-order was changed
+        if (me->BASE_SW_VER < 7)
+            for (n = numduplets;  n > 0;  n--)
+            {
+                tmpv  = dp[0];
+                dp[0] = dp[1]; dp++;
+                dp[0] = tmpv;  dp++;
+            }
 #else
-        for (n = numduplets;  n > 0;  n--, ro += 4)
-        {
-            me->lvmt->a32rd32(me->handle, ro, &w);
-            *dp++ =  w        & 0xFFFF;
-            *dp++ = (w >> 16) & 0xFFFF;
-        }
+        if (me->BASE_SW_VER < 7)
+            for (n = numduplets;  n > 0;  n--, ro += 4)
+            {
+                me->lvmt->a32rd32(me->handle, ro, &w);
+                *dp++ =  w        & 0xFFFF;
+                *dp++ = (w >> 16) & 0xFFFF;
+            }
+        else
+            for (n = numduplets;  n > 0;  n--, ro += 4)
+            {
+                me->lvmt->a32rd32(me->handle, ro, &w);
+                *dp++ = (w >> 16) & 0xFFFF;
+                *dp++ =  w        & 0xFFFF;
+            }
 #endif
     }
     for (n = ADC250_CHAN_STATS_first;  n <= ADC250_CHAN_STATS_last;  n++)
@@ -796,6 +820,14 @@ static void adc250_rw_p (int devid, void *devptr,
     {
         chn = addrs[n];
 
+#if 1
+        if (chn == 51) // That's absent ADC250_CHAN_CLB_STATE
+        {
+            ReturnInt32Datum(devid, chn, me->pz.measuring_now, 0);
+            goto NEXT_CHANNEL;
+        }
+#endif
+
         if (chn < 0  ||  chn >= countof(chinfo)  ||
             (ct = chinfo[chn].chtype) == PZFRAME_CHTYPE_UNSUPPORTED)
         {
@@ -809,7 +841,7 @@ static void adc250_rw_p (int devid, void *devptr,
             else
                 me->line_rqd[chn-ADC250_CHAN_LINE0] = 1;
 
-if (chn == ADC250_CHAN_LINE0) fprintf(stderr, "%s 0x%02x line0:req_mes\n", strcurtime_msc(), me->jumpers);
+//if (chn == ADC250_CHAN_LINE0) fprintf(stderr, "%s 0x%02x line0:req_mes\n", strcurtime_msc(), me->jumpers);
             pzframe_drv_req_mes(&(me->pz));
         }
         else if (ct == PZFRAME_CHTYPE_MARKER)
@@ -872,7 +904,7 @@ fprintf(stderr, "\t[%d] detectPLL: %d 0x%08x 0x%08x\n", me->devid, val, pll1, pl
             }
             else /*  ct == PZFRAME_CHTYPE_PZFRAME_STD, which also returns UPSUPPORTED for unknown */
                 ////fprintf(stderr, "PZFRAME_STD(%d,%d)\n", chn, val),
-                pzframe_drv_rw_p  (&(me->pz), chn,
+                 pzframe_drv_rw_p  (&(me->pz), chn,
                                    action == DRVA_WRITE? val : 0,
                                    action);
         }
@@ -889,6 +921,8 @@ enum
     PARAM_WAITTIME = ADC250_CHAN_WAITTIME,
     PARAM_STOP     = ADC250_CHAN_STOP,
     PARAM_ELAPSED  = ADC250_CHAN_ELAPSED,
+    PARAM_RUN_MODE = ADC250_CHAN_RUN_MODE,
+    PARAM_RUN      = ADC250_CHAN_RUN,
 };
 
 enum
@@ -924,18 +958,21 @@ static void FASTADC_IRQ_P (int devid, void *devptr,
   FASTADC_PRIVREC_T   *me = (FASTADC_PRIVREC_T *)devptr;
   uint32               w;
 
+static int total_irqs = 0;
+
 ////fprintf(stderr, "%s IRQ[%d]: n=%d vector=%d\n", strcurtime_msc(), devid, irq_n, irq_vect);
     if (irq_vect != me->irq_vect) return;
+fprintf(stderr, "\r%s devid=%-2d total=%d", strcurtime_msc(), devid, ++total_irqs);
 ////fprintf(stderr, "Yes!\n");
 me->lvmt->a32rd32(me->handle, ADC4X250_R_INT_STATUS, &w);
 ////fprintf(stderr, "zINT_STATUS=%08x\n", w);
 me->lvmt->a32wr32(me->handle, ADC4X250_R_CTRL,       ADC4X250_CTRL_ADC_BREAK_ACK); // Stop (or drop ADC_CMPLT)
 
-fprintf(stderr, "%s 0x%02x IRQ_P(do_return=%d)\n", strcurtime_msc(), me->jumpers, me->do_return);
+//fprintf(stderr, "%s 0x%02x IRQ_P(do_return=%d)\n", strcurtime_msc(), me->jumpers, me->do_return);
     /*!!! Here MUST call smth to read ADC4X250_R_INT_STATUS (and, probably, analyze its content) */
     if (me->do_return == 0  &&  me->force_read) ReadMeasurements(&(me->pz));
     pzframe_drv_drdy_p(&(me->pz), me->do_return, 0);
-    pzframe_drv_req_mes(&(me->pz));
+//    pzframe_drv_req_mes(&(me->pz));
 }
 
 static int  FASTADC_INIT_D(int devid, void *devptr, 
@@ -977,9 +1014,10 @@ fprintf(stderr, "%s businfo[2]=%08x jumpers=0x%x irq=%d vector=%d\n", strcurtime
 
     pzframe_drv_init(&(me->pz), devid,
                      PARAM_SHOT, PARAM_ISTART, PARAM_WAITTIME, PARAM_STOP, PARAM_ELAPSED,
+                     PARAM_RUN_MODE, PARAM_RUN, -1, -1,
                      StartMeasurements, TrggrMeasurements,
                      AbortMeasurements, ReadMeasurements,
-                     PrepareRetbufs);
+                     PrepareRetbufs, NULL, NULL);
 
     return InitParams(&(me->pz));
 }

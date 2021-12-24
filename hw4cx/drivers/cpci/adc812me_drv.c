@@ -98,6 +98,9 @@ static pzframe_chinfo_t chinfo[] =
     [ADC812ME_CHAN_VISIBLE_CLB]   = {PZFRAME_CHTYPE_VALIDATE,    0},
     [ADC812ME_CHAN_CALC_STATS]    = {PZFRAME_CHTYPE_VALIDATE,    0},
 
+    [ADC812ME_CHAN_RUN_MODE]      = {PZFRAME_CHTYPE_PZFRAME_STD, 0},
+    [ADC812ME_CHAN_RUN]           = {PZFRAME_CHTYPE_PZFRAME_STD, 0},
+
     [ADC812ME_CHAN_PTSOFS]        = {PZFRAME_CHTYPE_VALIDATE,    0},
     [ADC812ME_CHAN_NUMPTS]        = {PZFRAME_CHTYPE_VALIDATE,    0},
     [ADC812ME_CHAN_TIMING]        = {PZFRAME_CHTYPE_VALIDATE,    0},
@@ -318,6 +321,7 @@ static psp_paramdescr_t adc812me_params[] =
     PSP_P_FLAG("noistart",    adc812me_privrec_t, nxt_args[ADC812ME_CHAN_ISTART],     0, 0),
     PSP_P_FLAG("calcstats",   adc812me_privrec_t, nxt_args[ADC812ME_CHAN_CALC_STATS], 1, 0),
     PSP_P_FLAG("nocalcstats", adc812me_privrec_t, nxt_args[ADC812ME_CHAN_CALC_STATS], 0, 1),
+    PSP_P_LOOKUP ("run_mode", adc812me_privrec_t, nxt_args[ADC812ME_CHAN_RUN_MODE], -1, pzframe_drv_run_mode_lkp),
 
     PSP_P_END()
 };
@@ -997,6 +1001,8 @@ enum
     PARAM_WAITTIME = ADC812ME_CHAN_WAITTIME,
     PARAM_STOP     = ADC812ME_CHAN_STOP,
     PARAM_ELAPSED  = ADC812ME_CHAN_ELAPSED,
+    PARAM_RUN_MODE = ADC812ME_CHAN_RUN_MODE,
+    PARAM_RUN      = ADC812ME_CHAN_RUN,
 };
 
 #define FASTADC_NAME adc812me

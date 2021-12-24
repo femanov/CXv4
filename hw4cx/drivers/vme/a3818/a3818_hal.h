@@ -223,7 +223,7 @@ static void irq_fd_p(int uniq, void *privptr1,
     if ((event_mask & cvConnectionRecovered) != 0)
     {
         fprintf(stderr, "%s %s(%d,%d) A3818_CONNECTION_RECOVERED\n", strcurtime_msc(), __FUNCTION__, me->bus_major, me->bus_minor);
-localSleepBySelect(10*1000000);
+//localSleepBySelect(10*1000000);
 ////        err = CAENVME_DeviceReset(me->CAENVMElib_handle);
 ////        fprintf(stderr, "%s\treset err=%d\n", strcurtime_msc(), err);
         vect32=0xdeadbaba;
@@ -231,8 +231,43 @@ localSleepBySelect(10*1000000);
         fprintf(stderr, "\t\t\t\tcheck: err=%d lit_mask=0x%08x\n", err, lit_mask);
         err = CAENVME_IRQEnable(me->CAENVMElib_handle, 0x7F);
         fprintf(stderr, "\t\t\t\tenable: err=%d\n", err);
+#if 1
+        err = CAENVME_WriteRegister(me->CAENVMElib_handle, cvVMEIRQEnaReg, 0xFF);
+#endif
+#if 0
         err = CAENVME_ReadCycle(me->CAENVMElib_handle, 0xd6000000, &vect32, 0x09, cvD32);
         fprintf(stderr, "%s\t\tread: err=%d vect32=0x%08x\n", strcurtime_msc(), err, vect32);
+#endif
+#if 0 // Re-open the device
+    {
+      CVBoardTypes          BdType;
+      short                 Link;
+      short                 BdNum;
+
+        CAENVME_End(me->CAENVMElib_handle); me->CAENVMElib_handle = -1;
+        sl_del_fd(me->handle_fdhandle);     me->handle_fdhandle   = -1;
+    
+        BdType = cvV2718;
+        Link   = me->bus_major;
+        BdNum  = me->bus_minor;
+        if (me->bus_major >= 10000)
+        {
+            BdType = (me->bus_major - 10000) / 1000;
+            Link   = (me->bus_major - 10000) % 1000;
+        }
+        fprintf(stderr, "\t\t\t\t...CAENVME_Init(BdType=%d, Link=%d, BdNum=%d) start\n", BdType, Link, BdNum);
+        err = CAENVME_Init(BdType, Link, BdNum, &(me->CAENVMElib_handle));
+        fprintf(stderr, "\t\t\t\t...CAENVME_Init() finished err=%d handle=%d\n", err, me->CAENVMElib_handle);
+        err = CAENVME_IRQEnable(me->CAENVMElib_handle, 0x7F);
+
+        me->handle_fd       = CAENVME_GetFiledes(me->CAENVMElib_handle);
+        fprintf(stderr, "\t\t\t\tCAENVME_GetFiledes(%d)=%d\n", me->CAENVMElib_handle, me->handle_fd);
+        set_fd_flags(me->handle_fd, O_NONBLOCK, 1);
+        me->handle_fdhandle = sl_add_fd(0/*!!!uniq!!!*/, NULL,
+                                        me->handle_fd, SL_EX, irq_fd_p, me);
+        fprintf(stderr, "\t\t\t\tsl_add_fd(%d)=%d\n", me->handle_fd, me->handle_fdhandle);
+    }
+#endif
     }
 
 #if 1
@@ -243,10 +278,43 @@ localSleepBySelect(10*1000000);
     if (err < 0  ||  (lit_mask & (me->irq_mask >> 1)) == 0) return;
 #endif
 
+#if 1
     for (level = 1;  level <= 7;  level++)
         if ((lit_mask & (1 << (level - 1))) != 0)
         {
-            for (repcount = 100;  repcount > 0;  repcount--)
+          int vect_buf[100*1+1*0]; // "max value for repcount"
+          int vect_buf_used;
+          int vect_buf_idx;
+
+            // 1. Get a bunch of vectors
+            for (vect_buf_used = 0;
+                 vect_buf_used < countof(vect_buf);
+                 vect_buf_used++)
+            {
+                err = CAENVME_IACKCycle(me->CAENVMElib_handle,
+                                        level2cvIRQx[level], &vect32, cvD8);
+////fprintf(stderr, "\tIACKCycle(%d, %d): err=%d vect32=%d\n", me->CAENVMElib_handle, level, err, vect32);
+                if (err < 0) goto LAST_VECT; // This goto is just "break"
+                vect_buf[vect_buf_used] = (int)(vect32 & 0xFF);
+            }
+        LAST_VECT:;
+
+            // 2. Process those vectors
+            for (vect_buf_idx = 0;  vect_buf_idx < vect_buf_used;  vect_buf_idx++)
+            {
+                ii = me->irq_info + level;
+                if (ii->cb != NULL)
+                    ii->cb(me - a3818_hal_bus_info /*!!! info2idx() !!! */,
+                           ii->privptr, level, vect_buf[vect_buf_idx]);
+            }
+
+    NEXT_LEVEL:;
+        }
+#else
+    for (level = 1;  level <= 7;  level++)
+        if ((lit_mask & (1 << (level - 1))) != 0)
+        {
+            for (repcount = 100*1+1*0;  repcount > 0;  repcount--)
             {
                 err = CAENVME_IACKCycle(me->CAENVMElib_handle,
                                         level2cvIRQx[level], &vect32, cvD8);
@@ -261,6 +329,7 @@ localSleepBySelect(10*1000000);
 
     NEXT_LEVEL:;
         }
+#endif
 
     // Re-enable interrupts /*!!! Shouldn't we use event_mask instead of 0x7F? *.
     CAENVME_IRQEnable(me->CAENVMElib_handle, 0x7F);

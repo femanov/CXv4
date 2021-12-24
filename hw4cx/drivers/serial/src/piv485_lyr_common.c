@@ -570,6 +570,7 @@ static void piv485_fd_p(int unused_devid, void *unused_devptr,
     }
 
     /* Read 1 byte */
+    errno = 0; // To keep diagnostics below clean from previous errors
     r = uintr_read(fd,
                    lp->inbuf + lp->inbufused,
                    1);

@@ -1,6 +1,8 @@
 #include <stdio.h>
 
 #include "cxsd_driver.h"
+#include "vme_lyr.h"
+
 #include "drv_i/vdac20_drv_i.h"
 
 
@@ -74,7 +76,8 @@ static inline int32 dac20_val_to_daccode(int32 val)
 
 typedef struct
 {
-    int  iohandle;
+    vme_vmt_t *lvmt;
+    int        handle;
 } privrec_t;
 
 
@@ -82,8 +85,8 @@ static uint8 KVRdByte(privrec_t *me, uint8 addr)
 {
   uint16  w;
 
-    bivme2_io_a16wr16(me->iohandle, KREG_IO, KCMD(KCMD_READ_MEM, addr));
-    bivme2_io_a16rd16(me->iohandle, KREG_IO, &w);
+    me->lvmt->a16wr16(me->handle, KREG_IO, KCMD(KCMD_READ_MEM, addr));
+    me->lvmt->a16rd16(me->handle, KREG_IO, &w);
 
     return w & 0xFF;
 }
@@ -133,32 +136,30 @@ static int init_d(int devid, void *devptr,
 {
   privrec_t  *me = (privrec_t*)devptr;
 
+  int         bus_major;
+  int         bus_minor;
   int         jumpers;
 
-    if (businfocount < 1) return -CXRF_CFG_PROBL;
-    jumpers      = businfo[0] & 0xFFF;
+    if (businfocount < 3) return -CXRF_CFG_PROBL;
+    bus_major  = businfo[0];
+    bus_minor  = businfo[1];
+    jumpers    = businfo[2] & 0xFFF;
 
-    me->iohandle = bivme2_io_open(devid, devptr,
-                                  jumpers << 4, 2, ADDRESS_MODIFIER,
-                                  0, NULL);
-    if (me->iohandle < 0)
-    {
-        DoDriverLog(devid, 0, "open: %d/%s", me->iohandle, strerror(errno));
-        return -CXRF_DRV_PROBL;
-    }
+    me->lvmt   = GetLayerVMT(devid);
+    me->handle = me->lvmt->add(devid, devptr,
+                               bus_major, bus_minor,
+                               jumpers << 4, 2,
+                               16, ADDRESS_MODIFIER,
+                               0, 0, NULL,
+                               NULL, VME_LYR_OPTION_NONE);
+    if (me->handle < 0) return me->handle;
 
     SetChanRDs  (devid, VDAC20_CHAN_ADC_n_base, VDAC20_CHAN_ADC_n_count, 1000000.0, 0.0);
     SetChanRDs  (devid, VDAC20_CHAN_OUT_n_base, VDAC20_CHAN_OUT_n_count, 1000000.0, 0.0);
     SetChanQuant(devid, VDAC20_CHAN_OUT_n_base, VDAC20_CHAN_OUT_n_count, (CxAnyVal_t){.i32=THE_QUANT}, CXDTYPE_INT32);
+    SetChanRange(devid, VDAC20_CHAN_OUT_n_base, VDAC20_CHAN_OUT_n_count, (CxAnyVal_t){.i32=MIN_ALWD_VAL}, (CxAnyVal_t){.i32=MAX_ALWD_VAL}, CXDTYPE_INT32);
 
     return DEVSTATE_OPERATING;
-}
-
-static void term_d(int devid, void *devptr)
-{
-  privrec_t  *me = (privrec_t*)devptr;
-
-    bivme2_io_close  (me->iohandle);
 }
 
 static void rdwr_p(int devid, void *devptr,
@@ -204,11 +205,11 @@ static void rdwr_p(int devid, void *devptr,
                     if (val < MIN_ALWD_VAL) val = MIN_ALWD_VAL;
                     code = dac20_val_to_daccode(val);
 
-                    bivme2_io_a16wr16(me->iohandle, KREG_IO,
+                    me->lvmt->a16wr16(me->handle, KREG_IO,
                                       KCMD(KCMD_WR_DACL, code         & 0xFF));
-                    bivme2_io_a16wr16(me->iohandle, KREG_IO,
+                    me->lvmt->a16wr16(me->handle, KREG_IO,
                                       KCMD(KCMD_WR_DACM, (code >>  8) & 0xFF));
-                    bivme2_io_a16wr16(me->iohandle, KREG_IO,
+                    me->lvmt->a16wr16(me->handle, KREG_IO,
                                       KCMD(KCMD_WR_DACH, (code >> 16) & 0xFF));
                 }
                 code =
@@ -221,7 +222,7 @@ static void rdwr_p(int devid, void *devptr,
             case VDAC20_CHAN_DO_CALIBRATE:
                 if (action == DRVA_WRITE  &&  val == CX_VALUE_COMMAND)
                 {
-                    bivme2_io_a16wr16(me->iohandle, KREG_IO,
+                    me->lvmt->a16wr16(me->handle, KREG_IO,
                                       KCMD(KCMD_DO_CALIBRATE, 0));
                 }
                 ReturnInt32Datum(devid, chn, 0, 0);
@@ -232,7 +233,7 @@ static void rdwr_p(int devid, void *devptr,
                 {
                     /* Note: "digcorr on" is switched by bit7,
                              but its status is read in bit0 */
-                    bivme2_io_a16wr16(me->iohandle, KREG_IO,
+                    me->lvmt->a16wr16(me->handle, KREG_IO,
                                       KCMD(KCMD_SET_DIGCORR, (val & 1) << 7));
                 }
                 ReturnInt32Datum(devid, chn,
@@ -266,11 +267,11 @@ static void rdwr_p(int devid, void *devptr,
 }
 
 
-DEFINE_CXSD_DRIVER(vadc16, "VDAC20 VME DAC driver",
+DEFINE_CXSD_DRIVER(vdac20, "VDAC20 VME DAC driver",
                    NULL, NULL,
                    sizeof(privrec_t), NULL,
-                   1, 1,
-                   NULL, 0,
+                   3, 3,
+                   VME_LYR_API_NAME, VME_LYR_API_VERSION,
                    NULL,
                    -1, NULL, NULL,
-                   init_d, term_d, rdwr_p);
+                   init_d, NULL, rdwr_p);

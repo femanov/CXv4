@@ -12,6 +12,9 @@ devtype adc250 r1h3132620,r4h783155,r5i,w30i,r100i {
 	# absent in ADC250:	visible_clb	16
 	calc_stats	17
 
+	run_mode	18
+	run		19
+
 	ptsofs		20
 	numpts		21
 	timing		22
@@ -64,6 +67,6 @@ devtype adc250 r1h3132620,r4h783155,r5i,w30i,r100i {
 	int<0-3>	112
 
 	line<0-3>totalmin 116
-	line<0-3>totalmax 110
-	num_lines	114
+	line<0-3>totalmax 120
+	num_lines	124
 }

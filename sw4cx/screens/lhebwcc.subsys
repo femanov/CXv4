@@ -192,6 +192,7 @@ define(`VAC_MES_FLA', `"
                 disprange:1e-10-1e0
     } layinfo:newline
 
+ifelse(`', FALSE, `
     container sync "" tabber "" content:2 {
 
         container dds500 "DDS500" grid "notitle,noshadow" base:dds \
@@ -218,6 +219,30 @@ define(`VAC_MES_FLA', `"
         }
 
     }
+', `
+    container sync "DDS300s" grid nocoltitles,norowtitles ncols:2 content:2 {
+        container dds300_1 "" grid notitle,noshadow base:d3_1 \
+                coltitles:"1-1\t1-2" rowtitles:"Ампл., mV\tФаза, ??\tЧаст., Hz" \
+                ncols:2 content:eval(3*2) {
+            knob ampl1 "" text "nounits" mV %5.1f amp1
+            knob ampl2 "" text "nounits" mV %5.1f amp2
+            knob phas1 "" text "nounits" ?? %5.0f phs1
+            knob phas2 "" text "nounits" ?? %5.0f phs2
+            knob freq1 "" text "nounits" Hz %5.0f frq1
+            knob freq2 "" text "nounits" Hz %5.0f frq2
+        }
+        container dds300_2 "" grid notitle,noshadow,norowtitles base:d3_2 \
+                coltitles:"2-1\t2-2" rowtitles:"Ампл., mV\tФаза, ??\tЧаст., Hz" \
+                ncols:2 content:eval(3*2) {
+            knob ampl1 "" text "nounits" mV %5.1f amp1
+            knob ampl2 "" text "nounits" mV %5.1f amp2
+            knob phas1 "" text "nounits" ?? %5.0f phs1
+            knob phas2 "" text "nounits" ?? %5.0f phs2
+            knob freq1 "" text "nounits" Hz %5.0f frq1
+            knob freq2 "" text "nounits" Hz %5.0f frq2
+        }
+    }
+')
 
     container modulation "Управление пучком" grid "nocoltitles" \
             base:mod ncols:1 nflrs:5 nattl:3 content:eval(8+3) {

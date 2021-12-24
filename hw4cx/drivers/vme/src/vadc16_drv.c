@@ -3,6 +3,8 @@
 #include <errno.h>
 
 #include "cxsd_driver.h"
+#include "vme_lyr.h"
+
 #include "drv_i/vadc16_drv_i.h"
 
 
@@ -62,7 +64,8 @@ enum
 
 typedef struct
 {
-    int  iohandle;
+    vme_vmt_t *lvmt;
+    int        handle;
 
     /*
      The irq_n, ch_beg, ch_end triplet is used for a weird purpose:
@@ -71,13 +74,13 @@ typedef struct
      range [ch_beg,ch_end].
      Thus we emulate CAN behaviour in a most correct way.
      */
-    uint8  irq_n;
+    uint8      irq_n;
 
-    int    ch_beg;
-    int    ch_end;
-    int    timecode;
+    int        ch_beg;
+    int        ch_end;
+    int        timecode;
 
-    uint8  irq_vect;
+    uint8      irq_vect;
 } privrec_t;
 
 static psp_paramdescr_t vadc16_params[] =
@@ -93,8 +96,8 @@ static uint8 KVRdByte(privrec_t *me, uint8 addr)
 {
   uint16  w;
 
-    bivme2_io_a16wr16(me->iohandle, KREG_IO, KCMD(KCMD_READ_MEM, addr));
-    bivme2_io_a16rd16(me->iohandle, KREG_IO, &w);
+    me->lvmt->a16wr16(me->handle, KREG_IO, KCMD(KCMD_READ_MEM, addr));
+    me->lvmt->a16rd16(me->handle, KREG_IO, &w);
 
     return w & 0xFF;
 }
@@ -138,7 +141,7 @@ static void ReturnAdcChan(int devid, privrec_t *me, int l)
 }
 
 static void irq_p(int devid, void *devptr,
-                  int irq_n, int vector)
+                  int irq_n, int irq_vect)
 {
   privrec_t  *me = (privrec_t*)devptr;
 
@@ -147,7 +150,7 @@ static void irq_p(int devid, void *devptr,
   int         ch_beg;
   int         ch_end;
 
-    if (vector != me->irq_vect) return;
+    if (irq_vect != me->irq_vect) return;
 
     ch_beg = KVRdByte(me, ADDR_CHBEG);
     ch_end = KVRdByte(me, ADDR_CHEND);
@@ -162,23 +165,26 @@ static int init_d(int devid, void *devptr,
 {
   privrec_t  *me = (privrec_t*)devptr;
 
+  int         bus_major;
+  int         bus_minor;
   int         jumpers;
 
-    if (businfocount < 1) return -CXRF_CFG_PROBL;
-    jumpers      = businfo[0];
-    me->irq_n    = businfocount > 1? businfo[1] &  0x7 : 0;
-    me->irq_vect = businfocount > 2? businfo[2] & 0xFF : 0;
-fprintf(stderr, "businfo[0]=%08x jumpers=0x%x irq=%d\n", businfo[0], jumpers, me->irq_n);
+    if (businfocount < 3) return -CXRF_CFG_PROBL;
+    bus_major    = businfo[0];
+    bus_minor    = businfo[1];
+    jumpers      = businfo[2];
+    me->irq_n    = businfocount > 3? businfo[3] &  0x7 : 0;
+    me->irq_vect = businfocount > 4? businfo[4] & 0xFF : 0;
+fprintf(stderr, "businfo[2]=%08x jumpers=0x%x irq=%d\n", businfo[2], jumpers, me->irq_n);
 
-    me->iohandle = bivme2_io_open(devid, devptr,
-                                  jumpers << 4, 4, ADDRESS_MODIFIER,
-                                  me->irq_n, irq_p);
-    fprintf(stderr, "open=%d\n", me->iohandle);
-    if (me->iohandle < 0)
-    {
-        DoDriverLog(devid, 0, "open: %d/%s", me->iohandle, strerror(errno));
-        return -CXRF_DRV_PROBL;
-    }
+    me->lvmt   = GetLayerVMT(devid);
+    me->handle = me->lvmt->add(devid, devptr,
+                               bus_major, bus_minor,
+                               jumpers << 4, 4,
+                               16, ADDRESS_MODIFIER,
+                               me->irq_n, me->irq_vect, irq_p,
+                               NULL, VME_LYR_OPTION_NONE);
+    if (me->handle < 0) return me->handle;
 
     if (me->ch_beg   < 0) me->ch_beg   = KVRdByte(me, ADDR_CHBEG);
     if (me->ch_end   < 0) me->ch_end   = KVRdByte(me, ADDR_CHEND);
@@ -200,14 +206,14 @@ fprintf(stderr, "[%d-%d]@%d\n", me->ch_beg, me->ch_end, me->timecode);
     if (me->timecode > MAX_TIMECODE) me->timecode = DEF_TIMECODE;
 fprintf(stderr, "[%d-%d]@%d\n", me->ch_beg, me->ch_end, me->timecode);
 
-    bivme2_io_a16wr16(me->iohandle, KREG_IRQ,
+    me->lvmt->a16wr16(me->handle, KREG_IRQ,
                       (((uint16)(me->irq_n)) << 8) | me->irq_vect);
 
-    bivme2_io_a16wr16(me->iohandle, KREG_IO, KCMD(KCMD_STOP, 0));
-    bivme2_io_a16wr16(me->iohandle, KREG_IO, KCMD(KCMD_SET_CHBEG,  me->ch_beg));
-    bivme2_io_a16wr16(me->iohandle, KREG_IO, KCMD(KCMD_SET_CHEND,  me->ch_end));
-    bivme2_io_a16wr16(me->iohandle, KREG_IO, KCMD(KCMD_SET_ADTIME, me->timecode));
-    bivme2_io_a16wr16(me->iohandle, KREG_IO,
+    me->lvmt->a16wr16(me->handle, KREG_IO, KCMD(KCMD_STOP, 0));
+    me->lvmt->a16wr16(me->handle, KREG_IO, KCMD(KCMD_SET_CHBEG,  me->ch_beg));
+    me->lvmt->a16wr16(me->handle, KREG_IO, KCMD(KCMD_SET_CHEND,  me->ch_end));
+    me->lvmt->a16wr16(me->handle, KREG_IO, KCMD(KCMD_SET_ADTIME, me->timecode));
+    me->lvmt->a16wr16(me->handle, KREG_IO,
                       KCMD(KCMD_START,
                            KCMD_START_FLAG_MULTICHAN |
                            KCMD_START_FLAG_INFINITE  |
@@ -222,16 +228,15 @@ static void term_d(int devid, void *devptr)
 {
   privrec_t  *me = (privrec_t*)devptr;
 
-    bivme2_io_a16wr16(me->iohandle, KREG_IRQ, 0);
-    bivme2_io_a16wr16(me->iohandle, KREG_IO,  KCMD(KCMD_STOP, 0));
-    bivme2_io_close  (me->iohandle);
+    me->lvmt->a16wr16(me->handle, KREG_IRQ, 0);
+    me->lvmt->a16wr16(me->handle, KREG_IO,  KCMD(KCMD_STOP, 0));
 }
 
 static void ReRun(privrec_t *me, uint8 set_cmd, uint8 value)
 {
-    bivme2_io_a16wr16(me->iohandle, KREG_IO, KCMD(KCMD_STOP, 0));
-    bivme2_io_a16wr16(me->iohandle, KREG_IO, KCMD(set_cmd,   value));
-    bivme2_io_a16wr16(me->iohandle, KREG_IO,
+    me->lvmt->a16wr16(me->handle, KREG_IO, KCMD(KCMD_STOP, 0));
+    me->lvmt->a16wr16(me->handle, KREG_IO, KCMD(set_cmd,   value));
+    me->lvmt->a16wr16(me->handle, KREG_IO,
                       KCMD(KCMD_START,
                            KCMD_START_FLAG_MULTICHAN |
                            KCMD_START_FLAG_INFINITE  |
@@ -323,8 +328,8 @@ static void rdwr_p(int devid, void *devptr,
 DEFINE_CXSD_DRIVER(vadc16, "VADC16 VME ADC driver",
                    NULL, NULL,
                    sizeof(privrec_t), vadc16_params,
-                   1, 3,
-                   NULL, 0,
+                   3, 5,
+                   VME_LYR_API_NAME, VME_LYR_API_VERSION,
                    NULL,
                    -1, NULL, NULL,
                    init_d, term_d, rdwr_p);

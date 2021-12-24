@@ -43,6 +43,9 @@ static pzframe_chan_dscr_t adc250_chan_dscrs[] =
     [ADC250_CHAN_CALIBRATE]    = {"calibrate",    0, PZFRAME_CHAN_IS_PARAM | PZFRAME_CHAN_RW_ONLY_MASK},
     [ADC250_CHAN_CALC_STATS]   = {"calc_stats"},
 
+    [ADC250_CHAN_RUN_MODE]     = {"run_mode",     0, PZFRAME_CHAN_IMMEDIATE_MASK},
+    [ADC250_CHAN_RUN]          = {"run",          0, PZFRAME_CHAN_IS_PARAM | PZFRAME_CHAN_RW_ONLY_MASK},
+
     [ADC250_CHAN_PTSOFS]       = {"ptsofs"},
     [ADC250_CHAN_NUMPTS]       = {"numpts"},
     [ADC250_CHAN_TIMING]       = {"timing"},
@@ -51,7 +54,7 @@ static pzframe_chan_dscr_t adc250_chan_dscrs[] =
     [ADC250_CHAN_TRIG_TYPE]    = {"trig_type"},
     [ADC250_CHAN_TRIG_INPUT]   = {"trig_input"},
 
-    [ADC250_CHAN_PLL_PRESET]   = {"pll_preset",   0, PZFRAME_CHAN_IMMEDIATE_MASK | PZFRAME_CHAN_ON_CYCLE_MASK | PZFRAME_CHAN_RW_ONLY_MASK},
+    [ADC250_CHAN_PLL_PRESET]   = {"pll_preset",   0, PZFRAME_CHAN_IMMEDIATE_MASK | PZFRAME_CHAN_ON_CYCLE_MASK},
 
     [ADC250_CHAN_DEVICE_ID]    = {"device_id",    0, PZFRAME_CHAN_IMMEDIATE_MASK | PZFRAME_CHAN_ON_CYCLE_MASK},
     [ADC250_CHAN_BASE_SW_VER]  = {"base_sw_ver",  0, PZFRAME_CHAN_IMMEDIATE_MASK | PZFRAME_CHAN_ON_CYCLE_MASK},
@@ -90,7 +93,7 @@ static pzframe_chan_dscr_t adc250_chan_dscrs[] =
     DSCR_X4RDS(INT,,                "int","",       0, 0, 0, 0, ADC250_CHAN_LINE0),
 
     [ADC250_CHAN_CUR_PLL1_CTRL] = {"cur_pll1_ctrl", 0, PZFRAME_CHAN_IMMEDIATE_MASK | PZFRAME_CHAN_ON_CYCLE_MASK},
-    [ADC250_CHAN_CUR_PLL2_CTRL] = {"cur_pll2_ctrl", 0, PZFRAME_CHAN_IMMEDIATE_MASK | PZFRAME_CHAN_ON_CYCLE_MASK | PZFRAME_CHAN_IS_PARAM},
+    [ADC250_CHAN_CUR_PLL2_CTRL] = {"cur_pll2_ctrl", 0, PZFRAME_CHAN_IMMEDIATE_MASK | PZFRAME_CHAN_ON_CYCLE_MASK},
 
     // LINE[0-3]TOTAL{MIN,MAX} and NUM_LINES are omitted
 

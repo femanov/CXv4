@@ -9,7 +9,7 @@ grouping main v5p2camera "VEPP5 beam camera at v5p2" grid "noshadow,notitle" \
 
 sysname   v5p2camera
 defserver cxhw:26
-wintitle  main "VEPP5 beam camera at v5p2"
+wintitle  main "Beam camera at v5p2"
 winname   main v5p2camera
 winclass  main V5P2Camera
 winopts   main compact notoolbar

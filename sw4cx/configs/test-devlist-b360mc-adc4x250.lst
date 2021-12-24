@@ -11,6 +11,8 @@ include(`vadc16.devtype')
 dev _6 adc250@a3818vme ~ 0,0,6,5,1
 dev d5 adc250@a3818vme ~ 0,0,0xd5,5,15
 dev d6 adc250@a3818vme ~ 0,0,0xd6,5,16 numpts=2048 timing=int trigger=int trig_n=0 rangeA=0.5 rangeb=1 rangec=2 ranged=4
+dev i6 adc250@a3818vme ~ 1,0,0x96,5,96
+dev i8 adc250@a3818vme ~ 1,0,0x98,5,98
 ##dev a0 vadc16/remdrv ~ 0,0,0,5,50    b:192.168.130.76:8002
 ##dev a2 vadc16/remdrv ~ 0,0,2,5,52    b:192.168.130.76:8002
 #dev x zzz/remdrv r1i 0 0,0,b:192.168.130.76:8002

@@ -195,7 +195,7 @@ void PrintDatarefData(FILE *fp, util_refrec_t *urp, int parts)
             {
                 tv.tv_sec  = timestamp.sec;
                 tv.tv_usec = timestamp.nsec/1000;
-                fprintf(fp, "@%s", stroftime_msc(&tv, "-"));
+                fprintf(fp, " @%s", stroftime_msc(&tv, "-"));
             }
             else
                 fprintf(fp, " @%ld.%06ld", timestamp.sec, timestamp.nsec/1000);

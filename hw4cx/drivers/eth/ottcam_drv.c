@@ -122,6 +122,9 @@ static pzframe_chinfo_t chinfo[] =
     [OTTCAM_CHAN_SYNC]          = {PZFRAME_CHTYPE_VALIDATE,    0},
     [OTTCAM_CHAN_RRQ_MSECS]     = {PZFRAME_CHTYPE_VALIDATE,    0},
 
+    [OTTCAM_CHAN_RUN_MODE]      = {PZFRAME_CHTYPE_PZFRAME_STD, 0},
+    [OTTCAM_CHAN_RUN]           = {PZFRAME_CHTYPE_PZFRAME_STD, 0},
+
     /* status */
     [OTTCAM_CHAN_MISS]          = {PZFRAME_CHTYPE_STATUS,      -1},
     [OTTCAM_CHAN_ELAPSED]       = {PZFRAME_CHTYPE_PZFRAME_STD, 0},
@@ -963,9 +966,11 @@ static int ottcam_init_d(int devid, void *devptr,
                          OTTCAM_CHAN_WAITTIME,
                          OTTCAM_CHAN_STOP,
                          OTTCAM_CHAN_ELAPSED,
+                         OTTCAM_CHAN_RUN_MODE, OTTCAM_CHAN_RUN,
+                         -1, -1,
                          StartMeasurements, TrggrMeasurements,
                          AbortMeasurements, ReadMeasurements,
-                         PrepareRetbufs);
+                         PrepareRetbufs, NULL, NULL);
 
         InitParams(&(me->pz));
 

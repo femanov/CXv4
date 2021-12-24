@@ -759,6 +759,7 @@ static void InitDevice (int devid)
   CxsdDriverModRec *metric;
   const char       *auxinfo;
   const char       *options;
+  const char       *devname;
   drvopts_t         drvopts;
   int               state;
   int               s_devid;
@@ -770,6 +771,7 @@ static void InitDevice (int devid)
     metric  = dev_p->metric;
     auxinfo = CxsdDbGetStr(cxsd_hw_cur_db, db_ref->auxinfo_ofs);
     options = CxsdDbGetStr(cxsd_hw_cur_db, db_ref->options_ofs);
+    devname = CxsdDbGetStr(cxsd_hw_cur_db, db_ref->instname_ofs);
 
     if (options != NULL)
     {
@@ -848,15 +850,21 @@ static void InitDevice (int devid)
                                      db_ref->businfocount, db_ref->businfo,
                                      auxinfo);
         LEAVE_DRIVER_S(s_devid);
+
+        /* Check if the device was already terminated from inside init_dev();
+           in that case just return without any other actions
+           (ignoring which state was returned). */
+        if (dev_p->state < 0) return;
+
         gettimeofday(&(dev_p->stattime), NULL);
 
         /*!!! Check state!!! */
         if      (state < 0)
         {
             logline(LOGF_MODULES, LOGL_WARNING,
-                    "%s: %s[%d].init_dev()=%d -- refusal",
-                    __FUNCTION__, metric->mr.name, devid, state);
-            TerminDev(devid, state == DEVSTATE_OFFLINE? 0 : -state, NULL/* So that if device made SetDevState(,OFFLINE) itself, the description will remain */);
+                    "%s: %s[%d]%s.init_dev()=%d -- refusal",
+                    __FUNCTION__, metric->mr.name, devid, devname == NULL? "" : devname, state);
+            TerminDev(devid, state == DEVSTATE_OFFLINE? 0 : -state, NULL/* So that if device made SetDevState(,OFFLINE) itself, the description will remain *//* 09.10.2021: anyway, that's not the case anymore, because of "dev_p->state < 0" check above */);
         }
         else if (state == DEVSTATE_NOTREADY)
             FreezeDev(devid, 0, NULL);
