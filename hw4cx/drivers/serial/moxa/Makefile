@@ -54,6 +54,7 @@ EXPORTSFILES=	$(MONO_C_FILES) $(EXES)
 EXPORTSDIR=	lib/server/drivers/moxa_arm_drvlets
 
 LOCAL_DEFINES=	-DMOXA_KSHD485
+LOCAL_DEFINES+=	-DSPECIFIC_SERIAL_SETUP_FILE_H='"moxa_serial_setup_file.h"'
 
 ######################################################################
 PRJDIR=		../../..

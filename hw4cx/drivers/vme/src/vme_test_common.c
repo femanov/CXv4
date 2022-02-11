@@ -108,7 +108,7 @@ static void ParseAddrSpec(const char *argv0, const char *place,
     p++;
     if (*p == ':') p++;  // Optional separator, to separate words for shell
 
-    addr_p->offset = strtol(p, &errp, 0);
+    addr_p->offset = strtoul(p, &errp, 0);
     if (errp == p) goto ERR;
     p = errp;
 
@@ -122,7 +122,7 @@ static void ParseAddrSpec(const char *argv0, const char *place,
         }
         
         p++;
-        addr_p->count = strtol(p, &errp, 0);
+        addr_p->count = strtoul(p, &errp, 0);
         if (errp == p) goto ERR;
         p = errp;
         if (addr_p->count <= 0  ||
@@ -148,7 +148,7 @@ static void ParseAddrSpec(const char *argv0, const char *place,
         }
         
         p++;
-        addr_p->mask = strtol(p, &errp, 0);
+        addr_p->mask = strtoul(p, &errp, 0);
         if (errp == p) goto ERR;
         p = errp;
     }
@@ -173,7 +173,7 @@ static void ParseAddrSpec(const char *argv0, const char *place,
         while (1)
         {
             p++;
-            addr_p->value = strtol(p, &errp, 0);
+            addr_p->value = strtoul(p, &errp, 0);
             if (errp == p) goto ERR;
             p = errp;
 
@@ -229,6 +229,11 @@ static void ParseAddrSpec(const char *argv0, const char *place,
     }
 
     if (end_p != NULL) *end_p = p;
+    else
+    {
+        /* Check for end-of-spec ONLY when end_p==NULL, i.e., if nobody will parse the rest */
+        if (*p != '\0') goto ERR;
+    }
 
     return;
     
@@ -281,8 +286,8 @@ static void ParseDevSpec (const char *argv0, const char *spec,
     p = errp + 1;
 
     dev_p->base_addr        = strtoul(p, &errp, 0);
-    if (errp == p)                   goto ERR;
-//fprintf(stderr, "%s p=<%s> base_addr=%08x\n", __FUNCTION__, p, dev_p->base_addr);
+    if (errp == p  ||  *errp != '\0')goto ERR;
+//fprintf(stderr, "%s p=<%s> errp=<%s> base_addr=%08x\n", __FUNCTION__, p, errp, dev_p->base_addr);
     
     return;
     
@@ -485,7 +490,7 @@ static void WaitForIRQ(const char *argv0, const char *spec)
         usecs = -1;
     else
     {
-        usecs = strtol(p, &errp, 0);
+        usecs = strtoul(p, &errp, 0);
         if (errp == p)
             goto ERR;
     }
@@ -703,7 +708,7 @@ int main(int argc, char *argv[])
                 }
                 bzero(&irq, sizeof(irq));
                 p = optarg;
-                irq.n = strtol(p, &errp, 0);
+                irq.n = strtol(p, &errp, 0); // 12.01.2022: Should check IRQ value to be in range [1-7]
                 if (errp == p)
                 {
                     fprintf(stderr, "%s: error in IRQ-number spec\n", argv[0]);

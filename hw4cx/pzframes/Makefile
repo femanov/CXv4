@@ -2,7 +2,7 @@ FASTADCS=	adc200me adc812me \
 		adc200 adc502 adc333 adc4 c061621 f4226 \
 		vsdc2_1 vsdc2_2 \
 		pxi6363 \
-		adc4x250 adc250 #adc1000
+		adc4x250 adc250 adc1000
 VCAMIMGS=	ottcam img878
 WIREBPMS=	u0632
 

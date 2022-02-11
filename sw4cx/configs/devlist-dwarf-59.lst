@@ -1,3 +1,5 @@
 include(`kshd485.devtype')
 
-dev k1 kshd485@usbpiv485 ~ 0,1
+#dev k1 kshd485@usbpiv485 ~ 0,1
+dev k1 kshd485@mxupiv485 ~ 0,1
+#dev k1:log=pktdump kshd485@mxupiv485 ~ 1,1

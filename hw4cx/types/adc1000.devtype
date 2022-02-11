@@ -1,4 +1,4 @@
-devtype adc4x250 r1i3132674,r9i,w30i,r100i {
+devtype adc1000 r1h3132620,r9i,w30i,r100i {
 	data		0
 	marker		9
 
@@ -7,9 +7,12 @@ devtype adc4x250 r1i3132674,r9i,w30i,r100i {
 	istart		12
 	waittime	13
 	calibrate	14
-	fgt_clb		15
-	visible_clb	16
+	# absent in ADC250:		fgt_clb		15
+	# absent in ADC250:		visible_clb	16
 	calc_stats	17
+
+	run_mode	18
+	run		19
 
 	ptsofs		20
 	numpts		21
@@ -18,6 +21,8 @@ devtype adc4x250 r1i3132674,r9i,w30i,r100i {
 	range		24
 	trig_type	28
 	trig_input	29
+
+	pll_preset	39
 
 	device_id	40
 	base_sw_ver	41
@@ -28,8 +33,10 @@ devtype adc4x250 r1i3132674,r9i,w30i,r100i {
 	base_uniq_id	46
 	pga_uniq_id	47
 
+	pll_locked	48
+
 	elapsed		50
-	clb_state	51
+	# absent in ADC250:		clb_state	51
 	xs_per_point	52
 	xs_divisor	53
 	xs_factor	54
@@ -39,7 +46,7 @@ devtype adc4x250 r1i3132674,r9i,w30i,r100i {
 	cur_frqdiv	58
         # unused 59
 	cur_range	60
-	overflow	64
+	overflow<0-3>	64
 
 	on		70
 	rangemin	74
@@ -50,12 +57,29 @@ devtype adc4x250 r1i3132674,r9i,w30i,r100i {
 	clb_zero<0-3>	90
 	clb_gain<0-3>	94
 
+	cur_pll1_ctrl	98
+	cur_pll2_ctrl	99
+
 	min		100
 	max		104
 	avg		108
 	int		112
 
 	totalmin	116
-	totalmax	110
-	num_lines	114
+	totalmax	120
+	num_lines	124
+
+	# Names for compatibility with ADC250/ADC500
+	line0		data
+	range0		range
+	cur_range0	cur_range
+	line0on		on
+	line0rangemin	rangemin
+	line0rangemax	rangemax
+	min0		min
+	max0		max
+	avg0		avg
+	int0		int
+	line0totalmin	totalmin
+	line0totalmax	totalmax
 }

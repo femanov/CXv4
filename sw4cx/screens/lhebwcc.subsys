@@ -13,6 +13,7 @@ define(`RGSWCH',
                push 1; qryval; sub; putchan $6; ret;"')
 
 #---------------------------------------------------------------------
+#!!!!!!!!!! should put VVI somewhere!!!
 
 sysname lhebwcc
 defserver tower:47
@@ -22,7 +23,7 @@ winclass main LhEbwCC
 winopts  main "maxitoolbar,with_save_btn,with_load_btn,hist_period=0.1,hist_len=864000"
 
 grouping main VERONA_grouping "Beam welding control center" \
-        lrtb content:9 {
+        lrtb content:7 {
 
     container vip "Высоковольтный источник питания" \
             grid "nocoltitles,norowtitles" 4 base:vip content:4 {
@@ -141,33 +142,13 @@ define(`MAGOLD_LINE', `
             coltitles:"Iуст, A\tIизм, A\tUизм, V" ncols:2 content:eval(8*2) {
         MAGOLD_LINE(acx,  "Ан.корр.X",   -1.5, 1.5)
         MAGOLD_LINE(acy,  "Ан.корр.Y",   -1.5, 1.5)
-        MAGOLD_LINE(ld,   "Квадр.кат.",   0.0, 1.5)
-        MAGOLD_LINE(ls,   "Фок. кат.",    0.0, 1.5)
+        MAGOLD_LINE(afc,  "Ан.фок.к.",    0.0, 1.5)
+        MAGOLD_LINE(foc,  "Фок. кат.",    0.0, 1.5)
         MAGOLD_LINE(c2x,  "Корр. 2 X",   -1.5, 1.5)
         MAGOLD_LINE(c2y,  "Корр. 2 Y",   -1.5, 1.5)
         MAGOLD_LINE(dc1x, "Корр. 1 X",   -1.5, 1.5)
         MAGOLD_LINE(dc1y, "Корр. 1 Y",   -1.5, 1.5)
 #        knob ld_rate "ЛзДин.скор." text nounits "" "% 7.4f" i_ld_rate
-    }
-
-# 1:id 2:label 3:min_alwd 4:max_alwd
-define(`MAGSYS_LINE', `
-    knob $1_Iset $2 text nounits "" "% 7.4f" i_`'$1`'_s \
-            alwdrange:$3-$4 step:0.01
-    disp $1_Imes "" text nounits "" "% 7.4f" i_`'$1`'_m
-    disp $1_Umes "" text nounits "" "% 7.4f" i_`'$1`'_v
-')
-
-    container magsys2 "Магнитная система 2" grid base:magsys2 \
-            coltitles:"Iуст, A\tIизм, A\tUизм, V" ncols:3 content:eval(8*3) {
-        MAGSYS_LINE(acx,  "Ан.корр.X",   -1.5, 1.5)
-        MAGSYS_LINE(acy,  "Ан.корр.Y",   -1.5, 1.5)
-        MAGSYS_LINE(afc,  "Квадр.кат.",  -1.5, 1.5)
-        MAGSYS_LINE(foc,  "Фок.кат.",     0.0, 1.5)
-        MAGSYS_LINE(c2x,  "Корр. 2 X",   -1.5, 1.5)
-        MAGSYS_LINE(c2y,  "Корр. 2 Y",   -1.5, 1.5)
-        MAGSYS_LINE(dc1x, "Корр. 1 X",   -1.5, 1.5)
-        MAGSYS_LINE(dc1y, "Корр. 1 Y",   -1.5, 1.5)
     }
 
 # vacuum(volts)=10^(1.667*volts-d), where d=11.33mbar,9.33Pa,11.46torr
@@ -179,17 +160,13 @@ define(`VAC_MES_FLA', `"
     ret;
 "')
     container alarms "Алармы и блокировки" grid "nocoltitles,norowtitles" \
-            base:vac ncols:2 content:eval(4*2) {
-        disp "" "Запрет ВИПу"    led color=red                   r:ilk6
-        disp "" "Запрет эл.пуч." led color=red                   r:ilk7
-        disp "" "Токооседание"   led color=red                   r:ilk3
-        disp "" ""               text "" mA             %6.3f      tokoosedanie
-        disp "" "Вак.+в-метр"    led color=red                   r:ilk1
+            base:vac ncols:2 content:4 {
         disp "vacuum" "P"        text withlabel Pa      %5.0e    r:VAC_MES_FLA \
                 disprange:1e-10-1e0
-        noop
         disp "linear" "="        text withlabel Pa      %8.5f    r:VAC_MES_FLA \
                 disprange:1e-10-1e0
+        disp "volts"  "U"        text withlabel V       %6.3f    r:vacuum_mes
+        disp "exp"    "=> E"     text withlabel ""      %6.3f    r:"_all_code; getchan vacuum_mes; mul 1.667; sub 9.33; ret;" disprange:-20-+20
     } layinfo:newline
 
 ifelse(`', FALSE, `
@@ -269,16 +246,16 @@ define(`WELD_LINE', `
 ')
 #    container weld "" tabber "right" content:2 {
 
-        container weld2 "Перемещение пучка" grid "" base:magsys2.weld \
-                coltitles:"ТекущУст\tНачало\tКонец" \
-                rowtitles:"Корр. 2 X\tКорр. 2 Y\tВремя, s" \
-                ncols:3 content:eval(2*3+3) {
-            WELD_LINE(0)
-            WELD_LINE(1)
-            knob   T     "T"   text noincdec - %5.3f time
-            button start Start button r:do_start
-            button stop  Stop  button r:do_stop
-        }
+##        container weld2 "Перемещение пучка" grid "" base:magsys2.weld \
+##                coltitles:"ТекущУст\tНачало\tКонец" \
+##                rowtitles:"Корр. 2 X\tКорр. 2 Y\tВремя, s" \
+##                ncols:3 content:eval(2*3+3) {
+##            WELD_LINE(0)
+##            WELD_LINE(1)
+##            knob   T     "T"   text noincdec - %5.3f time
+##            button start Start button r:do_start
+##            button stop  Stop  button r:do_stop
+##        }
 
 #        container weld1 "ЭЛС-1" grid "notitle,noshadow" base:magsys.weld \
 #                coltitles:"ТекущУст\tНачало\tКонец" \
@@ -296,6 +273,6 @@ define(`WELD_LINE', `
 #    }
 
     noop -plot "" histplot "width=700,height=290 \
-            foreach(`x', `(alarms.vacuum,alarms.linear,vip.mes.vip_uout,gunctl.ctl.un_mes,gunctl.stab.ih_mes,gunctl.stab.il_mes,gunctl.ctl.I,gunctl.mes.Uheat_mes)', ` add=.x')" \
+            foreach(`x', `(alarms.vacuum,alarms.linear,alarms.exp,vip.mes.vip_uout,gunctl.ctl.un_mes,gunctl.stab.ih_mes,gunctl.stab.il_mes,gunctl.ctl.I,gunctl.mes.Uheat_mes)', ` add=.x')" \
             layinfo:newline
 }

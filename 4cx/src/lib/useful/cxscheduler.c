@@ -333,7 +333,8 @@ int  sl_main_loop(void)
            added timeouts will be TV_IS_AFTER(subsequent,now), so that
            this loop will process not more than what exists at its
            beginning, and thus would be finite. */
-        while (frs_tid >= 0  &&  TV_IS_AFTER(now, tout_list[frs_tid].when))
+        while (!should_break  &&
+               frs_tid >= 0  &&  TV_IS_AFTER(now, tout_list[frs_tid].when))
         {
             tid      = frs_tid;
             cb       = tout_list[tid].cb;
@@ -395,7 +396,7 @@ int  sl_main_loop(void)
         }
         else if (r != 0)
         {
-            for (fd = 0;  fd <= maxall;  fd++)
+            for (fd = 0;  !should_break  &&  fd <= maxall;  fd++)
                 if (FD_ISSET(fd, &sel_rfds)  ||
                     FD_ISSET(fd, &sel_wfds)  ||
                     FD_ISSET(fd, &sel_efds))

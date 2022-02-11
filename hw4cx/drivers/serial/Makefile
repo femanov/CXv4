@@ -5,6 +5,7 @@ include		$(PRJDIR)/PrjRules.mk
 ######################################################################
 
 SUBDIRS=        local com usb
+SUBDIRS+=	mxupcie # In its current form there's no external dependencies, so no canary required and the subdirectory can be built unconditionally
 
 # Value derived from arm-linux/x_rules.mk
 ARM_CANARY=	$(PRJDIR)/../x-compile/arm-linux_1.3/bin/arm-linux-gcc

@@ -16,6 +16,7 @@
 #include "misc_types.h"
 #include "misc_macros.h"
 #include "misc_sleepbyselect.h"
+#include "cx_sysdeps.h"
 #include "timeval_utils.h"
 
 #include "cxscheduler.h"
@@ -146,10 +147,10 @@ static void ParseDevSpec (const char *argv0, const char *spec,
     p = errp + 1;
 
     dev_p->epcs_offs        = strtoul(p, &errp, 0);
-    if (errp == p  ||  *errp != '\0')goto ERR;
+    if (errp == p)                   goto ERR;
 
     return;
-
+    
  ERR:
     fprintf(stderr, "%s: error in device spec \"%s\"\n", argv0, spec);
     exit(1);
@@ -170,73 +171,18 @@ static const char      *option_bus_config = NULL;
 
 static int read4b (uint32 offs, uint32 *v_p)
 {
-  uint16  wl, wh;
+  int  r;
 
-#if 0
-    vme_hal_a32rd32(the_bus_handle, dev.am, dev.base_addr + dev.epcs_offs + offs, v_p);
-#else
-    if    (dev.data_size == 32)
-    {
-        if      (dev.addr_size == 32) vme_hal_a32rd32(the_bus_handle, dev.am, dev.base_addr + dev.epcs_offs + offs, v_p);
-        else if (dev.addr_size == 24) vme_hal_a24rd32(the_bus_handle, dev.am, dev.base_addr + dev.epcs_offs + offs, v_p);
-        else   /*dev.addr_size == 16*/vme_hal_a16rd32(the_bus_handle, dev.am, dev.base_addr + dev.epcs_offs + offs, v_p);
-    }
-    else /*dev.data_size == 16*/
-    {
-        // Note: VME is BIG-endian, so that HI-word is at offset 0 inside 32bits and LO-word is at offset 2
-        if      (dev.addr_size == 32)
-        {
-            vme_hal_a32rd16(the_bus_handle, dev.am, dev.base_addr + dev.epcs_offs + offs + 0, &wh);
-            vme_hal_a32rd16(the_bus_handle, dev.am, dev.base_addr + dev.epcs_offs + offs + 2, &wl);
-        }
-        else if (dev.addr_size == 24)
-        {
-            vme_hal_a24rd16(the_bus_handle, dev.am, dev.base_addr + dev.epcs_offs + offs + 0, &wh);
-            vme_hal_a24rd16(the_bus_handle, dev.am, dev.base_addr + dev.epcs_offs + offs + 2, &wl);
-        }
-        else   /*dev.addr_size == 16*/
-        {
-            vme_hal_a16rd16(the_bus_handle, dev.am, dev.base_addr + dev.epcs_offs + offs + 0, &wh);
-            vme_hal_a16rd16(the_bus_handle, dev.am, dev.base_addr + dev.epcs_offs + offs + 2, &wl);
-        }
-        *v_p = (((uint32)wh) << 16) | wl;
-    }
-#endif
+    r = vme_hal_a32rd32(the_bus_handle, dev.am, dev.base_addr + dev.epcs_offs + offs, v_p);
 
     return 0;
 }
 
 static int write4b(uint32 offs, uint32  v)
 {
-#if 0
-    vme_hal_a32wr32(the_bus_handle, dev.am, dev.base_addr + dev.epcs_offs + offs, v);
-#else
-    if    (dev.data_size == 32)
-    {
-        if      (dev.addr_size == 32) vme_hal_a32wr32(the_bus_handle, dev.am, dev.base_addr + dev.epcs_offs + offs, v);
-        else if (dev.addr_size == 24) vme_hal_a24wr32(the_bus_handle, dev.am, dev.base_addr + dev.epcs_offs + offs, v);
-        else   /*dev.addr_size == 16*/vme_hal_a16wr32(the_bus_handle, dev.am, dev.base_addr + dev.epcs_offs + offs, v);
-    }
-    else /*dev.data_size == 16*/
-    {
-        // Note: VME is BIG-endian, so that HI-word is at offset 0 inside 32bits and LO-word is at offset 2
-        if      (dev.addr_size == 32)
-        {
-            vme_hal_a32wr16(the_bus_handle, dev.am, dev.base_addr + dev.epcs_offs + offs + 0, (v >> 16) & 0xFFFF);
-            vme_hal_a32wr16(the_bus_handle, dev.am, dev.base_addr + dev.epcs_offs + offs + 2,  v        & 0xFFFF);
-        }
-        else if (dev.addr_size == 24)
-        {
-            vme_hal_a24wr16(the_bus_handle, dev.am, dev.base_addr + dev.epcs_offs + offs + 0, (v >> 16) & 0xFFFF);
-            vme_hal_a24wr16(the_bus_handle, dev.am, dev.base_addr + dev.epcs_offs + offs + 2,  v        & 0xFFFF);
-        }
-        else   /*dev.addr_size == 16*/
-        {
-            vme_hal_a16wr16(the_bus_handle, dev.am, dev.base_addr + dev.epcs_offs + offs + 0, (v >> 16) & 0xFFFF);
-            vme_hal_a16wr16(the_bus_handle, dev.am, dev.base_addr + dev.epcs_offs + offs + 2,  v        & 0xFFFF);
-        }
-    }
-#endif
+  int  r;
+
+    r = vme_hal_a32wr32(the_bus_handle, dev.am, dev.base_addr + dev.epcs_offs + offs, v);
 
     return 0;
 }
@@ -298,7 +244,7 @@ static int readflash_proc(const char *arg __attribute__((unused)), int fd)
 
     for (read_offs = 0;  read_offs < v_EPCS_SIZE; /* NO-INCREMENT */)
     {
-        if (option_verbose) fprintf(stderr, "\rReading from offset 0x%08x ", read_offs);
+        if (option_verbose) fprintf(stderr, "Reading from offset 0x%08x\r", read_offs);
 
         // Set current read address
         write4b(EPCS_OFS_EPCS_ADDR, read_offs);
@@ -320,21 +266,23 @@ static int readflash_proc(const char *arg __attribute__((unused)), int fd)
             return -1;
         }
 
-        // Set the read address
+        // 
         write4b(EPCS_OFS_EPCS_BUFF_RD_ADDR, 0);
         //
         for (read_w_n = 0;  read_w_n < v_BUFF_WORD_NUM;  read_w_n++, read_offs += 4)
         {
-            write4b(EPCS_OFS_EPCS_BUFF_RD_ADDR, 0); // Set read address for non-auto-incrementing devices (those with D16, namely the S_TIMER)
             read4b(EPCS_OFS_EPCS_BUFF_DATA, &w);
-            // Bit-flip the word read...
             w = mirror32bits(w);
-            // ...and disassemble it into bytes in an endian-agnostic way...
+#if   BYTE_ORDER == LITTLE_ENDIAN
             bytes[0] = (w >> 24) & 0xFF;
             bytes[1] = (w >> 16) & 0xFF;
             bytes[2] = (w >>  8) & 0xFF;
             bytes[3] =  w        & 0xFF;
-            // Finally, write it into file
+#elif BYTE_ORDER == BIG_ENDIAN
+            /* Do-nothing */
+#else
+#error Sorry, the "BYTE_ORDER" is neither "LITTLE_ENDIAN" nor "BIG_ENDIAN"
+#endif
             write(fd, bytes, sizeof(bytes));
         }
     }
@@ -370,7 +318,7 @@ static int writeflash_proc(const char *arg __attribute__((unused)), int fd)
 
     for (write_offs = 0, end_of_file = 0;  end_of_file == 0 /*Any check for size?*/;  /* NO-INCREMENT */)
     {
-        if (option_verbose) fprintf(stderr, "\rWriting to offset 0x%08x ", write_offs);
+        if (option_verbose) fprintf(stderr, "Writing to offset 0x%08x\r", write_offs);
 
         // Set current write address
         write4b(EPCS_OFS_EPCS_ADDR, write_offs);
@@ -380,18 +328,20 @@ static int writeflash_proc(const char *arg __attribute__((unused)), int fd)
         //
         for (write_w_n = 0;  write_w_n < v_BUFF_WORD_NUM;  write_w_n++, write_offs += 4)
         {
-            bytes[0] = bytes[1] = bytes[2] = bytes[3]; // Pre-fill everything with zeroes
             read_r = read(fd, bytes, sizeof(bytes));
             if (read_r < sizeof(bytes)) end_of_file = 1;
             if (read_r <= 0) goto END_READ_BLOCK;
-            // Assemble the word-to-write in an endian-agnostic way...
+#if   BYTE_ORDER == LITTLE_ENDIAN
             w =           bytes[3]         |
-                (((uint32)bytes[2]) <<  8) |
+                (((uint32)bytes[2])  << 8) |
                 (((uint32)bytes[1]) << 16) |
                 (((uint32)bytes[0]) << 24);
-            // ...and bit-flip it
+#elif BYTE_ORDER == BIG_ENDIAN
+            /* Do-nothing */
+#else
+#error Sorry, the "BYTE_ORDER" is neither "LITTLE_ENDIAN" nor "BIG_ENDIAN"
+#endif
             w = mirror32bits(w);
-            // Finally, write it to flash (with prior setting the write address)
             write4b(EPCS_OFS_EPCS_BUFF_WR_ADDR, write_w_n);
             write4b(EPCS_OFS_EPCS_BUFF_DATA, w);
         }

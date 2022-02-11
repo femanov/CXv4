@@ -218,7 +218,7 @@ static void DoSend(const char *argv0, const char *spec)
     }
     else
     {
-        id = strtol(p, &errp, 0);
+        id = strtol(p, &errp, 0); // Note: CAN ID is either 11 or 28 bits, always less than 31; so we use just strtol(), not strtoul()
         if (errp == p)
         {
             fprintf(stderr, "%s: bad ID spec in \"%s\"\n", argv0, spec);
@@ -304,7 +304,7 @@ static void DoRecv(const char *argv0, const char *spec)
     p++;
     if (*p != '\0')
     {
-        intval = strtol(p, &errp, 0);
+        intval = strtoul(p, &errp, 0);
         if (errp == p)
         {
             fprintf(stderr, "%s: bad milliseconds/-count spec in \"%s\"\n", argv0, spec);

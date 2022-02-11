@@ -1,0 +1,14 @@
+[Unit]
+Description=CXv4 servers management service
+After=multi-user.target
+
+[Service]
+Type=oneshot
+User=oper
+ExecStart=/bin/sh -c ${HOME}/4pult/bin/start-all-servers
+ExecStop=/bin/sh -c ${HOME}/4pult/bin/stop-all-servers
+RemainAfterExit=true
+KillMode=none
+
+[Install]
+WantedBy=multi-user.target
