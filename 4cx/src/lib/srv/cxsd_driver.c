@@ -250,8 +250,8 @@ void StdSimulated_rw_p(int devid, void *devptr __attribute__((unused)),
             v.i64 = v.u64 = gcid * 5000 + cycle;
 #endif
 #if MAY_USE_FLOAT
-            v.f32 =         gcid + cycle / 1000;
-            v.f64 =         gcid + cycle / 1000;
+            v.f32 =         gcid + cycle / 1000.;
+            v.f64 =         gcid + cycle / 1000.;
 #endif
             v.t8  = 'a' + ((gcid + cycle) % 26);
             v.t32 = 'A' + ((gcid + cycle) % 26);

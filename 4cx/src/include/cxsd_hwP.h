@@ -60,6 +60,11 @@ typedef struct
     CxsdLayerModRec     *metric;
 } cxsd_hw_lyr_t;
 
+enum
+{
+    CXSD_HW_CHAN_BHVR_HAS_DEFVAL  = 1 << 0,
+   
+};
 typedef void (*cxsd_hw_chan_evproc_t)(int            uniq,
                                       void          *privptr1,
                                       cxsd_gchnid_t  gcid,
@@ -84,6 +89,7 @@ typedef struct
     int8            is_internal;
     int8            do_ignore_upd_cycle;
     int8            rw_readonly;       // is internally a rw-channel, but device is readonly
+    uint32          bhvr;
 
     int             devid;             // "Backreference" -- device this channel belongs to
     cxsd_gchnid_t   boss;              // if >= 0

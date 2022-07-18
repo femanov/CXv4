@@ -1,0 +1,20 @@
+grouping main tornadotest "Test4Tornado" \
+        split "vertical" content:3 {
+    pzframe adc "" onei32l "height=300,maxfrq=10" adc1 \
+        layinfo:"left=0,right=0,top=0,bottom=0@-plot"
+#    pzframe adc "" adc250 "height=300,maxfrq=10" adc1 \
+#        layinfo:"left=0,right=0,top=0,bottom=0@-plot"
+    container v "" grid nodecor base:mma1 ncols:3 content:3 {
+        disp avg "Avg" text "withlabel" r:avg disprange:-10-+10
+        disp min "Min" text "withlabel" r:min disprange:-10-+10
+        disp max "Max" text "withlabel" r:max disprange:-10-+10
+    }
+    noop -plot "" histplot "height=300,add=v.avg,add=v.max,add=v.min" \
+        layinfo:"left=0,right=0,bottom=0"
+}    
+
+sysname   tornadotest
+wintitle  main "Test4Tornado"
+winname   main Test4Tornado
+winclass  main Test4Tornado
+winopts   main resizable,compact,notoolbar,hist_period=0.1,hist_len=864000

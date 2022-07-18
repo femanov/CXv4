@@ -47,7 +47,22 @@ dev adc250_98  adc250/remdrv  ~ 0,0,0x98,5,0x98 b:bivme2-rfmeas run_mode=auto_re
 dev adc250_9a  adc250/remdrv  ~ 0,0,0x9a,5,0x9a b:bivme2-rfmeas run_mode=auto_re_run pll_preset=vepp5_rfmeas
 dev adc250_9c  adc250/remdrv  ~ 0,0,0x9c,5,0x9c b:bivme2-rfmeas run_mode=auto_re_run pll_preset=vepp5_rfmeas
 # ADC1000s
-dev adc1000_a4 adc1000/remdrv ~ 0.0,0xA4,5,0xA4 b:bivme2-rfmeas run_mode=auto_re_run pll_preset=vepp5_rfmeas
-dev adc1000_a8 adc1000/remdrv ~ 0.0,0xA8,5,0xA8 b:bivme2-rfmeas run_mode=auto_re_run pll_preset=vepp5_rfmeas
+dev adc1000_a2 adc1000/remdrv ~ 0,0,0xA2,5,0xA2 b:bivme2-rfmeas run_mode=auto_re_run pll_preset=vepp5_rfmeas
+dev adc1000_a8 adc1000/remdrv ~ 0,0,0xA8,5,0xA8 b:bivme2-rfmeas run_mode=auto_re_run pll_preset=vepp5_rfmeas
 
 dev l_timer rfmeas_l_timer/remdrv ~ 0,0,0x80 b:bivme2-rfmeas
+
+#### 2. cpoint-aliases ###############################################
+cpoint adc250_kls_HV	adc250_8a
+cpoint adc250_kls_inRF	adc250_8c
+cpoint adc250_s1n2	adc250_8e
+cpoint adc250_s3n4	adc250_90
+cpoint adc250_s5n6	adc250_92
+cpoint adc250_s7n8	adc250_94
+cpoint adc250_s9n10	adc250_96
+cpoint adc250_s11n12	adc250_98
+cpoint adc250_s13n41	adc250_9a
+cpoint adc250_grp_gunHV	adc250_9c
+cpoint adc1000_gunBeam	adc1000_a2
+cpoint adc1000_FCT	adc1000_a8
+

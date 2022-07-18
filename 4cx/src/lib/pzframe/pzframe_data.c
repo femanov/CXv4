@@ -90,7 +90,9 @@ static void PzframeDataEvproc(int            uniq,
                               void          *info_ptr,
                               void          *privptr2)
 {
-  pzframe_data_t      *pfr = privptr2;
+  pzframe_data_dpl_t  *dpl = privptr2;
+  pzframe_data_t      *pfr = dpl->p;
+  int                  cn  = dpl->n;
   pzframe_type_dscr_t *ftd = pfr->ftd;
 
   cx_time_t            fresh_age_time;
@@ -98,7 +100,7 @@ static void PzframeDataEvproc(int            uniq,
   struct timeval       timenow;
   struct timeval       timediff;
 
-  int                  cn;
+//  int                  cn;
   int                  info_changed;
   rflags_t             rflags;
   cxdtype_t            dtype;
@@ -123,6 +125,14 @@ static void PzframeDataEvproc(int            uniq,
         }
         pfr->fresh_age_timeval.tv_sec  = fresh_age_time.sec;
         pfr->fresh_age_timeval.tv_usec = fresh_age_time.nsec / 1000;
+        return;
+    }
+    else if (reason == CDA_REF_R_RDSCHG)
+    {
+        /*!!! Remember for info_changed somehow? */
+        pfr->rds_had_changed = 1; // Was prepared 29.06.2016, but truly added only 10.04.2022
+        /* Call upstream */
+        PzframeDataCallCBs(pfr, PZFRAME_REASON_RDSCHG, cn);
         return;
     }
 
@@ -426,9 +436,10 @@ int  PzframeDataRealize   (pzframe_data_t *pfr,
 
             if      (is_marker)
             {
-                evmask   = CDA_REF_EVMASK_UPDATE | CDA_REF_EVMASK_RSLVSTAT | CDA_REF_EVMASK_FRESHCHG;
+                evmask   = CDA_REF_EVMASK_UPDATE | CDA_REF_EVMASK_RSLVSTAT | CDA_REF_EVMASK_FRESHCHG |
+                           CDA_REF_EVMASK_RDSCHG;
                 evproc   = PzframeDataEvproc;
-                privptr2 = pfr;
+                privptr2 = pfr->dpls + cn;
             }
             else if ((ftd->chan_dscrs[cn].chan_type & PZFRAME_CHAN__DEVSTATE_MASK) != 0)
             {

@@ -58,6 +58,7 @@ static void data_evproc(int            devid,
         nelems = cda_current_nelems_of_ref(ref);
         cda_acc_ref_data                  (ref, &buf,     NULL);
         cda_get_ref_stat                  (ref, &rflags, &timestamp);
+//fprintf(stderr, "bridge%d[%d]: DATA nelems=%d [0]=%d\n", devid, chn, nelems, ((int16*)buf)[0]);
         ReturnDataSet(devid, 1,
                       &chn, &dtype,  &nelems,
                       &buf, &rflags, &timestamp);
@@ -123,10 +124,12 @@ static int bridge_init_d(int devid, void *devptr,
   int             max_nelems;
   int             is_trusted;
   int             is_on_cycle;
+  int             is_no_rd_conv;
 
   int             mirror_mode;
   int             all_trusted;
   int             all_on_cycle;
+  int             all_no_rd_conv;
 
     me->devid = devid;
     GetDevPlace(devid, &dev_first, &(me->numchans));
@@ -147,9 +150,10 @@ static int bridge_init_d(int devid, void *devptr,
     bzero(me->map, map_size);
 
     foreign_base = auxinfo;
-    mirror_mode  = 0;
-    all_trusted  = 0;
-    all_on_cycle = 0;
+    mirror_mode    = 0;
+    all_trusted    = 0;
+    all_on_cycle   = 0;
+    all_no_rd_conv = 0;
     if (foreign_base != NULL)
     {
         if (*foreign_base == '@')
@@ -157,9 +161,10 @@ static int bridge_init_d(int devid, void *devptr,
             foreign_base++;
             while (1)
             {
-                if      (*foreign_base == '*') mirror_mode  = 1;
-                else if (*foreign_base == '!') all_trusted  = 1;
-                else if (*foreign_base == '~') all_on_cycle = 1;
+                if      (*foreign_base == '*') mirror_mode    = 1;
+                else if (*foreign_base == '!') all_trusted    = 1;
+                else if (*foreign_base == '~') all_on_cycle   = 1;
+                else if (*foreign_base == '.') all_no_rd_conv = 1;
                 else if (*foreign_base == ':') {foreign_base++; goto END_BASE_FLAGS;}
                 else
                 {
@@ -203,8 +208,9 @@ static int bridge_init_d(int devid, void *devptr,
     for (chn = 0;  chn < me->numchans;  chn++)
     {
         me->map[chn] = CDA_DATAREF_ERROR;
-        is_trusted  = all_trusted;
-        is_on_cycle = all_on_cycle;
+        is_trusted    = all_trusted;
+        is_on_cycle   = all_on_cycle;
+        is_no_rd_conv = all_no_rd_conv;
         if (mirror_mode)
         {
             GetNameOf(type_nsp, chn, &foreign_name);
@@ -225,8 +231,9 @@ static int bridge_init_d(int devid, void *devptr,
                 foreign_name++;
                 while (1)
                 {
-                    if      (*foreign_name == '!') is_trusted  = 1;
-                    else if (*foreign_name == '~') is_on_cycle = 1;
+                    if      (*foreign_name == '!') is_trusted    = 1;
+                    else if (*foreign_name == '~') is_on_cycle   = 1;
+                    else if (*foreign_name == '.') is_no_rd_conv = 1;
                     else if (*foreign_name == ':') {foreign_name++; goto END_NAME_FLAGS;}
                     else
                     {
@@ -248,8 +255,8 @@ static int bridge_init_d(int devid, void *devptr,
         }
 
         if ((me->map[chn] = cda_add_chan(me->cid, NULL, foreign_name,
-                                         (is_on_cycle? 0 : CDA_DATAREF_OPT_ON_UPDATE) |
-                                           CDA_DATAREF_OPT_NO_RD_CONV*0,
+                                         (is_on_cycle?   0 : CDA_DATAREF_OPT_ON_UPDATE) |
+                                         (is_no_rd_conv? CDA_DATAREF_OPT_NO_RD_CONV : 0),
                                          dtype, max_nelems,
                                          CDA_REF_EVMASK_UPDATE     |
                                            CDA_REF_EVMASK_RDSCHG   |

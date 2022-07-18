@@ -41,6 +41,26 @@ static void reporterror(const char *format, ...)
 }
 
 
+#ifndef DO_DEBUG_FDIOLIB
+  #define DO_DEBUG_FDIOLIB 0
+#endif
+#if DO_DEBUG_FDIOLIB
+  static FILE *debug_fp = NULL;
+  #define DEBUG_OUT(fr, format, params...) \
+      do { \
+          if (debug_fp != NULL) \
+          { \
+              fprintf(debug_fp, "%s ", strcurtime_msc()); \
+              fprintf(debug_fp, "handle=%d,fd=%d: ", fr2handle(fr), fr->fd); \
+              fprintf(debug_fp, format, ##params); \
+              fprintf(debug_fp, "\n"); \
+          } \
+      } while (0)
+#else
+  #define DEBUG_OUT(fr, format, params...)
+#endif
+                                
+
 /*
   Note: for DGRAM connections a special layout of _sysbuf is used --
         each datagram is prefixed with dgraminfo_t header.
@@ -158,6 +178,7 @@ static void close_because(fdinfo_t *fr, int reason)
     fr->last_err   = errno;
     fr->is_defunct = 1;
     sl_set_fd_mask(fr->fdhandle, 0);
+    DEBUG_OUT(fr, "close_because(%d) mask=0", reason);
     fr->notifier(fr->uniq, fr->privptr1,
                  fr2handle(fr), reason, NULL, 0, fr->privptr2);
 }
@@ -192,6 +213,7 @@ static int StreamReadyForWrite(fdinfo_t *fr)
         reporterror("%s(handle=%d,fd=%d): STREAM-READY-FOR_WRITE, but _sysbufused==0!\n",
                     __FUNCTION__, fr2handle(fr), fr->fd);
         sl_set_fd_mask(fr->fdhandle, SL_RD);
+        DEBUG_OUT(fr, "STREAM-READY-FOR_WRITE, but _sysbufused==0!");
         return 0;
     }
     
@@ -207,6 +229,7 @@ static int StreamReadyForWrite(fdinfo_t *fr)
     }
     else
     {
+        DEBUG_OUT(fr, "uintr_write(%zd @%zd)=%d", fr->_sysbufused, fr->_sysbufoffset, r);
         fr->_sysbufoffset += r;
         fr->_sysbufused   -= r;
         
@@ -215,6 +238,7 @@ static int StreamReadyForWrite(fdinfo_t *fr)
         {
             sl_set_fd_mask(fr->fdhandle, SL_RD);
             fr->_sysbufoffset = 0;
+            DEBUG_OUT(fr, "mask=SL_RD; r=%d", r);
         }
     }
 
@@ -436,7 +460,9 @@ static int StreamSend        (fdinfo_t *fr, const uint8 *buf, size_t size)
   size_t     newbufsize;
 
     if (size == 0) return 0;
-    
+
+    DEBUG_OUT(fr, "StreamSend(%zd): locked=%d _sysbufused=%zd", size, fr->send_locked, fr->_sysbufused);
+
     /* Check if the buffer is already non-empty */
     if (fr->send_locked == 0  &&  fr->_sysbufused != 0)
     {
@@ -461,6 +487,7 @@ static int StreamSend        (fdinfo_t *fr, const uint8 *buf, size_t size)
             buf  += r;
             size -= r;
         }
+        DEBUG_OUT(fr, "send:uintr_write(SEE_ABOVE)=%d", r);
     }
 
     /* Do we still have anything to send later? */
@@ -499,6 +526,7 @@ static int StreamSend        (fdinfo_t *fr, const uint8 *buf, size_t size)
 
         /* And mark descriptor as w-pending */
         sl_set_fd_mask(fr->fdhandle, SL_RD|SL_WR);
+        DEBUG_OUT(fr, "mask=SL_RD|SL_WR: _sysbufused=%zd _sysbufoffset=%zd (+size=%zd)", fr->_sysbufused, fr->_sysbufoffset, size);
     }
 
     return 0;
@@ -941,6 +969,16 @@ fdio_handle_t fdio_register_fd(int uniq, void *privptr1,
         ////fprintf(stderr, "IGNORING SIGPIPE!!!\n");
         set_signal(SIGPIPE, SIG_IGN);
     }
+
+#if DO_DEBUG_FDIOLIB
+    if (debug_fp == NULL)
+    {
+      const char *envp;
+
+        if ((envp = getenv("DEBUG_FDIOLIB_HANDLE")) != NULL)
+            debug_fp = fdopen(atoi(envp), "w");
+    }
+#endif
 
     if (uniq_checker != NULL  &&  uniq_checker(__FUNCTION__, uniq)) return -1;
 

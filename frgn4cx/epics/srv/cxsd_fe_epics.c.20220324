@@ -1,0 +1,162 @@
+#include "cxsd_hw.h"
+#include "cxsd_hwP.h"
+#include "cxsd_frontend.h"
+#include "cxsd_modmgr.h"
+#include "cxsd_logger.h"
+#include "cxsd_access.h"
+
+#include "cxsd_fe_epics.h"
+#include "cxsd_fe_epics_meat.h"
+
+
+enum {RDS_MAX_COUNT = 20};
+enum
+{
+    I_PHYS_COUNT = 2,
+};
+
+enum
+{
+    MONITOR_EVMASK =
+        CXSD_HW_CHAN_EVMASK_UPDATE   |
+        CXSD_HW_CHAN_EVMASK_RDSCHG
+};
+
+//////////////////////////////////////////////////////////////////////
+
+typedef struct
+{
+    int            in_use;
+    cxsd_cpntid_t  cpid;
+    cxsd_gchnid_t  gcid;
+    const char    *name;
+
+    int            phys_count;
+    int            phys_n_allocd;    // in PAIRS -- i.e., malloc(sizeof(double)*phys_n_allocd*2)
+    double         imm_phys_rds[I_PHYS_COUNT * 2];
+    double        *alc_phys_rds;
+} moninfo_t;
+
+static  moninfo_t       *monitors_list        = NULL;
+static  int              monitors_list_allocd = 0;
+
+// GetMonSlot()
+GENERIC_SLOTARRAY_DEFINE_GROWING(static, Mon, moninfo_t,
+                                 monitors, in_use, 0, 1,
+                                 0, 100, 0,
+                                 , , void)
+
+static void RlsMonSlot(int id)
+{
+  moninfo_t *mp = AccessMonSlot(id);
+
+    mp->in_use = 0;
+
+#if 0
+    CxsdHwDelChanEvproc(cp->ID, lint2ptr(cp2cd(cp)),
+                        mp->gcid, MONITOR_EVMASK,
+                        MonEvproc, lint2ptr(id));
+
+    if (mp->cpid >= 0)
+    {
+        periodics_used--;
+        periodics_needs_rebuild = 1;
+    }
+#endif
+
+    safe_free(mp->name);
+    safe_free(mp->alc_phys_rds);
+}
+
+//////////////////////////////////////////////////////////////////////
+
+int  cxsd_fe_epics_pvExistTest(const char *name)
+{
+  cxsd_gchnid_t  gcid;
+
+    return (CxsdHwResolveChan(name, &gcid,
+                              NULL, NULL, 0,
+                              NULL, NULL, NULL, NULL,
+                              NULL, NULL, NULL, NULL) > 0);
+}
+
+int  cxsd_fe_epics_createPV   (const char *name)
+{
+  cxsd_cpntid_t  cpid;
+  cxsd_gchnid_t  gcid;
+  int            phys_count;
+  double         rds_buf[RDS_MAX_COUNT*2];
+
+    /* Does this name exist? */
+    if ((cpid = CxsdHwResolveChan(name, &gcid,
+                                  &phys_count, rds_buf, RDS_MAX_COUNT,
+                                  NULL, NULL, NULL, NULL,
+                                  NULL, NULL, NULL, NULL)) < 0)
+        return -1;
+}
+
+//////////////////////////////////////////////////////////////////////
+
+static sl_tid_t  fdManager_process_polling_tid = -1;
+static void call_fdManager_process(int uniq, void *unsdptr, sl_tid_t tid, void *privptr)
+{
+    cxsd_fe_epics_meat_do_poll();
+    fdManager_process_polling_tid = sl_enq_tout_after(0, NULL, 100000/*100ms<=>10Hz*/, call_fdManager_process, NULL);
+}
+
+static void test_fd7(int uniq, void *unsdptr, sl_tid_t tid, void *privptr)
+{
+  int  r;
+    errno = 0;
+    r = check_fd_state(7, 0);
+    fprintf(stderr, "%s r=%d errno=%d/%s\n", __FUNCTION__, r, errno, strerror(errno));
+    sl_enq_tout_after(0, NULL, 1000000, test_fd7, NULL);
+}
+static int  epics_init_f (int server_instance)
+{
+  int r;
+
+//    test_fd7(0, NULL, 0, NULL);
+
+    r = cxsd_fe_epics_meat_init_f(server_instance, cxsd_hw_numchans);
+    if (r == 0) fdManager_process_polling_tid = sl_enq_tout_after(0, NULL, 1/*Schedule first poll right after start*/, call_fdManager_process, NULL);
+    return r;
+}
+
+static void epics_term_f (void)
+{
+    if (fdManager_process_polling_tid >= 0) sl_deq_tout(fdManager_process_polling_tid); fdManager_process_polling_tid = -1;
+    cxsd_fe_epics_meat_term_f();
+}
+
+static void epics_begin_c(void)
+{
+}
+
+static void epics_end_c  (void)
+{
+}
+
+
+static int  epics_init_m(void);
+static void epics_term_m(void);
+
+//////////////////////////////////////////////////////////////////////
+
+DEFINE_CXSD_FRONTEND(epics, "EPICS/CA (Channel Access) frontend for CXv4",
+                     epics_init_m, epics_term_m,
+                     epics_init_f, epics_term_f,
+                     epics_begin_c, epics_end_c);
+
+static int  epics_init_m(void)
+{
+    return CxsdRegisterFrontend(&(CXSD_FRONTEND_MODREC_NAME(epics)));
+}
+
+static void epics_term_m(void)
+{
+    CxsdDeregisterFrontend     (&(CXSD_FRONTEND_MODREC_NAME(epics)));
+}
+
+//////////////////////////////////////////////////////////////////////
+

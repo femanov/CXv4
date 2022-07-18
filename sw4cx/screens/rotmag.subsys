@@ -1,11 +1,11 @@
 
-winname   main turnmag
-winclass  main TurnMag
+winname   main rotmag
+winclass  main RotMag
 winopts   main nostatusline
-wintitle  main "Turning Magnet"
-defserver canhw:21.turnmag
+wintitle  main "Rotating Magnet"
+defserver canhw:21.rotmag
 
-grouping  main TurnMag "Turning Magnet" lrtb content:2 {
+grouping  main RotMag "Rotating Magnet" lrtb content:2 {
     container control "Control" grid notitle,noshadow,nocoltitles \
             content:4 {
         disp loc "Position" selector "nolabel" r:cur_direction \
@@ -28,13 +28,13 @@ grouping  main TurnMag "Turning Magnet" lrtb content:2 {
     container move "Move" grid noshadow,fold_h,nocoltitles \
             rowtitles:"Till stop\t0.1s\tN s" \
             ncols:3 content:12 {
-        button - "Mogil." button r:go_bury_max
+        button - "Mogil." button r:go_dump_max
         button - "Ring"   button r:go_ring_max
         button - "STOP"   button r:stop
-        button - "Mogil." button r:go_bury_100ms
+        button - "Mogil." button r:go_dump_100ms
         button - "Ring"   button r:go_ring_100ms
         noop
-        button - "Mogil." button r:go_bury_n_s
+        button - "Mogil." button r:go_dump_n_s
         button - "Ring"   button r:go_ring_n_s
         knob   - "N="     text   r:n_s \
                 options:"withlabel,noincdec" dpyfmt:%4.1f

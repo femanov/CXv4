@@ -105,7 +105,7 @@ static fastadc_line_dscr_t adc1000_line_dscrs[] =
     {"DATA", "V", NULL,
      ADC1000_CHAN_DATA,
      FASTADC_DATA_CN_MISSING, FASTADC_DATA_IS_ON_ALWAYS,
-     1000000.0,
+     4096.0,
      {.int_r={ADC1000_MIN_VALUE, ADC1000_MAX_VALUE}},
      ADC1000_CHAN_RANGEMIN, ADC1000_CHAN_RANGEMAX}
 };

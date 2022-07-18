@@ -32,7 +32,8 @@ enum
     S_SCALE2_SHIFT = 14,
 };
 
-static int32  quants       [4] = {2000, 4000, 8000, 16000};
+static int32  quants       [8] = {2000,  4000,  8000, 16000,
+                                  8000, 16000, 32000, 64000};
 static int    timing_scales[4] = {5000/*1e9/200e6*/, 5128/*1e9/195e6*/, 0, 0};
 static int    frqdiv_scales[4] = {1, 2, 4, 8};
 
@@ -68,6 +69,9 @@ static pzframe_chinfo_t chinfo[] =
     [ADC200_CHAN_RANGE2]        = {PZFRAME_CHTYPE_VALIDATE,    0},
     [ADC200_CHAN_ZERO1]         = {PZFRAME_CHTYPE_VALIDATE,    0},
     [ADC200_CHAN_ZERO2]         = {PZFRAME_CHTYPE_VALIDATE,    0},
+
+    [ADC200_CHAN_J5]            = {PZFRAME_CHTYPE_VALIDATE,    0},
+    [ADC200_CHAN_J6]            = {PZFRAME_CHTYPE_VALIDATE,    0},
 
     /* status */
     [ADC200_CHAN_ELAPSED]       = {PZFRAME_CHTYPE_PZFRAME_STD, 0},
@@ -166,6 +170,17 @@ static psp_lkp_t adc200_range_lkp[] =
     {NULL, 0}
 };
 
+static psp_lkp_t adc200_j5_j6_lkp[] =
+{
+    {"0",   0},
+    {"2,3", 0},
+    {"2V",  0},
+    {"1",   1},
+    {"1,2", 1},
+    {"8V",  1},
+    {NULL, 0}
+};
+
 static psp_paramdescr_t adc200_params[] =
 {
     PSP_P_INT   ("ptsofs",   adc200_privrec_t, nxt_args[ADC200_CHAN_PTSOFS], 0,    0, ADC200_MAX_NUMPTS-1),
@@ -176,6 +191,8 @@ static psp_paramdescr_t adc200_params[] =
     PSP_P_LOOKUP("range2",   adc200_privrec_t, nxt_args[ADC200_CHAN_RANGE2], ADC200_R_2048,   adc200_range_lkp),
     PSP_P_INT   ("zero1",    adc200_privrec_t, nxt_args[ADC200_CHAN_ZERO1],  128,  0, 255),
     PSP_P_INT   ("zero2",    adc200_privrec_t, nxt_args[ADC200_CHAN_ZERO2],  128,  0, 255),
+    PSP_P_LOOKUP("j5",       adc200_privrec_t, nxt_args[ADC200_CHAN_J5],     0,               adc200_j5_j6_lkp),
+    PSP_P_LOOKUP("j6",       adc200_privrec_t, nxt_args[ADC200_CHAN_J6],     0,               adc200_j5_j6_lkp),
 
     PSP_P_FLAG("istart",     adc200_privrec_t, nxt_args[ADC200_CHAN_ISTART],     1, 0),
     PSP_P_FLAG("noistart",   adc200_privrec_t, nxt_args[ADC200_CHAN_ISTART],     0, 0),
@@ -203,6 +220,8 @@ static int32 ValidateParam(pzframe_drv_t *pdr, int n, int32 v)
         if (v < 0)   v = 0;
         if (v > 255) v = 255;
     }
+    else if (n == ADC200_CHAN_J5      ||  n == ADC200_CHAN_J6)
+        v = (v != 0);
     else if (n == ADC200_CHAN_PTSOFS)
     {
         v &=~ 1;
@@ -375,8 +394,9 @@ static rflags_t ReadMeasurements(pzframe_drv_t *pdr)
     numduplets = (me->cur_args[ADC200_CHAN_NUMPTS] + 1) / 2;
     for (nl = 0;  nl < ADC200_NUM_LINES;  nl++)
     {
-        shift =       (me->cur_args[ADC200_CHAN_ZERO1  + nl] & 255) - 256;
-        scale = quants[me->cur_args[ADC200_CHAN_RANGE1 + nl] & 3];
+        shift =        (me->cur_args[ADC200_CHAN_ZERO1  + nl] & 255) - 256;
+        scale = quants[(me->cur_args[ADC200_CHAN_RANGE1 + nl] & 3) +
+                       (me->cur_args[ADC200_CHAN_J5     + nl] * 4)];
         dp = me->retdata + nl * me->cur_args[ADC200_CHAN_NUMPTS];
         w = me->cur_args[ADC200_CHAN_PTSOFS] / 2;
         DO_NAF(CAMAC_REF, N_DEV, A_ADRPTR, 17, &w);  // Set read address
@@ -467,11 +487,13 @@ static void PrepareRetbufs     (pzframe_drv_t *pdr, rflags_t add_rflags)
     {
         me->cur_args[ADC200_CHAN_LINE1ON       + x] = 1;
         me->cur_args[ADC200_CHAN_LINE1RANGEMIN + x] =
-            ((  0 + (me->cur_args[ADC200_CHAN_ZERO1  + x] & 255)) - 256) *
-              quants[me->cur_args[ADC200_CHAN_RANGE1 + x] & 3];
+            ((  0 +  (me->cur_args[ADC200_CHAN_ZERO1  + x] & 255)) - 256) *
+              quants[(me->cur_args[ADC200_CHAN_RANGE1 + x] & 3) +
+                     (me->cur_args[ADC200_CHAN_J5     + x] * 4)];
         me->cur_args[ADC200_CHAN_LINE1RANGEMAX + x] =
-            ((255 + (me->cur_args[ADC200_CHAN_ZERO1  + x] & 255)) - 256) *
-              quants[me->cur_args[ADC200_CHAN_RANGE1 + x] & 3];
+            ((255 +  (me->cur_args[ADC200_CHAN_ZERO1  + x] & 255)) - 256) *
+              quants[(me->cur_args[ADC200_CHAN_RANGE1 + x] & 3) +
+                     (me->cur_args[ADC200_CHAN_J5     + x] * 4)];
     }
 
     /* 2. Device-specific: mark-for-returning */

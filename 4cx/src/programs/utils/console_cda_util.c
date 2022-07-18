@@ -558,7 +558,7 @@ static int ParseOneChar (const char    *argv0,
                 (hexdigit2num(cp[5]) <<  8) |
                 (hexdigit2num(cp[6]) <<  4) |
                 (hexdigit2num(cp[7]));
-            cp += 4;
+            cp += 8;
         }
         else
             c32 = (unsigned char)ch;

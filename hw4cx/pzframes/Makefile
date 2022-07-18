@@ -2,12 +2,13 @@ FASTADCS=	adc200me adc812me \
 		adc200 adc502 adc333 adc4 c061621 f4226 \
 		vsdc2_1 vsdc2_2 \
 		pxi6363 \
-		adc4x250 adc250 adc1000
+		adc4x250 adc250 adc1000 \
+		onei32l
 VCAMIMGS=	ottcam img878
 WIREBPMS=	u0632
 
 DEVS=		$(FASTADCS) $(VCAMIMGS) $(WIREBPMS)
-EXES=		$(DEVS) pzframeclient
+EXES=		$(DEVS) pzframeclient pzframestand
 # ----
 
 DEVNNN_KNOBPLUGIN_FILES_F=	$(1)_data.o $(1)_gui.o $(1)_knobplugin.o
@@ -28,6 +29,7 @@ pxi6363_COMPONENTS=	$(call DEVNNN_FILES_F,pxi6363)
 adc4x250_COMPONENTS=	$(call DEVNNN_FILES_F,adc4x250)
 adc250_COMPONENTS=	$(call DEVNNN_FILES_F,adc250)
 adc1000_COMPONENTS=	$(call DEVNNN_FILES_F,adc1000)
+onei32l_COMPONENTS=	$(call DEVNNN_FILES_F,onei32l)
 # CCDs
 ottcam_COMPONENTS=	$(call DEVNNN_FILES_F,ottcam)
 img878_COMPONENTS=	$(call DEVNNN_FILES_F,img878)
@@ -35,6 +37,10 @@ img878_COMPONENTS=	$(call DEVNNN_FILES_F,img878)
 u0632_COMPONENTS=	$(call DEVNNN_FILES_F,u0632)
 
 pzframeclient_COMPONENTS=	pzframeclient.o pzframeclient_knobset.o \
+				$(foreach D, $(DEVS), \
+				  $(call DEVNNN_KNOBPLUGIN_FILES_F, $D) \
+				 )
+pzframestand_COMPONENTS=	pzframestand.o pzframeclient_knobset.o \
 				$(foreach D, $(DEVS), \
 				  $(call DEVNNN_KNOBPLUGIN_FILES_F, $D) \
 				 )
@@ -46,7 +52,7 @@ DIR_DEPENDS=		$(UNCFILES:.o=.d)
 
 LOCAL_LIBDEPS=	$(LIBPZFRAME_GUI) $(LIBPZFRAME_DATA)
 
-LOCAL_GNTDFILES=pzframeclient.c pzframeclient_knobset.c \
+LOCAL_GNTDFILES=pzframeclient.c pzframestand.c pzframeclient_knobset.c \
 		$(foreach D, $(FASTADCS) $(VCAMIMGS) $(WIREBPMS), \
 		  $D.c $D_data.h $D_gui.h $D_knobplugin.h $D_knobplugin.c)
 
@@ -114,9 +120,12 @@ pzframeclient_knobset.c: Makefile
 		  echo '}';\
 		) >$@
 
-pzframeclient.c: $(TOPDIR)/programs/xmclients/pult.c
+pzframeclient.c:	$(TOPDIR)/programs/xmclients/pult.c
 	$(SCRIPTSDIR)/ln-sf_safe.sh $< $@
-pzframeclient.o pzframeclient.d: \
+pzframestand.c:		$(TOPDIR)/programs/xmclients/stand.c
+	$(SCRIPTSDIR)/ln-sf_safe.sh $< $@
+pzframeclient.o pzframeclient.d \
+pzframestand.o  pzframestand.d: \
 	SPECIFIC_DEFINES=-DSPECIFIC_KNOBSET_H_FILE='"pzframeclient_knobset.h"' \
 	                 -DSPECIFIC_REGISTERKNOBSET_CODE='RegisterPzframeclientKnobset()'
 
@@ -125,6 +134,8 @@ pzframeclient.o pzframeclient.d: \
 #           should NOT depend on $(LIBCHL)
 EXPORTSFILES=	$(EXES) $(MONO_C_FILES)
 EXPORTSDIR=	bin
+
+pzframestand:		$(LIBCDA_D_INSRV) $(LIBCXSD_PLUGINS) $(LIBCXSD) # Note: this line should be BEFORE common "$(CHL_EXES): ...", because order of libraries does matter (here specified libs depend on libuseful+libmisc)
 
 #!!!because of "v2cx::"; RHEL6: SPECIFIC_LIBS sufficient, RHEL7: DIR_LIBS
 DIR_LIBS=	$(MOTIF_LIBS) $(LIBDL)

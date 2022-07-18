@@ -426,6 +426,8 @@ static void InteractWithClient(int uniq, void *unsdptr,
                 send_or_close(cd, perbuf_grow_err_msg);
                 return;
             }
+            cp->periodics_used++;
+            cp->periodics_needs_rebuild = 1;
 
             /* Fill */
             mp->cpid = cpid;

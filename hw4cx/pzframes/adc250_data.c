@@ -106,7 +106,7 @@ static pzframe_chan_dscr_t adc250_chan_dscrs[] =
      __CX_CONCATENATE(ADC250_CHAN_LINE,x),                            \
      FASTADC_DATA_CN_MISSING,                                         \
      __CX_CONCATENATE(__CX_CONCATENATE(ADC250_CHAN_LINE,x),ON),       \
-     1000000.0,                                                       \
+     4096.0,                                                       \
      {.int_r={ADC250_MIN_VALUE, ADC250_MAX_VALUE}},                   \
      __CX_CONCATENATE(__CX_CONCATENATE(ADC250_CHAN_LINE,x),RANGEMIN), \
      __CX_CONCATENATE(__CX_CONCATENATE(ADC250_CHAN_LINE,x),RANGEMAX)}

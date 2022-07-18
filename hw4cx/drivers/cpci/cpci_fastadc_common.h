@@ -32,7 +32,8 @@ static int  FASTADC_INIT_D(int devid, void *devptr,
                            const char *auxinfo __attribute__((unused)))
 {
   FASTADC_PRIVREC_T   *me = (FASTADC_PRIVREC_T *)devptr;
-  int                 n;
+  int                  r;
+  int                  n;
 
   enum {BAR0 = 0};
 
@@ -77,7 +78,15 @@ static int  FASTADC_INIT_D(int devid, void *devptr,
                      AbortMeasurements, ReadMeasurements,
                      PrepareRetbufs, NULL, NULL);
 
-    return InitParams(&(me->pz));
+    r = InitParams(&(me->pz));
+    if (r < 0) return r;
+
+    for (n = 0;  n < countof(chinfo);  n++)
+        if (chinfo[n].chtype == PZFRAME_CHTYPE_PZFRAME_STD  &&
+            me->nxt_args[n] >= 0)
+            pzframe_drv_rw_p(&(me->pz), n, me->nxt_args[n], DRVA_WRITE);
+
+    return r;
 }
 
 static void FASTADC_TERM_D(int devid, void *devptr)

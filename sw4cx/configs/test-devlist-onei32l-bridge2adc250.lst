@@ -1,0 +1,49 @@
+# Set 1st word inside "ifelse" to "1" for ADC250 and to "0" for everything else
+ifelse(0, `0',
+  `
+  # Tornado and various other fast-ADCs except ADC250
+  define(`THE_R', 1000000)
+  define(`RNGMX', 10000000)
+  '
+,
+  `
+  # ADC250
+  define(`THE_R', 4096)
+  define(`RNGMX', 32767)
+  '
+)
+
+devtype bridged r1h10000,w1i,r1i {
+	data		0	drvinfo:line3   r:THE_R
+	numpts		1	drvinfo:numpts
+#	rangemin	2	drvinfo:line3rangemin
+#	rangemax	3	drvinfo:line3rangemax
+	cur_numpts	2	drvinfo:cur_numpts
+}
+devtype br_mma r2h,r1d {
+	min		0	r:THE_R
+	max		1	r:THE_R
+	avg		2	r:THE_R
+}
+devtype ranges r2i {
+	rangemin	0	drvinfo:-RNGMX
+	rangemax	0	drvinfo:+RNGMX
+}
+devtype torbridge r1i100000 {
+	data		0	drvinfo:ai0	r:THE_R
+}
+
+#dev adc1	bridged/bridge	~ -	@.:cx::b360mc:1.i6
+#dev adc1	bridged/bridge	~ -	@.:cx::cxhw:15.adc250_8a
+dev adc1	torbridge/bridge  ~ -	@.:epics::
+dev mma1	br_mma/vector_minmaxavg ~ - @10000:adc1.data
+dev the_range	ranges/const ~ -
+cpoint adc1.rangemin the_range.rangemin
+cpoint adc1.rangemax the_range.rangemax
+
+cpoint adc1.line0 adc1.data
+cpoint adc1.marker adc1.data
+
+# /net/x10sae/home/user/work/hw4cx/pzframes/pzframestand /net/x10sae/home/user/work/sw4cx/screens/tornadotest.subsys -f /net/x10sae/home/user/work/sw4cx/configs/test-devlist-onei32l-bridge2adc250.lst -M /net/x10sae/home/user/work/4cx/exports/lib/server/drivers
+# LD_LIBRARY_PATH=/home/user/compile/base-3.15.6/lib/linux-x86_64/ CX_CDA_PLUGINS_DIR=${HOME}/work/frgn4cx/epics/cda ~/work/hw4cx/pzframes/pzframestand ~/work/sw4cx/screens/tornadotest.subsys -f ~/work/sw4cx/configs/test-devlist-onei32l-bridge2adc250.lst -M /tmp/4cx/lib/server/drivers
+# LD_LIBRARY_PATH=. ./pzframestand ./tornadotest.subsys -f test-devlist-onei32l-bridge2adc250.lst -M .

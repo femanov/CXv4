@@ -224,6 +224,8 @@ static int  IsAlwdRST_ILK_SET(void *devptr, int prev_state __attribute__((unused
         /* 26.09.2012: following added to allow [Reset] in other cases */
         || (me->ctx.cur_state >= KLS_STATE_RST_ILK_SET  &&
             me->ctx.cur_state <= KLS_STATE_RST_ILK_DRP)
+        /* 25.04.2022: following added to allow [Reset] with malfunctioning interlock cables */
+        ||  me->ignore_ilks
         ;
 }
 
@@ -266,7 +268,7 @@ static int  IsAlwdSW_ON_UP (void *devptr, int prev_state __attribute__((unused))
     for (ilk_n = 0, ilk_eff = 0;  ilk_n < SODC_ILK_count;  ilk_n++)
         ilk_eff |= !(me->cur[SODC_ILK_base + ilk_n].v.i32); // Note: Invert
 
-    return ilk_eff == 0;
+    return ilk_eff == 0  ||  me->ignore_ilks;
 }
 
 static void SwchToSW_ON_UP (void *devptr, int prev_state __attribute__((unused)))

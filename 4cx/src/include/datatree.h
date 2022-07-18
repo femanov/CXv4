@@ -41,6 +41,7 @@ enum
 
 // Standard commands
 #define DATATREE_STDCMD_FREEZE "datatreeFreeze"
+#define DATATREE_STDCMD_ONCE   "datatreeOnce"
 
 
 typedef void (*knob_editstate_hook_t)(DataKnob k, int state);

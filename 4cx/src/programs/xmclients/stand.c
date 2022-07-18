@@ -14,6 +14,12 @@
 #include "Chl.h"
 #include "MotifKnobs_cda.h"
 
+#include "datatreeP.h"
+
+#ifdef SPECIFIC_KNOBSET_H_FILE
+  #include SPECIFIC_KNOBSET_H_FILE
+#endif /* SPECIFIC_KNOBSET_H_FILE */
+
 #include "cxlib.h"
 #include "cda.h"
 
@@ -177,7 +183,7 @@ static void ParseCommandLine(int argc, char *argv[])
     printf("Usage: %s [options]\n"
            "\n"
            "Options:\n"
-           "  -b TIME   server base cycle size, in µs (def=%d)\n"
+           "  -b TIME   server base cycle size, in microseconds (def=%d)\n"
            "  -f DBREF  obtain HW config from DBREF instead of " DEF_FILE_DEVLIST "\n"
            "  -h        display this help and exit\n"
            "  -l LIST   default drvlog categories\n"
@@ -279,6 +285,9 @@ int main(int argc, char *argv[])
     set_signal(SIGPIPE, SIG_IGN);
 
     MotifKnobs_cdaRegisterKnobset();
+#ifdef SPECIFIC_REGISTERKNOBSET_CODE
+    SPECIFIC_REGISTERKNOBSET_CODE;
+#endif /* SPECIFIC_REGISTERKNOBSET_CODE */
 
     XhInitApplication(&argc, argv, app_name, app_class, fallbacks);
     ParseCommandLine(argc, argv);

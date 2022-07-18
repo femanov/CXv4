@@ -255,9 +255,9 @@ int       sl_del_fd     (sl_fdh_t fdh)
     }
 
     sl_set_fd_mask(fdh, 0);
-    FD_CLR(fd, &sel_rfds);
-    FD_CLR(fd, &sel_wfds);
-    FD_CLR(fd, &sel_efds);
+//    FD_CLR(fd, &sel_rfds); // 12.02.2022: Note: those FD_CLR()s are now performed by sl_set_fd_mask()
+//    FD_CLR(fd, &sel_wfds);
+//    FD_CLR(fd, &sel_efds);
     RemoveUsed(fd);
     fd_uniqs[fd] = 0; //!!! Note: we employ "==0" as "unused".
 
@@ -280,9 +280,9 @@ int       sl_set_fd_mask(sl_fdh_t fdh, int mask)
         return -1;
     }
 
-    if (mask & SL_RD) AddRfds(fd); else RemoveRfds(fd);
-    if (mask & SL_WR) AddWfds(fd); else RemoveWfds(fd);
-    if (mask & SL_EX) AddEfds(fd); else RemoveEfds(fd);
+    if (mask & SL_RD) AddRfds(fd); else {RemoveRfds(fd); FD_CLR(fd, &sel_rfds);}
+    if (mask & SL_WR) AddWfds(fd); else {RemoveWfds(fd); FD_CLR(fd, &sel_wfds);}
+    if (mask & SL_EX) AddEfds(fd); else {RemoveEfds(fd); FD_CLR(fd, &sel_efds);}
 
     /*!!! Shouldn't we clear bits in sel_NNN? */
     

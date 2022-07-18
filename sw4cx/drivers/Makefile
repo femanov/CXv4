@@ -4,7 +4,7 @@ VDEV_DRIVERS=	ist_cdac20_drv.so v1k_cdac20_drv.so v3h_a40d16_drv.so \
 		iset_walker_drv.so \
 		zebedev_subharmonic_drv.so \
 		lebedev_lincamsel_drv.so lebedev_linsenctl_drv.so \
-		lebedev_ringcamsel_drv.so lebedev_turnmag_drv.so \
+		lebedev_ringcamsel_drv.so lebedev_rotmag_drv.so \
 		modbus_tcp_rb_drv.so \
 		lebedev_avg_drv.so \
 		double_iset_drv.so \

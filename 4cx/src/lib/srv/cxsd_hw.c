@@ -279,6 +279,9 @@ static int chan_evproc_remover(cxsd_hw_chan_cbrec_t *p, void *privptr)
 }
 int  CxsdHwSetDb   (CxsdDb db)
 {
+  struct timeval     timenow;
+  cx_time_t          timestamp;
+
   int                lyr_n;
   int                devid;
   CxsdDbDevLine_t   *hw_d;
@@ -303,6 +306,10 @@ int  CxsdHwSetDb   (CxsdDb db)
   int                nsline;
   int                dcpr_id;
   CxsdDbDcPrInfo_t  *dcpr_p;
+  void              *defval_data;
+  size_t             defval_bytes;
+  cxdtype_t          defval_dtype;
+  int                defval_nelems;
 
   size_t             layers_bufsize;
   size_t             devices_bufsize;
@@ -327,6 +334,10 @@ int  CxsdHwSetDb   (CxsdDb db)
   size_t             crv_bufofs;
   size_t             nwr_bufofs;
   size_t             rqd_bufsize;
+
+    gettimeofday(&timenow, NULL);
+    timestamp.sec  = timenow.tv_sec;
+    timestamp.nsec = timenow.tv_usec * 1000;
 
     db->is_readonly = 1;
     cxsd_hw_cur_db  = db;
@@ -383,7 +394,7 @@ int  CxsdHwSetDb   (CxsdDb db)
                     /* Is it a power of 2?  I.e., does alignment have sense? */
                     /* (In fact, ANY dtype has a size==power_of_2, because
                         of cxdtype_t organization: CXDTYPE_SIZE_MASK part
-                        contains the 2-exponrnt of the size in bytes;
+                        contains the 2-exponent of the size in bytes;
                         thus, ONLY power-of-2 sizes are representable.) */
                     (/* NO == 1 */    usize == 2   ||  
                      usize == 4   ||  usize == 8   ||  
@@ -452,55 +463,87 @@ int  CxsdHwSetDb   (CxsdDb db)
                             next_wr_val_bufsize += csize;
                         }
                     }
-
-                /* And fill in properties based on devtypes/channels */
-                if (stage)
-                    for (nsp_kind = 0;  nsp_kind <= 1;  nsp_kind++)
-                    {
-                        /* Note: we use "devtype" namespace first,
-                                 than a "channels" one, so that
-                                 the "channels" has precedence over the "devtype"
-                                 (because it can override the former) */
-                        nsp_id = (nsp_kind == 0)? dev_p->db_ref->type_nsp_id
-                                                : dev_p->db_ref->chan_nsp_id;
-                        if (nsp_id > 0)
-                        {
-                            nsp = cxsd_hw_cur_db->nsps_list[nsp_id];
-                            for (nsline = 0;
-                                 nsline < nsp->items_used;
-                                 nsline++)
-                                if ((dcpr_id = nsp->items[nsline].dcpr_id) > 0)
-                                {
-                                    dcpr_p = cxsd_hw_cur_db->dcprs + dcpr_id;
-                                    chn_p  = cxsd_hw_channels + dev_p->first + nsp->items[nsline].devchan_n;
-
-                                    chn_p->dcpr_id = dcpr_id;
-
-                                    if (dcpr_p->fresh_age.sec >= 0)
-                                        chn_p->fresh_age         = dcpr_p->fresh_age;
-                                    if (dcpr_p->phys_rd_specified)
-                                    {
-                                        chn_p->phys_rd_specified = dcpr_p->phys_rd_specified;
-                                        chn_p->phys_rds[0]       = dcpr_p->phys_rds[0];
-                                        chn_p->phys_rds[1]       = dcpr_p->phys_rds[1];
-                                    }
-                                    if (dcpr_p->q_dtype != CXDTYPE_UNKNOWN)
-                                    {
-                                        chn_p->q_dtype           = dcpr_p->q_dtype;
-                                        chn_p->q                 = dcpr_p->q;
-                                    }
-                                    if (dcpr_p->range_dtype != CXDTYPE_UNKNOWN)
-                                    {
-                                        chn_p->range_dtype       = dcpr_p->range_dtype;
-                                        chn_p->range[0]          = dcpr_p->range[0];
-                                        chn_p->range[1]          = dcpr_p->range[1];
-                                    }
-                                    if (dcpr_p->return_type != IS_AUTOUPDATED_NOT)
-                                        /* NO return_type pre-setting for now */;
-                                }
-                        }
-                    }
             }
+
+            /* And fill in properties based on devtypes/channels */
+            if (stage)
+                for (nsp_kind = 0;  nsp_kind <= 1;  nsp_kind++)
+                {
+                    /* Note: we use "devtype" namespace first,
+                             than a "channels" one, so that
+                             the "channels" has precedence over the "devtype"
+                             (because it can override the former) */
+                    nsp_id = (nsp_kind == 0)? dev_p->db_ref->type_nsp_id
+                                            : dev_p->db_ref->chan_nsp_id;
+                    if (nsp_id > 0)
+                    {
+                        nsp = cxsd_hw_cur_db->nsps_list[nsp_id];
+                        for (nsline = 0;
+                             nsline < nsp->items_used;
+                             nsline++)
+                            if ((dcpr_id = nsp->items[nsline].dcpr_id) > 0)
+                            {
+                                dcpr_p = cxsd_hw_cur_db->dcprs + dcpr_id;
+                                chn_p  = cxsd_hw_channels + dev_p->first + nsp->items[nsline].devchan_n;
+
+                                chn_p->dcpr_id = dcpr_id;
+
+                                if (dcpr_p->fresh_age.sec >= 0)
+                                    chn_p->fresh_age         = dcpr_p->fresh_age;
+                                if (dcpr_p->phys_rd_specified)
+                                {
+                                    chn_p->phys_rd_specified = dcpr_p->phys_rd_specified;
+                                    chn_p->phys_rds[0]       = dcpr_p->phys_rds[0];
+                                    chn_p->phys_rds[1]       = dcpr_p->phys_rds[1];
+                                }
+                                if (dcpr_p->q_dtype != CXDTYPE_UNKNOWN)
+                                {
+                                    chn_p->q_dtype           = dcpr_p->q_dtype;
+                                    chn_p->q                 = dcpr_p->q;
+                                }
+                                if (dcpr_p->range_dtype != CXDTYPE_UNKNOWN)
+                                {
+                                    chn_p->range_dtype       = dcpr_p->range_dtype;
+                                    chn_p->range[0]          = dcpr_p->range[0];
+                                    chn_p->range[1]          = dcpr_p->range[1];
+                                }
+                                if (dcpr_p->return_type != IS_AUTOUPDATED_NOT)
+                                {
+                                    /* ATTENTION:
+                                       This is a copy of SetChanReturnType() code, which should be kept in sync with source. */
+                                    chn_p->is_autoupdated      = (dcpr_p->return_type == IS_AUTOUPDATED_YES  ||
+                                                                  dcpr_p->return_type == IS_AUTOUPDATED_TRUSTED);
+                                    chn_p->do_ignore_upd_cycle = (dcpr_p->return_type == DO_IGNORE_UPD_CYCLE);
+                                    if (dcpr_p->return_type == IS_AUTOUPDATED_TRUSTED)
+                                        chn_p->fresh_age  = (cx_time_t){0,0};
+                                }
+                                if (dcpr_p->defval_binofs > 0                                      &&
+                                    CxsdDbGetBin(db, dcpr_p->defval_binofs,
+                                                 &defval_data, &defval_bytes, &defval_dtype) == 0  &&
+                                    defval_dtype == chn_p->dtype                                   &&
+                                    chn_p->dtype != CXDTYPE_UNKNOWN /* For now, defval specification for CXDTYPE_UNKNOWN channels wouldn't work because 1) Parsing wouldn't work; 2) Checks below wouldn't work correctly */)
+                                {
+                                    // Check+correct
+                                    defval_nelems = defval_bytes / chn_p->usize;
+                                    if (defval_nelems > chn_p->max_nelems)
+                                        defval_nelems = chn_p->max_nelems;
+                                    // Store
+                                    if (defval_nelems > 0) memcpy(chn_p->current_val, defval_data, defval_bytes);
+                                    chn_p->current_nelems = defval_nelems;
+                                    chn_p->rflags         = 0;
+                                    chn_p->timestamp      = timestamp;
+                                    chn_p->upd_cycle      = current_cycle;
+#if CXSD_HW_SUPPORTS_CXDTYPE_UNKNOWN
+                                    chn_p->current_dtype  = chn_p->dtype;
+                                    chn_p->current_usize  = chn_p->usize;
+#endif /* CXSD_HW_SUPPORTS_CXDTYPE_UNKNOWN */
+
+                                    // Notify RstDev*() to skip this channel
+                                    chn_p->bhvr |= CXSD_HW_CHAN_BHVR_HAS_DEFVAL;
+                                }
+                            }
+                    }
+                }
 
             /* Fill in # of channels */
             if (stage)
@@ -2242,8 +2285,11 @@ static void SetDevRflags    (int devid, rflags_t rflags_to_set)
          x > 0;
          x--,              gcid++,              chn_p++)
     {
-        chn_p->rflags  |= rflags_to_set;
-        chn_p->crflags |= rflags_to_set;
+        if ((chn_p->bhvr & CXSD_HW_CHAN_BHVR_HAS_DEFVAL) == 0)
+        {
+            chn_p->rflags  |= rflags_to_set;
+            chn_p->crflags |= rflags_to_set;
+        }
 
         CxsdHwCallChanEvprocs(gcid, &call_info);
     }
@@ -2258,10 +2304,11 @@ static void RstDevRflags    (int devid)
     for (x = dev_p->count, chn_p = cxsd_hw_channels + dev_p->first;
          x > 0;
          x--, chn_p++)
-    {
-        chn_p->rflags   = 0;
-        chn_p->crflags  = 0;
-    }
+        if ((chn_p->bhvr & CXSD_HW_CHAN_BHVR_HAS_DEFVAL) == 0)
+        {
+            chn_p->rflags   = 0;
+            chn_p->crflags  = 0;
+        }
 }
 
 static void RstDevTimestamps(int devid)
@@ -2273,11 +2320,12 @@ static void RstDevTimestamps(int devid)
     for (x = dev_p->count, chn_p = cxsd_hw_channels + dev_p->first;
          x > 0;
          x--, chn_p++)
-    {
-        chn_p->timestamp.sec  = INITIAL_TIMESTAMP_SECS;
-        chn_p->timestamp.nsec = 0;
-        chn_p->upd_cycle      = 0;
-    }
+        if ((chn_p->bhvr & CXSD_HW_CHAN_BHVR_HAS_DEFVAL) == 0)
+        {
+            chn_p->timestamp.sec  = INITIAL_TIMESTAMP_SECS;
+            chn_p->timestamp.nsec = 0;
+            chn_p->upd_cycle      = 0;
+        }
 }
 
 static void RstDevUpdCycles (int devid)
@@ -2289,9 +2337,10 @@ static void RstDevUpdCycles (int devid)
     for (x = dev_p->count, chn_p = cxsd_hw_channels + dev_p->first;
          x > 0;
          x--, chn_p++)
-    {
-        chn_p->upd_cycle      = 0;
-    }
+        if ((chn_p->bhvr & CXSD_HW_CHAN_BHVR_HAS_DEFVAL) == 0)
+        {
+            chn_p->upd_cycle      = 0;
+        }
 }
 
 static void report_devstate(int devid, const char *description)
@@ -3198,6 +3247,9 @@ void SetChanReturnType(int devid,
          x < count;
          x++, chn_p++)
     {
+        /* ATTENTION:
+           A copy of this logic is located in CxsdHwSetDb() at channel-properties-initialization section.
+           So, if this logic is modified here, that copy should also be updated. */
         chn_p->is_autoupdated      = (return_type == IS_AUTOUPDATED_YES  ||
                                       return_type == IS_AUTOUPDATED_TRUSTED);
         chn_p->do_ignore_upd_cycle = (return_type == DO_IGNORE_UPD_CYCLE);

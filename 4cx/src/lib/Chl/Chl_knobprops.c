@@ -1063,6 +1063,6 @@ static void Update1HZProc(XtPointer     closure,
   dlgrec_t   *rec = (dlgrec_t *)closure;
 
     rec->upd_timer = XtAppAddTimeOut(xh_context, UPDATE_PERIOD_MS, Update1HZProc, (XtPointer)rec);
-    if (XtIsManaged(rec->box)  &&  rec->subsys->is_freezed == 0)
+    if (XtIsManaged(rec->box)  &&  (rec->subsys->is_freezed == 0  ||  rec->subsys->oneshot))
         ShowCurVals(rec);
 }

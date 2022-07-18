@@ -1,6 +1,7 @@
 #include <stdlib.h>
 #include <ctype.h>
 #include <errno.h>
+#include <limits.h> // For INT_MAX
 
 #include "memcasecmp.h"
 
@@ -92,6 +93,8 @@ int     CxsdDbDestroy(CxsdDb db)
     }
 
     safe_free(db->strbuf);
+
+    safe_free(db->binbuf);
 
 
     free(db);
@@ -211,72 +214,6 @@ int     CxsdDbAddLyrI(CxsdDb db,
     return 0;
 }
 
-int     CxsdDbAddMem (CxsdDb db, const char        *mem, size_t len)
-{
-  int     retval;
-  size_t  seglen;
-  int     ofs;
-  char   *newbuf;
-  size_t  shortage;
-  size_t  increment;
-
-    if (db->is_readonly)
-    {
-        errno = EROFS;
-        return -1;
-    }
-
-    if (mem == NULL  ||  *mem == '\0') return 0;
-
-    /* Try to find an already-registered string */
-    for (ofs = 0;  ofs < db->strbuf_used;  ofs += seglen + 1)
-    {
-        seglen = strlen(db->strbuf + ofs);
-        if (len == seglen  &&
-            /* Note case-SENSITIVE comparison:
-               strings in different case should be distinct */
-            memcmp(mem, db->strbuf + ofs, len) == 0)
-            return ofs;
-    }
-
-    if (db->strbuf_used + len + 1 > db->strbuf_allocd)
-    {
-        shortage = (db->strbuf_used + len + 1) - db->strbuf_allocd;
-        if (db->strbuf_used == 0) shortage++;  // For empty at offset==0
-
-        increment = (shortage + 1023) &~ 1023U; // Grow to a next multiple of 1kB
-
-        newbuf = safe_realloc(db->strbuf, db->strbuf_allocd + increment);
-        if (newbuf == NULL) return -1;
-        db->strbuf         = newbuf;
-        db->strbuf_allocd += increment;
-
-        /* Grow from 0?  Add an empty "string" for offset==0 */
-        if (db->strbuf_used == 0)
-        {
-            db->strbuf[0] = '\0';
-            db->strbuf_used++;
-        }
-    }
-
-    retval = db->strbuf_used;
-    memcpy(db->strbuf + retval, mem, len); db->strbuf[retval + len] = '\0';
-    db->strbuf_used += len + 1;
-
-    return retval;
-}
-
-int     CxsdDbAddStr (CxsdDb db, const char *str)
-{
-    return CxsdDbAddMem(db, str, strlen(str));
-}
-
-const char
-       *CxsdDbGetStr (CxsdDb db, int ofs)
-{
-    if (ofs <= 0  ||  ofs > db->strbuf_used - 1) return NULL;
-    return db->strbuf + ofs;
-}
 
 int     CxsdDbAddNsp (CxsdDb db, CxsdDbDcNsp_t     *nsp)
 {
@@ -640,6 +577,246 @@ int     CxsdDbClvlFindItem(CxsdDb db, int clvl_id,
         }
 
     return -1;
+}
+
+
+int     CxsdDbAddMem (CxsdDb db, const char        *mem, size_t len)
+{
+  int     retval;
+  size_t  seglen;
+  int     ofs;
+  char   *newbuf;
+  size_t  shortage;
+  size_t  increment;
+
+    if (db->is_readonly)
+    {
+        errno = EROFS;
+        return -1;
+    }
+
+    if (mem == NULL  ||  *mem == '\0') return 0;
+
+    /* Try to find an already-registered string */
+    for (ofs = 0;  ofs < db->strbuf_used;  ofs += seglen + 1)
+    {
+        seglen = strlen(db->strbuf + ofs);
+        if (len == seglen  &&
+            /* Note case-SENSITIVE comparison:
+               strings in different case should be distinct */
+            memcmp(mem, db->strbuf + ofs, len) == 0)
+            return ofs;
+    }
+
+    if (db->strbuf_used + len + 1 > db->strbuf_allocd)
+    {
+        shortage = (db->strbuf_used + len + 1) - db->strbuf_allocd;
+        if (db->strbuf_used == 0) shortage++;  // For empty at offset==0
+
+        increment = (shortage + 1023) &~ 1023U; // Grow to a next multiple of 1kB
+
+        if (db->strbuf_allocd + increment > INT_MAX)
+        {
+            errno = EOVERFLOW;
+            return -1;
+        }
+
+        newbuf = safe_realloc(db->strbuf, db->strbuf_allocd + increment);
+        if (newbuf == NULL) return -1;
+        db->strbuf         = newbuf;
+        db->strbuf_allocd += increment;
+
+        /* Grow from 0?  Add an empty "string" for offset==0 */
+        if (db->strbuf_used == 0)
+        {
+            db->strbuf[0] = '\0';
+            db->strbuf_used++;
+        }
+    }
+
+    retval = db->strbuf_used;
+    memcpy(db->strbuf + retval, mem, len); db->strbuf[retval + len] = '\0';
+    db->strbuf_used += len + 1;
+
+    return retval;
+}
+
+int     CxsdDbAddStr (CxsdDb db, const char *str)
+{
+    return CxsdDbAddMem(db, str, strlen(str));
+}
+
+const char
+       *CxsdDbGetStr (CxsdDb db, int ofs)
+{
+    if (ofs <= 0  ||  ofs > db->strbuf_used - 1) return NULL;
+    return db->strbuf + ofs;
+}
+
+static inline CxsdDbBinHdr_t * binofs2hdr(CxsdDb db, int ofs) {return (void*)(((uint8 *)(db->binbuf)) + ofs - sizeof(CxsdDbBinHdr_t));}
+
+int     CxsdDbAddBinStart (CxsdDb db,
+                           cxdtype_t  dtype, 
+                           size_t     supposed_total_size,
+                                      void *data, size_t len)
+{
+  int             ofs;
+  CxsdDbBinHdr_t *hdr;
+  size_t          shortage;
+  size_t          increment;
+  void           *newbuf;
+
+    if (db->binbuf_cur_ofs > 0)
+    {
+        errno = EBUSY;
+        return -1;
+    }
+
+    ofs = ((db->binbuf_used + 15) &~15UL) + sizeof(CxsdDbBinHdr_t);
+
+    // Should we grow the buffer right now?
+    if (db->binbuf_allocd < ofs + supposed_total_size)
+    {
+        shortage = (ofs + supposed_total_size) - db->binbuf_allocd;
+
+        increment = (shortage + 1023) &~ 1023U; // Grow to a next multiple of 1kB
+
+        if (db->binbuf_allocd + increment > INT_MAX)
+        {
+            errno = EOVERFLOW;
+            return -1;
+        }
+
+        newbuf = safe_realloc(db->binbuf, db->binbuf_allocd + increment);
+        if (newbuf == NULL) return -1;
+        db->binbuf         = newbuf;
+        db->binbuf_allocd += increment;
+    }
+
+    // "Open" the block
+    db->binbuf_used    = ofs;
+    db->binbuf_cur_ofs = ofs;
+    hdr = binofs2hdr(db, db->binbuf_cur_ofs);
+    bzero(hdr, sizeof(*hdr));
+    hdr->u.hdr.dtype = dtype;
+    hdr->u.hdr.len   = 0;
+
+    // Optionally add the 1st segment
+    if (len > 0  &&  CxsdDbAddBinAddSeg(db, data, len) < 0)
+    {
+        CxsdDbAddBinCancel(db);
+        return -1;
+    }
+
+    return 0;
+}
+
+void    CxsdDbAddBinCancel(CxsdDb db)
+{
+    if (db->binbuf_cur_ofs <= 0)
+    {
+        errno = EBADF;
+        return;
+    }
+
+    db->binbuf_used    = db->binbuf_cur_ofs - sizeof(CxsdDbBinHdr_t);
+    db->binbuf_cur_ofs = 0;
+}
+
+int     CxsdDbAddBinAddSeg(CxsdDb db, void *data, size_t len)
+{
+  CxsdDbBinHdr_t *hdr;
+  size_t          shortage;
+  size_t          increment;
+  void           *newbuf;
+
+    if (db->binbuf_cur_ofs <= 0)
+    {
+        errno = EBADF;
+        return -1;
+    }
+
+    if (len == 0) return 0;
+
+    if (db->binbuf_allocd - db->binbuf_used < len)
+    {
+        shortage = len - (db->binbuf_allocd - db->binbuf_used);
+
+        increment = (shortage + 1023) &~ 1023U; // Grow to a next multiple of 1kB
+
+        if (db->binbuf_allocd + increment > INT_MAX)
+        {
+            errno = EOVERFLOW;
+            return -1;
+        }
+
+        newbuf = safe_realloc(db->binbuf, db->binbuf_allocd + increment);
+        if (newbuf == NULL) return -1;
+        db->binbuf         = newbuf;
+        db->binbuf_allocd += increment;
+    }
+
+    hdr = binofs2hdr(db, db->binbuf_cur_ofs);
+    memcpy(hdr->data + hdr->u.hdr.len, data, len);
+    hdr->u.hdr.len  += len;
+    db->binbuf_used += len;
+
+    return 0;
+}
+
+int     CxsdDbAddBinFinish(CxsdDb db)
+{
+  int             ofs;
+  CxsdDbBinHdr_t *hdr;
+  CxsdDbBinHdr_t *erl; // "EaRLier"
+
+    if (db->binbuf_cur_ofs <= 0)
+    {
+        errno = EBADF;
+        return -1;
+    }
+
+    hdr = binofs2hdr(db, db->binbuf_cur_ofs);
+
+    /* Check for duplicates */
+    for (ofs = sizeof(CxsdDbBinHdr_t);
+         ofs < db->binbuf_cur_ofs;
+         ofs += sizeof(CxsdDbBinHdr_t) + ((erl->u.hdr.len + 15) &~15UL))
+    {
+        erl = binofs2hdr(db, ofs);
+        if (erl->u.hdr.dtype == hdr->u.hdr.dtype  &&
+            erl->u.hdr.len   == hdr->u.hdr.len    &&
+            (erl->u.hdr.len == 0  ||
+             memcmp(erl->data, hdr->data, erl->u.hdr.len) == 0)
+           )
+        {
+            CxsdDbAddBinCancel(db);
+            return ofs;
+        }
+    }
+
+    ofs = db->binbuf_cur_ofs;
+    db->binbuf_cur_ofs = 0;
+
+    return ofs;
+}
+
+int     CxsdDbGetBin      (CxsdDb db, int ofs, void **data_p, size_t *len_p, cxdtype_t *dtype_p)
+{
+  CxsdDbBinHdr_t *hdr;
+
+    if (ofs < sizeof(CxsdDbBinHdr_t)  ||  ofs >= db->binbuf_used /* Unfortunately, no other safe way to check upper limit */)
+    {
+        errno = EBADF;
+        return -1;
+    }
+
+    hdr = binofs2hdr(db, ofs);
+    if (data_p  != NULL) *data_p  = hdr->data;
+    if (len_p   != NULL) *len_p   = hdr->u.hdr.len;
+    if (dtype_p != NULL) *dtype_p = hdr->u.hdr.dtype;
+
+    return 0;
 }
 
 

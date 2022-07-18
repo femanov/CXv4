@@ -7,7 +7,7 @@ common_CLIENTS=	ist_cdac20 v1k_cdac20 v3h_a40d16 mps20_ceac124 \
 CLIENTS=	rfsyn_eng v5rfsyn v5ie v5kls v5cnv \
 		linmag linvac linthermcan linslbpms linipp lin485s linrf_smc \
 		ringmag ringcor23 ringcor45 ringrf ringcurmon \
-		subharmonic lincamsel ringcamsel turnmag \
+		subharmonic lincamsel ringcamsel rotmag \
 		v5h1adc200s \
 		v5adc200_gun  v5adc200_kls1 v5adc200_kls2 v5adc200_kls3 \
 		v5adc200_grp1 v5adc200_grp2 ionchamber \

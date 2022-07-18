@@ -114,6 +114,10 @@ int      PzframeKnobpluginHandleCmd_m(DataKnob k, const char *cmd, int info_int)
     {
         PzframeDataSetRunMode(kpn->g->pfr, !info_int, -1);
     }
+    if      (strcmp(cmd, DATATREE_STDCMD_ONCE) == 0)
+    {
+        PzframeDataSetRunMode(kpn->g->pfr, -1,        +1);
+    }
 
     return 0;
 }

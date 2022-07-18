@@ -1,0 +1,283 @@
+#include "cxsd_hw.h"
+#include "cxsd_hwP.h"
+#include "cxsd_frontend.h"
+#include "cxsd_modmgr.h"
+#include "cxsd_logger.h"
+#include "cxsd_access.h"
+
+#include "cxsd_fe_epics.h"
+#include "cxsd_fe_epics_meat.h"
+
+
+enum {RDS_MAX_COUNT = 20};
+enum
+{
+    I_PHYS_COUNT = 2,
+};
+
+enum
+{
+    MONITOR_EVMASK =
+        CXSD_HW_CHAN_EVMASK_UPDATE   |
+        CXSD_HW_CHAN_EVMASK_RDSCHG
+};
+
+//////////////////////////////////////////////////////////////////////
+
+typedef struct
+{
+    int            in_use;
+    cxsd_cpntid_t  cpid;
+    cxsd_gchnid_t  gcid;
+    const char    *name;
+
+    void          *PV_ptr;
+
+    int            phys_count;
+    int            phys_n_allocd;    // in PAIRS -- i.e., malloc(sizeof(double)*phys_n_allocd*2)
+    double         imm_phys_rds[I_PHYS_COUNT * 2];
+    double        *alc_phys_rds;
+} moninfo_t;
+
+static moninfo_t       *fe_epics_monitors_list           = NULL;
+static int              fe_epics_monitors_list_allocd    = 0;
+
+static cxsd_gchnid_t   *fe_epics_periodics               = NULL;
+static int              fe_epics_periodics_allocd        = 0;
+static int              fe_epics_periodics_used          = 0;
+static int              fe_epics_periodics_needs_rebuild = 0;
+
+// GetMonSlot()
+GENERIC_SLOTARRAY_DEFINE_GROWING(static, Mon, moninfo_t,
+                                 fe_epics_monitors, in_use, 0, 1,
+                                 0, 100, 0,
+                                 , , void)
+
+static void RlsMonSlot(int id)
+{
+  moninfo_t *mp = AccessMonSlot(id);
+
+    mp->in_use = 0;
+
+#if 0
+    CxsdHwDelChanEvproc(cp->ID, lint2ptr(cp2cd(cp)),
+                        mp->gcid, MONITOR_EVMASK,
+                        MonEvproc, lint2ptr(id));
+
+    if (mp->cpid >= 0)
+    {
+        periodics_used--;
+        periodics_needs_rebuild = 1;
+    }
+#endif
+
+    mp->PV_ptr = NULL;
+
+    safe_free(mp->name);
+    safe_free(mp->alc_phys_rds);
+}
+
+//////////////////////////////////////////////////////////////////////
+
+static void StoreRDs(moninfo_t *mp, int phys_count, double *rds)
+{
+    if (phys_count > 0)
+    {
+        if (mp->alc_phys_rds != NULL  ||  phys_count > I_PHYS_COUNT)
+        {
+            if (GrowUnitsBuf(&(mp->alc_phys_rds), &(mp->phys_n_allocd),
+                             phys_count, sizeof(double) * 2) < 0)
+            {
+                /*!!!Bark? */
+                return;
+            }
+        }
+        memcpy(mp->alc_phys_rds != NULL? mp->alc_phys_rds : mp->imm_phys_rds,
+               rds, phys_count * sizeof(double) * 2);
+    }
+    mp->phys_count = phys_count;
+}
+
+static void MonEvproc(int            uniq,
+                      void          *privptr1,
+                      cxsd_gchnid_t  gcid,
+                      int            reason,
+                      void          *privptr2)
+{
+  int          id = ptr2lint(privptr2);
+  moninfo_t   *mp = AccessMonSlot(id);
+
+}
+
+static int CxsdHwIsChanValReady(int gcid)
+{
+  cxsd_hw_chan_t        *chn_p = cxsd_hw_channels + gcid;
+
+    if (gcid <= 0  ||  gcid >= cxsd_hw_numchans) return -1;
+
+    return
+        chn_p->is_internal
+        ||
+        (chn_p->timestamp.sec != CX_TIME_SEC_NEVER_READ
+         &&
+         (chn_p->rw  ||
+          (chn_p->is_autoupdated       &&
+           chn_p->fresh_age.sec  == 0  &&
+           chn_p->fresh_age.nsec == 0)
+         )
+        );
+}
+
+
+//////////////////////////////////////////////////////////////////////
+
+int  cxsd_fe_epics_pvExistTest(const char *name)
+{
+  cxsd_gchnid_t  gcid;
+
+    return (CxsdHwResolveChan(name, &gcid,
+                              NULL, NULL, 0,
+                              NULL, NULL, NULL, NULL,
+                              NULL, NULL, NULL, NULL) > 0);
+}
+
+int  cxsd_fe_epics_createPV   (const char *name)
+{
+  int            mid;
+  moninfo_t     *mp;
+
+  cxsd_cpntid_t  cpid;
+  cxsd_gchnid_t  gcid;
+  int            phys_count;
+  double         rds_buf[RDS_MAX_COUNT*2];
+
+    /* Does this name exist? */
+    if ((cpid = CxsdHwResolveChan(name, &gcid,
+                                  &phys_count, rds_buf, RDS_MAX_COUNT,
+                                  NULL, NULL, NULL, NULL,
+                                  NULL, NULL, NULL, NULL)) < 0)
+        return -1;
+
+    mid = GetMonSlot();
+    if (mid < 0) return -1;
+    mp  = AccessMonSlot(mid);
+    mp->cpid = -1; // Prevent RlsMonSlot() from "periodics_used--" if called before "periodics_used++"
+    if ((mp->name = strdup(name)) == NULL)
+    {
+        RlsMonSlot(mid);
+        return CXSD_FE_EPICS_noMemory;
+    }
+    /* Add a cell to periodics[] */
+    if (fe_epics_periodics_allocd <= fe_epics_periodics_used  &&
+        GrowUnitsBuf(&(fe_epics_periodics),
+                     &(fe_epics_periodics_allocd),
+                     fe_epics_periodics_allocd + 100,
+                     sizeof(*(fe_epics_periodics))) < 0)
+    {
+        RlsMonSlot(mid);
+        return CXSD_FE_EPICS_noMemory;
+    }
+
+    /* Fill */
+    mp->cpid = cpid;
+    mp->gcid = gcid;
+    StoreRDs(mp, phys_count, rds_buf);
+
+    /* Subscribe to updates */
+    if (CxsdHwAddChanEvproc(0, NULL,
+                            mp->gcid, MONITOR_EVMASK,
+                            MonEvproc, lint2ptr(mid)) < 0)
+    {
+        RlsMonSlot(mid);
+        return CXSD_FE_EPICS_noMemory;
+    }
+
+    return mid;
+}
+
+int  cxsd_fe_epics_set_PV_ptr (int mid, void *PV_ptr)
+{
+  moninfo_t *mp = AccessMonSlot(mid);
+
+    /*!!!Check!!!*/
+
+    mp->PV_ptr = PV_ptr;
+
+    return 0;
+}
+
+//////////////////////////////////////////////////////////////////////
+
+static sl_tid_t  fdManager_process_polling_tid = -1;
+static void call_fdManager_process(int uniq, void *unsdptr, sl_tid_t tid, void *privptr)
+{
+    cxsd_fe_epics_meat_do_poll();
+    fdManager_process_polling_tid = sl_enq_tout_after(0, NULL, 100000/*100ms<=>10Hz*/, call_fdManager_process, NULL);
+}
+
+static void test_fd7(int uniq, void *unsdptr, sl_tid_t tid, void *privptr)
+{
+  int  r;
+    errno = 0;
+    r = check_fd_state(7, 0);
+    fprintf(stderr, "%s r=%d errno=%d/%s\n", __FUNCTION__, r, errno, strerror(errno));
+    sl_enq_tout_after(0, NULL, 1000000, test_fd7, NULL);
+}
+static int  epics_init_f (int server_instance)
+{
+  int r;
+
+//    test_fd7(0, NULL, 0, NULL);
+
+    r = cxsd_fe_epics_meat_init_f(server_instance, cxsd_hw_numchans);
+    if (r == 0) fdManager_process_polling_tid = sl_enq_tout_after(0, NULL, 1/*Schedule first poll right after start*/, call_fdManager_process, NULL);
+    return r;
+}
+
+static void epics_term_f (void)
+{
+    if (fdManager_process_polling_tid >= 0) sl_deq_tout(fdManager_process_polling_tid); fdManager_process_polling_tid = -1;
+    cxsd_fe_epics_meat_term_f();
+
+    safe_free(fe_epics_periodics);
+    fe_epics_periodics               = NULL;
+    fe_epics_periodics_allocd        = 0;
+    fe_epics_periodics_used          = 0;
+    fe_epics_periodics_needs_rebuild = 0;
+
+    safe_free(fe_epics_monitors_list);
+    fe_epics_monitors_list        = NULL;
+    fe_epics_monitors_list_allocd = 0;
+}
+
+static void epics_begin_c(void)
+{
+}
+
+static void epics_end_c  (void)
+{
+}
+
+
+static int  epics_init_m(void);
+static void epics_term_m(void);
+
+//////////////////////////////////////////////////////////////////////
+
+DEFINE_CXSD_FRONTEND(epics, "EPICS/CA (Channel Access) frontend for CXv4",
+                     epics_init_m, epics_term_m,
+                     epics_init_f, epics_term_f,
+                     epics_begin_c, epics_end_c);
+
+static int  epics_init_m(void)
+{
+    return CxsdRegisterFrontend(&(CXSD_FRONTEND_MODREC_NAME(epics)));
+}
+
+static void epics_term_m(void)
+{
+    CxsdDeregisterFrontend     (&(CXSD_FRONTEND_MODREC_NAME(epics)));
+}
+
+//////////////////////////////////////////////////////////////////////
+

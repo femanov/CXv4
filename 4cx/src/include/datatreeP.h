@@ -472,6 +472,7 @@ typedef struct _data_subsys_t_struct
     //
     int             cid; /*!!! cda_context_t */
     int             is_freezed;
+    int             oneshot;
     int             readonly;
     rflags_t        currflags; /* added 29.11.2015 */
 

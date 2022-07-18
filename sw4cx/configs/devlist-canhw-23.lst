@@ -27,8 +27,10 @@ define(`IPP_BOX', `
         online	$2.box$3.online
         cur_M	$2.box$3.cur_M
         cur_P	$2.box$3.cur_P
+        cur_CREG	$2.box$3.cur_CREG
         M	$2.box$3.M
         P	$2.box$3.P
+        CREG	$2.box$3.CREG
     }
 ')
 

@@ -198,6 +198,10 @@ static pzframe_chinfo_t chinfo[] =
 
 //--------------------------------------------------------------------
 
+#define USE_ADC1000_TRIG_ORDER 0
+#if USE_ADC1000_TRIG_ORDER
+enum {PER_ADC_BUF_LEN = 1024}; // Multiple of 256 bytes (D32 BLT burst size)
+#endif
 typedef struct
 {
     pzframe_drv_t      pz;
@@ -224,6 +228,9 @@ int jumpers;
     int                data_rqd;
 #ifndef DEVTYPE_ADC1000 // ADC1000 is 1-channel
     int                line_rqd[DEVDEP_NUM_LINES];
+#endif
+#if defined(DEVTYPE_ADC1000)  &&  USE_ADC1000_TRIG_ORDER
+    uint32             adcbuf[4][PER_ADC_BUF_LEN];
 #endif
     struct
     {
@@ -384,6 +391,17 @@ static int32 ValidateParam(pzframe_drv_t *pdr, int n, int32 v)
     {
         if (v < ADC4X250_RANGE_VAL_0_5V) v = ADC4X250_RANGE_VAL_0_5V;
         if (v > ADC4X250_RANGE_VAL_4V)   v = ADC4X250_RANGE_VAL_4V;
+#ifdef DEVTYPE_ADC1000
+        /* e-mail from Anton Pavlenko 07.02.2022 (Message-ID: <5f2b5fd58844cece4e87960e29cb36ed@inp.nsk.su>):
+               В случае выбора +-0,5В и +-1В реально будет включен диапазон +-0,5 для
+               обоих вариантов конфигурации соответствующего регистра.
+               В случае +-2В и +-4В будет работать диапазон +-2В." */
+        if (me->BASE_SW_VER < 999) 
+        {
+            if (v == ADC4X250_RANGE_VAL_4V) v = ADC4X250_RANGE_VAL_2V;
+            if (v == ADC4X250_RANGE_VAL_1V) v = ADC4X250_RANGE_VAL_0_5V;
+        }
+#endif
     }
     else if (n == ADC250_CHAN_TRIG_TYPE)
     {
@@ -541,12 +559,6 @@ fprintf(stderr, "\t\t[ADC250_CHAN_TRIG_TYPE]=%d [ADC250_CHAN_TRIG_INPUT]=%d\n", 
     sl_enq_tout_after(me->devid, me, HEARTBEAT_USECS, adcNNN_hbt, NULL);
 #endif
 
-    //pzframe_drv_rw_p(&(me->pz), ADC250_CHAN_RUN_MODE, me->nxt_args[ADC250_CHAN_RUN_MODE], DRVA_WRITE);
-    for (n = 0;  n < countof(chinfo);  n++)
-        if (chinfo[n].chtype == PZFRAME_CHTYPE_PZFRAME_STD  &&
-            me->nxt_args[n] >= 0)
-            pzframe_drv_rw_p(&(me->pz), n, me->nxt_args[n], DRVA_WRITE);
-
     return DEVSTATE_OPERATING;
 }
 static void  StopDevice(pzframe_drv_t *pdr)
@@ -698,6 +710,41 @@ static rflags_t ReadMeasurements(pzframe_drv_t *pdr)
 ////fprintf(stderr, "INT_STATUS=%08x\n", w);
     me->lvmt->a32wr32(me->handle, ADC4X250_R_CTRL,       ADC4X250_CTRL_ADC_BREAK_ACK); // Stop
 
+#if defined(DEVTYPE_ADC1000)  &&  USE_ADC1000_TRIG_ORDER
+    {
+      auto     uint32 *s0, *s1, *s2, *s3;
+      register uint32 *a0, *a1, *a2, *a3;
+      register uint32  w0,  w1,  w2,  w3;
+      register ADC250_DATUM_T *wp;
+
+        if      (1 == 0x9) {s0 = me->adcbuf[0]; s1 = me->adcbuf[1]; s2 = me->adcbuf[2]; s3 = me->adcbuf[3];}
+        else if (1 == 0x5) {s0 = me->adcbuf[1]; s1 = me->adcbuf[2]; s2 = me->adcbuf[3]; s3 = me->adcbuf[0];}
+        else if (1 == 0x6) {s0 = me->adcbuf[2]; s1 = me->adcbuf[3]; s2 = me->adcbuf[0]; s3 = me->adcbuf[1];}
+        else /*  1 == 0xA*/{s0 = me->adcbuf[3]; s1 = me->adcbuf[0]; s2 = me->adcbuf[1]; s3 = me->adcbuf[2];}
+
+        a0 = s0; a1 = s1; a2 = s2; a3 = s3;
+        wp = me->retdata;
+
+        numduplets = 1024;
+if (me->BASE_SW_VER == 12345678)
+        for (n = 0;  n < numduplets;  n++)
+        {
+            w0 = *a0++;
+            w1 = *a1++;
+            w2 = *a2++;
+            w3 = *a3++;
+            *wp++ = w0 & 0xFFFF;
+            *wp++ = w1 & 0xFFFF;
+            *wp++ = w2 & 0xFFFF;
+            *wp++ = w3 & 0xFFFF;
+            *wp++ = (w0 >> 16) & 0xFFFF;
+            *wp++ = (w1 >> 16) & 0xFFFF;
+            *wp++ = (w2 >> 16) & 0xFFFF;
+            *wp++ = (w3 >> 16) & 0xFFFF;
+        }
+    }
+#endif
+
     numduplets = (me->cur_args[ADC250_CHAN_NUMPTS] + 1) / 2;
     for (nl = 0;  nl < DEVDEP_NUM_LINES;  nl++)
     {
@@ -767,6 +814,8 @@ fprintf(stderr, "%s %s(): INT_STATUS=%08x, simulating IRQ\n", strcurtime_msc(), 
     pzframe_drv_drdy_p(&(me->pz), me->do_return, 0);
 }
 
+static int32 range2rangemin[4] = {-1*4096/2, -1*4096, -2*4096, -4*4096};
+static int32 range2rangemax[4] = {+1*4096/2, +1*4096, +2*4096, +4*4096};
 static void PrepareRetbufs     (pzframe_drv_t *pdr, rflags_t add_rflags)
 {
   adcNNN_privrec_t *me = PDR2ME(pdr);
@@ -785,11 +834,13 @@ static void PrepareRetbufs     (pzframe_drv_t *pdr, rflags_t add_rflags)
     {
         me->cur_args[ADC250_CHAN_LINE0ON       + x] = 1;
         me->cur_args[ADC250_CHAN_LINE0RANGEMIN + x] =
-ADC250_MIN_VALUE;
-//            (    0-2048) * quants[me->cur_args[ADC250_CHAN_RANGE0 + x] & 3];
+range2rangemin[me->cur_args[ADC250_CHAN_RANGE0 + x] & 3];
+//ADC250_MIN_VALUE;
+////            (    0-2048) * quants[me->cur_args[ADC250_CHAN_RANGE0 + x] & 3];
         me->cur_args[ADC250_CHAN_LINE0RANGEMAX + x] =
-ADC250_MAX_VALUE;
-//            (0xFFF-2048) * quants[me->cur_args[ADC250_CHAN_RANGE0 + x] & 3];
+range2rangemax[me->cur_args[ADC250_CHAN_RANGE0 + x] & 3];
+//ADC250_MAX_VALUE;
+////            (0xFFF-2048) * quants[me->cur_args[ADC250_CHAN_RANGE0 + x] & 3];
     }
 
     /* 2. Device-specific: mark-for-returning */
@@ -1068,6 +1119,7 @@ static int  FASTADC_INIT_D(int devid, void *devptr,
                            const char *auxinfo __attribute__((unused)))
 {
   FASTADC_PRIVREC_T   *me = (FASTADC_PRIVREC_T *)devptr;
+  int                  r;
   int                  n;
   int                  bus_major;
   int                  bus_minor;
@@ -1107,7 +1159,15 @@ fprintf(stderr, "%s businfo[2]=%08x jumpers=0x%x irq=%d vector=%d\n", strcurtime
                      AbortMeasurements, ReadMeasurements,
                      PrepareRetbufs, NULL, NULL);
 
-    return InitParams(&(me->pz));
+    r = InitParams(&(me->pz));
+    if (r < 0) return r;
+
+    for (n = 0;  n < countof(chinfo);  n++)
+        if (chinfo[n].chtype == PZFRAME_CHTYPE_PZFRAME_STD  &&
+            me->nxt_args[n] >= 0)
+            pzframe_drv_rw_p(&(me->pz), n, me->nxt_args[n], DRVA_WRITE);
+
+    return r;
 }
 
 static void FASTADC_TERM_D(int devid, void *devptr)

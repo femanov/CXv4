@@ -1,0 +1,83 @@
+#include <casdef.h>
+#include <fdManager.h>
+
+#include "cxsd_fe_epics.h"
+#include "cxsd_fe_epics_meat.h"
+
+
+#if 1
+class fe_epics_Server : public caServer
+{
+ public:
+    fe_epics_Server();
+
+    pvExistReturn        pvExistTest(const casCtx &ctx, const char *pPVName);
+    pvCreateReturn       createPV   (const casCtx &ctx, const char *pPVName);
+};
+
+fe_epics_Server::fe_epics_Server() : caServer()
+{
+}
+
+pvExistReturn        fe_epics_Server::pvExistTest(const casCtx &ctx, const char *pPVName)
+{
+fprintf(stderr, "%s(\"%s\")\n", __FUNCTION__, pPVName);
+    return cxsd_fe_epics_pvExistTest(pPVName)? pverExistsHere : pverDoesNotExistHere;
+}
+
+pvCreateReturn       fe_epics_Server::createPV   (const casCtx &ctx, const char *pPVName)
+{
+    return S_casApp_pvNotFound;
+}
+
+// -------------------------------------------------------------------
+static fe_epics_Server *the_server = NULL;
+static int  create_epics_Server(void)
+{
+fprintf(stderr, "%s entry\n", __FUNCTION__);
+    if (the_server != NULL)
+    {
+        return -1;
+    }
+    the_server = new(fe_epics_Server);
+fprintf(stderr, "%s the_server=%p\n", __FUNCTION__, the_server);
+    return the_server == NULL? -1 : 0;
+}
+static void delete_epics_Server(void)
+{
+    if (the_server != NULL)
+    {
+        delete(the_server);
+        the_server = NULL;
+    }
+}
+
+static void do_call_fdManager_process()
+{
+    fileDescriptorManager.process(0);
+}
+#endif
+
+
+//////////////////////////////////////////////////////////////////////
+
+extern "C"
+{
+
+int cxsd_fe_epics_meat_init_f (int server_instance, int cxsd_hw_numchans_val)
+{
+    return create_epics_Server();
+}
+
+void cxsd_fe_epics_meat_term_f (void)
+{
+    delete_epics_Server();
+}
+
+void cxsd_fe_epics_meat_do_poll(void)
+{
+    do_call_fdManager_process();
+}
+
+
+} /* extern "C" */

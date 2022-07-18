@@ -109,6 +109,9 @@ typedef struct // Is a slightly modified copy from CxsdDbCpntInfo_t
     /* Additional strings */
     int                 dbprops_ofs;
     int                 drvinfo_ofs;
+
+    /* Binary data */
+    int                 defval_binofs;
 } CxsdDbDcPrInfo_t; // "DcPr" -- Device Channel PRoperties
 
 typedef struct
@@ -202,7 +205,26 @@ typedef struct _CxsdDbInfo_t_struct
     char               *strbuf;     // dictionary
     size_t              strbuf_used;
     size_t              strbuf_allocd;
+
+    void               *binbuf;
+    size_t              binbuf_used;
+    size_t              binbuf_allocd;
+    int                 binbuf_cur_ofs;
 } CxsdDbInfo_t;
+
+typedef struct
+{
+    union
+    {
+        struct
+        {
+            size_t     len;
+            cxdtype_t  dtype;
+        } hdr;
+        uint8  _16bytes[16];
+    } u;
+    uint8 data[0];
+} CxsdDbBinHdr_t;
 
 
 CxsdDb  CxsdDbCreate (void);
@@ -214,10 +236,6 @@ int     CxsdDbAddDev (CxsdDb db, CxsdDbDevLine_t   *dev_p,
 int     CxsdDbAddLyrI(CxsdDb db,
                       const char *lyrname, int bus_n,
                       const char *lyrinfo);
-int     CxsdDbAddMem (CxsdDb db, const char        *mem, size_t len);
-int     CxsdDbAddStr (CxsdDb db, const char        *str);
-const char
-       *CxsdDbGetStr (CxsdDb db, int ofs);
 
 int     CxsdDbAddNsp (CxsdDb db, CxsdDbDcNsp_t     *nsp);
 const CxsdDbDcNsp_t
@@ -236,6 +254,20 @@ int     CxsdDbClvlAddItem (CxsdDb db, int clvl_id, CxsdDbClvlItem_t item);
 int     CxsdDbClvlFindItem(CxsdDb db, int clvl_id,
                            const char *name, size_t namelen,
                            CxsdDbClvlItem_t *item_return);
+
+int     CxsdDbAddMem (CxsdDb db, const char        *mem, size_t len);
+int     CxsdDbAddStr (CxsdDb db, const char        *str);
+const char
+       *CxsdDbGetStr (CxsdDb db, int ofs);
+
+int     CxsdDbAddBinStart (CxsdDb db,
+                           cxdtype_t  dtype, 
+                           size_t     supposed_total_size,
+                                      void *data, size_t len);
+void    CxsdDbAddBinCancel(CxsdDb db);
+int     CxsdDbAddBinAddSeg(CxsdDb db, void *data, size_t len);
+int     CxsdDbAddBinFinish(CxsdDb db);
+int     CxsdDbGetBin      (CxsdDb db, int ofs, void **data_p, size_t *len_p, cxdtype_t *dtype_p);
 
 //////////////////////////////////////////////////////////////////////
 

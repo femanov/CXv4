@@ -599,8 +599,9 @@ int main(int argc, char *argv[])
             }
         }
 
-        commands[ncmd].action(arg, fd);
+        r = commands[ncmd].action(arg, fd);
         if (should_close_fd) close(fd);
+        if (r != 0) exit(1);
     }
 
     return 0;

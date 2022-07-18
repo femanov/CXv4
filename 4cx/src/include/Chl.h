@@ -33,6 +33,7 @@ char *ChlLastErr(void);
 #define CHL_STDCMD_LOAD_MODE "chlLoadMode"
 #define CHL_STDCMD_SAVE_MODE "chlSaveMode"
 #define CHL_STDCMD_FREEZE    DATATREE_STDCMD_FREEZE
+#define CHL_STDCMD_ONCE      DATATREE_STDCMD_ONCE
 #define CHL_STDCMD_SHOW_HELP "chlShowHelp"
 #define CHL_STDCMD_QUIT      "chlQuit"
 

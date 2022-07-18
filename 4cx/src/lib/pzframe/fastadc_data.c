@@ -88,17 +88,27 @@ static void ProcessAdcInfo(fastadc_data_t *adc)
         {
             /* 1. numpts */
             /* a. Get */
+            // From individual channel?
             if      (atd->line_dscrs[nl].cur_numpts_cn >= 0)
                 PzframeDataGetChanInt(pfr,
                                       atd->line_dscrs[nl].cur_numpts_cn,
                                       &numpts);
+            // Fixed individual value (specified negated)?
             else if (atd->line_dscrs[nl].cur_numpts_cn < -1)
                 numpts = -atd->line_dscrs[nl].cur_numpts_cn;
-            else
+            // From common channel?
+            else if (atd->common_cur_numpts_cn         >= 0)
                 PzframeDataGetChanInt(pfr,
                                       atd->common_cur_numpts_cn,
                                       &numpts);
+            // Fixed common value (specified negated)?
+            else if (atd->common_cur_numpts_cn         < -1)
+                numpts = -atd->common_cur_numpts_cn;
+            // A fallback: just get current nelems
+            else
+                numpts = cda_current_nelems_of_ref(pfr->refs[atd->line_dscrs[nl].data_cn]);
             /* b. Limit */
+            // ...plus a safety net for a case when cda_current_nelems_of_ref() results in error
             if (numpts < 0)
                 numpts = 0;
             if (numpts > atd->max_numpts)
@@ -179,6 +189,7 @@ static void ProcessAdcInfo(fastadc_data_t *adc)
                             FindMinMax_uint8 (adc->mes.plots[nl].x_buf, numpts,
                                               adc->mes.plots[nl].cur_range.int_r + 0,
                                               adc->mes.plots[nl].cur_range.int_r + 1);
+                        /* Treat calculated range as changed anyway */
                         pfr->other_info_changed = 1;
                     }
                     /* b. Symmetrize */
@@ -202,6 +213,7 @@ static void ProcessAdcInfo(fastadc_data_t *adc)
                             FindMinMax_float32(adc->mes.plots[nl].x_buf, numpts,
                                                adc->mes.plots[nl].cur_range.dbl_r + 0,
                                                adc->mes.plots[nl].cur_range.dbl_r + 1);
+                        /* Treat calculated range as changed anyway */
                         pfr->other_info_changed = 1;
                     }
                     /* b. Symmetrize */

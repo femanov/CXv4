@@ -428,8 +428,11 @@ static void ProcessContextEvent(int            uniq,
     switch (reason)
     {
         case CDA_CTX_R_CYCLE:
-            if (subsys->is_freezed == 0)
+            if (subsys->is_freezed == 0  ||  subsys->oneshot)
+            {
                 CdrProcessSubsystem(subsys, info_int, 0, &(subsys->currflags));
+                subsys->oneshot = 0;
+            }
             break;
     }
 }

@@ -175,6 +175,38 @@ static void FlushXPoints(Display *dpy, Window win, GC gc,
     *npts_p = 1;
 }
 
+static void CheckDispRange(cxdtype_t dtype, plotdata_range_t *range_p)
+{
+    if (reprof_cxdtype(dtype) == CXDTYPE_REPR_INT)
+    {
+        if (range_p->int_r[0] == range_p->int_r[1])
+        {
+            /* This strange check tries to prevent integer overflow:
+               we increment UPPER bound if it is low enough
+               (as "value < 1" means that it can be incremented and wouldn't exceed 1)
+               and decrement LOWER bound in the opposite case
+               (as "value >= 1" implies that it can be decremented even if unsigned) */
+            if (range_p->int_r[1] < 1)
+                range_p->int_r[1]++;
+            else
+                range_p->int_r[0]--;
+        }
+    }
+    else
+    {
+        /* A guard against constant value (in which case the range "width" becomes 0, which leads to division by zero when scaling */
+        /* Note: while "==" comparison of float values is dubious, equal values CAN happen if numpts==1 */
+        if (range_p->dbl_r[0] == range_p->dbl_r[1])
+        {
+            /* This check is unified with REPR_INT variant above  */
+            if (range_p->dbl_r[1] < 1)
+                range_p->dbl_r[1]++;
+            else
+                range_p->dbl_r[0]--;
+        }
+    }
+}
+
 //////////////////////////////////////////////////////////////////////
 
 static void DrawPlotView  (plot_info_t *plot)
@@ -303,6 +335,7 @@ static void DrawPlotAxis  (plot_info_t *plot)
   char        *p;
   int          twid;
 
+  plotdata_range_t     cur_range;
 
     XtVaGetValues(plot->vprt.axis, XmNwidth, &cur_w, XmNheight, &cur_h, NULL);
 
@@ -412,19 +445,22 @@ static void DrawPlotAxis  (plot_info_t *plot)
                     one->data != NULL  &&
                     one->data->on)
                 {
+                    cur_range = one->data->cur_range;
+                    CheckDispRange(one->data->x_buf_dtype, &cur_range);
+
                     if (reprof_cxdtype(one->data->x_buf_dtype) == CXDTYPE_REPR_INT)
                         val = plot->raw2pvl
                               (plot->privptr, nl,
                                RESCALE_VALUE((int64)i,
                                              0, v_tick_segs,
-                                             one->data->cur_range.int_r[0],
-                                             one->data->cur_range.int_r[1])
+                                             cur_range.int_r[0],
+                                             cur_range.int_r[1])
                               );
                     else
-                        val = RESCALE_VALUE(i,
-                                            0, v_tick_segs,
-                                            one->data->cur_range.dbl_r[0],
-                                            one->data->cur_range.dbl_r[1]);
+                        val =  RESCALE_VALUE(i,
+                                             0, v_tick_segs,
+                                             cur_range.dbl_r[0],
+                                             cur_range.dbl_r[1]);
                     val = plot->pvl2dsp(plot->privptr, nl, val) / one->magn * one->plrt;
 
                     p = snprintf_dbl_trim(buf, sizeof(buf), one->dpyfmt, val, 1);
@@ -699,16 +735,22 @@ void      XhPlotCalcMargins(XhPlot plot)
   int                  m_h;
   int                  m_v;
 
+  plotdata_range_t     all_range;
+
     lfrt_cwdt = 0;
     for (nl = 0, one = plot->plots + nl;  nl < plot->maxplots;  nl++, one++)
         if (one->data != NULL)
+        {
+            all_range = one->data->all_range;
+            CheckDispRange(one->data->x_buf_dtype, &all_range);
+            
             for (minmax = 0;  minmax <= 1;  minmax++)
             {
                 if (reprof_cxdtype(one->data->x_buf_dtype) == CXDTYPE_REPR_INT)
                     val = plot->raw2pvl(plot->privptr, nl,
-                                        one->data->all_range.int_r[minmax]);
+                                        all_range.int_r[minmax]);
                 else
-                    val =               one->data->all_range.dbl_r[minmax];
+                    val =               all_range.dbl_r[minmax];
                 val = plot->pvl2dsp(plot->privptr, nl, val);
 
                 snprintf_dbl_trim(buf, sizeof(buf), 
@@ -720,6 +762,7 @@ void      XhPlotCalcMargins(XhPlot plot)
                 cwdt = XTextWidth(one->finfo, buf, strlen(buf));
                 if (lfrt_cwdt < cwdt) lfrt_cwdt = cwdt;
             }
+        }
 
     bott_chgt = plot->axis_finfo->ascent + plot->axis_finfo->descent;
 
@@ -863,10 +906,10 @@ void      XhPlotOneDraw (XhPlot plot, plotdata_t *data, int magn, GC gc)
   int               rgt_lim; // RiGhT LIMit
   int               data_ofs;
 
-  int               is_int    = reprof_cxdtype(data->x_buf_dtype) == CXDTYPE_REPR_INT;
-  int               is_usgn   = ((data->x_buf_dtype & CXDTYPE_USGN_MASK) != 0);
-  size_t            dataunits = sizeof_cxdtype(data->x_buf_dtype);
-  plotdata_range_t  cur_range = data->cur_range;
+  int               is_int;
+  int               is_usgn;
+  size_t            dataunits;
+  plotdata_range_t  cur_range;
 
   int               i;
   int               x;
@@ -904,6 +947,12 @@ void      XhPlotOneDraw (XhPlot plot, plotdata_t *data, int magn, GC gc)
     p32 = (int32 *)  (data->x_buf) + data_ofs;
     f32 = (float32 *)(data->x_buf) + data_ofs;
     f64 = (float64 *)(data->x_buf) + data_ofs;
+
+    is_int    = reprof_cxdtype(data->x_buf_dtype) == CXDTYPE_REPR_INT;
+    is_usgn   = ((data->x_buf_dtype & CXDTYPE_USGN_MASK) != 0);
+    dataunits = sizeof_cxdtype(data->x_buf_dtype);
+    cur_range = data->cur_range;
+    CheckDispRange(data->x_buf_dtype, &cur_range);
 
     ////fprintf(stderr, "*%d /%d lft_out=%d horz_offset=%d data_ofs=%d x=%d\n", plot->x_xpnd, plot->x_cmpr, lft_out, plot->vprt.horz_offset, data_ofs, -lft_out*(plot->vprt.horz_offset%plot->x_xpnd));
     for (npoints = 0,          x_ctr = 0,

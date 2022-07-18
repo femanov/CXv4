@@ -10,12 +10,14 @@
 #include "pixmaps/btn_save.xpm"
 #include "pixmaps/btn_quit.xpm"
 #include "pixmaps/btn_pause.xpm"
+#include "pixmaps/btn_once.xpm"
 #include "pixmaps/btn_help.xpm"
 
 #include "pixmaps/btn_mini_open.xpm"
 #include "pixmaps/btn_mini_save.xpm"
 #include "pixmaps/btn_mini_quit.xpm"
 #include "pixmaps/btn_mini_pause.xpm"
+#include "pixmaps/btn_mini_once.xpm"
 #include "pixmaps/btn_mini_help.xpm"
 
 
@@ -108,20 +110,32 @@ enum
     MIN_HISTRING_LEN = 10,   MAX_HISTRING_LEN = 86400*10
 };
 
+enum
+{
+    TOOLBAR_KIND_MAXI = 0,
+    TOOLBAR_KIND_MINI = 1,
+    TOOLBAR_KIND_NONE = 2,
+};
+
 typedef struct
 {
-    int     notoolbar;
     int     nostatusline;
     int     compact;
     int     resizable;
 
-    int     minitoolbar;
+    int     toolbar_kind;
     int     with_freeze_btn;
+    int     with_once_btn;
     int     with_save_btn;
     int     with_load_btn;
     int     num_bnr_cols;
     int     with_tbar_loggia;
     int     forbid_argv_params;
+
+    int     is_freezed;
+    int     oneshot;
+
+    int     remdbg;
 
     double  cyclesize_secs;
     int     def_histring_len;
@@ -129,20 +143,26 @@ typedef struct
 
 static psp_paramdescr_t text2appopts[] =
 {
-    PSP_P_FLAG("notoolbar",          appopts_t, notoolbar,          1, 0),
     PSP_P_FLAG("nostatusline",       appopts_t, nostatusline,       1, 0),
     PSP_P_FLAG("compact",            appopts_t, compact,            1, 0),
     PSP_P_FLAG("resizable",          appopts_t, resizable,          1, 0),
 
-    PSP_P_FLAG("minitoolbar",        appopts_t, minitoolbar,        1, 1),
-    PSP_P_FLAG("maxitoolbar",        appopts_t, minitoolbar,        0, 0),
+    PSP_P_FLAG("maxitoolbar",        appopts_t, toolbar_kind,       TOOLBAR_KIND_MAXI, 0),
+    PSP_P_FLAG("minitoolbar",        appopts_t, toolbar_kind,       TOOLBAR_KIND_MINI, 1),
+    PSP_P_FLAG("notoolbar",          appopts_t, toolbar_kind,       TOOLBAR_KIND_NONE, 0),
 
     PSP_P_FLAG("with_freeze_btn",    appopts_t, with_freeze_btn,    1, 0),
+    PSP_P_FLAG("with_once_btn",      appopts_t, with_once_btn,      1, 0),
     PSP_P_FLAG("with_save_btn",      appopts_t, with_save_btn,      1, 0),
     PSP_P_FLAG("with_load_btn",      appopts_t, with_load_btn,      1, 0),
     PSP_P_INT ("toolbar_bnr_cols",   appopts_t, num_bnr_cols,       0,     0, 100),
     PSP_P_FLAG("with_tbar_loggia",   appopts_t, with_tbar_loggia,   1, 0),
     PSP_P_FLAG("forbid_argv_params", appopts_t, forbid_argv_params, 1, 0),
+
+    PSP_P_FLAG("is_freezed",         appopts_t, is_freezed,         1, 0),
+    PSP_P_FLAG("oneshot",            appopts_t, oneshot,            1, 0),
+
+    PSP_P_FLAG("remdbg",             appopts_t, remdbg,             1, 0),
 
     PSP_P_REAL("hist_period",        appopts_t, cyclesize_secs,     1.0,   MIN_CYCLESIZE_US/1000000.0, MAX_CYCLESIZE_US/1000000.0),
     PSP_P_INT ("hist_len",           appopts_t, def_histring_len,   86400, MIN_HISTRING_LEN,           MAX_HISTRING_LEN),
@@ -160,10 +180,10 @@ static int CallUpdate(chl_histinterest_cbinfo_t *p, void *privptr)
     p->proc(p->privptr, ptr2lint(privptr));
     return 0;
 }
-static void CycleCallback(int       uniq     __attribute__((unused)),
-                          void     *privptr1,
-                          sl_tid_t  tid      __attribute__((unused)),
-                          void     *privptr2)
+static void HistoryCycleCallback(int       uniq     __attribute__((unused)),
+                                 void     *privptr1,
+                                 sl_tid_t  tid      __attribute__((unused)),
+                                 void     *privptr2)
 {
   DataSubsys      subsys = privptr1;
   chl_privrec_t  *cr     = privptr2;
@@ -173,7 +193,7 @@ static void CycleCallback(int       uniq     __attribute__((unused)),
     timeval_add_usecs(&cycle_end, &cycle_start, subsys->cyclesize_us);
 
     cycle_tid = sl_enq_tout_at(0, subsys,
-                               &cycle_end, CycleCallback, cr);
+                               &cycle_end, HistoryCycleCallback, cr);
 
     if (subsys->is_freezed) return;
 
@@ -208,6 +228,7 @@ static xh_actdescr_t stdtoolslist[] =
     XhXXX_TOOLLOGGIA(),
     XhXXX_SEPARATOR(),
     XhXXX_TOOLCHK(CHL_STDCMD_FREEZE,    "Freeze",               btn_pause_xpm, btn_mini_pause_xpm),
+    XhXXX_TOOLCMD(CHL_STDCMD_ONCE,      "One measurement",      btn_once_xpm,  btn_mini_once_xpm),
     XhXXX_TOOLLEDS(),
     XhXXX_TOOLCMD(CHL_STDCMD_SHOW_HELP, "Short help",           btn_help_xpm,  btn_mini_help_xpm),
     XhXXX_TOOLFILLER(),
@@ -230,7 +251,6 @@ int  ChlRunSubsystem(DataSubsys subsys,
 
   appopts_t       opts;
   int             toolbar_mask     = XhWindowToolbarMask;
-  int             minitoolbar_mask = 0;
   int             statusline_mask  = XhWindowStatuslineMask;
   int             compact_mask     = 0;
   int             resizable_mask   = XhWindowUnresizableMask;
@@ -280,12 +300,23 @@ int  ChlRunSubsystem(DataSubsys subsys,
     if (subsys->cyclesize_us > MAX_CYCLESIZE_US) subsys->cyclesize_us = MAX_CYCLESIZE_US;
     subsys->def_histring_len = opts.def_histring_len;
 
-    if (opts.notoolbar||0)    toolbar_mask     = 0;
+    if (opts.remdbg) // Is a shortcut for "minitoolbar with_freeze_btn with_once_btn is_freezed oneshot"
+    {
+        if (opts.toolbar_kind != TOOLBAR_KIND_MAXI)
+            opts.toolbar_kind = TOOLBAR_KIND_MINI;
+        opts.with_freeze_btn  = 1;
+        opts.with_once_btn    = 1;
+        opts.is_freezed       = 1;
+        opts.oneshot          = 1;
+    }
+
     if (opts.nostatusline) statusline_mask  = 0;
     if (opts.compact)      compact_mask     = XhWindowCompactMask;
     if (opts.resizable)    resizable_mask   = 0;
 
-    if (opts.minitoolbar)  minitoolbar_mask = XhWindowToolbarMiniMask;
+    if      (opts.toolbar_kind == TOOLBAR_KIND_NONE)  toolbar_mask = 0;
+    else if (opts.toolbar_kind == TOOLBAR_KIND_MINI)  toolbar_mask = XhWindowToolbarMask | XhWindowToolbarMiniMask;
+    else   /*opts.toolbar_kind == TOOLBAR_KIND_MAXI*/ toolbar_mask = XhWindowToolbarMask;
 
     /* Wipe out unused buttons in case of standard toolbar and modify what needed */
     if (toolslist == stdtoolslist)
@@ -295,6 +326,10 @@ int  ChlRunSubsystem(DataSubsys subsys,
                 (toolslist[n].type == XhACT_CHECKBOX                      &&
                  strcasecmp(toolslist[n].cmd, CHL_STDCMD_FREEZE)    == 0  &&
                  opts.with_freeze_btn  == 0)
+                ||
+                (toolslist[n].type == XhACT_COMMAND                       &&
+                 strcasecmp(toolslist[n].cmd, CHL_STDCMD_ONCE)      == 0  &&
+                 opts.with_once_btn    == 0)
                 ||
                 (toolslist[n].type == XhACT_COMMAND                       &&
                  strcasecmp(toolslist[n].cmd, CHL_STDCMD_LOAD_MODE) == 0  &&
@@ -313,8 +348,7 @@ int  ChlRunSubsystem(DataSubsys subsys,
     }
 
     win = XhCreateWindow(win_title, win_name, win_class,
-                         toolbar_mask | statusline_mask | compact_mask | resizable_mask |
-                         minitoolbar_mask,
+                         toolbar_mask | statusline_mask | compact_mask | resizable_mask,
                          NULL, toolslist);
     if (win == NULL)
     {
@@ -357,14 +391,26 @@ int  ChlRunSubsystem(DataSubsys subsys,
         attachbottom(leds_grid, NULL, 0);
         XhGridSetGrid(leds_grid, 0, 0);
         MotifKnobs_leds_create(subsys->leds_ptr,
-                               leds_grid, opts.minitoolbar? -15 : 20,
+                               leds_grid, opts.toolbar_kind == TOOLBAR_KIND_MINI? -15 : 20,
                                subsys->cid, MOTIFKNOBS_LEDS_PARENT_GRID);
+    }
+
+    if (opts.is_freezed)
+    {
+        subsys->is_freezed = opts.is_freezed; 
+        CdrBroadcastCmd(CdrGetMainGrouping(subsys), CHL_STDCMD_FREEZE, subsys->is_freezed);
+        XhSetCommandOnOff(win, CHL_STDCMD_FREEZE, subsys->is_freezed);
+    }
+    if (opts.oneshot)
+    {
+        subsys->oneshot    = opts.oneshot;
+        CdrBroadcastCmd(CdrGetMainGrouping(subsys), CHL_STDCMD_ONCE,   0);
     }
 
     gettimeofday(&cycle_start, NULL);
     timeval_add_usecs(&cycle_end, &cycle_start, subsys->cyclesize_us);
     cycle_tid = sl_enq_tout_at(0, subsys,
-                               &cycle_end, CycleCallback, cr);
+                               &cycle_end, HistoryCycleCallback, cr);
 
     XhShowWindow      (win);
     XhRunApplication();
@@ -437,8 +483,10 @@ int ChlHandleStdCommand(XhWindow window, const char *cmd, int info_int)
                               comment);
         }
     }
-    else if (strcmp(cmd, CHL_STDCMD_FREEZE) == 0)
+    else if (strcmp(cmd, CHL_STDCMD_FREEZE)    == 0)
         cr->subsys->is_freezed = info_int;
+    else if (strcmp(cmd, CHL_STDCMD_ONCE)      == 0)
+        cr->subsys->oneshot    = 1;
     else if (strcmp(cmd, CHL_STDCMD_SHOW_HELP) == 0)
         ChlShowHelp(window, CHL_HELP_ALL);
     else if (strcmp(cmd, CHL_STDCMD_QUIT)      == 0)

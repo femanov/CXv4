@@ -6,6 +6,8 @@
               
 #include <pthread.h>
 
+#include "cx_sysdeps.h"
+
 #include "misc_macros.h"
 #include "misclib.h"
 
@@ -25,7 +27,7 @@ static pthread_t        mt_sl_threadid;
 static pthread_mutex_t  mt_sl_mutex;
 
 
-#define DEBUG_LOCKS 1
+#define DEBUG_LOCKS 0
 #if DEBUG_LOCKS
   #define _GNU_SOURCE         /* See feature_test_macros(7) */
   #include <unistd.h>
@@ -34,13 +36,18 @@ static int call_gettid(void)
 {
     return syscall(SYS_gettid);
 }
-#endif
+#if OPTION_HAS_PROGRAM_INVOCATION_NAME
+  #define ARGV0_REF program_invocation_name
+#else
+  #define ARGV0_REF "mt_cxscheduler"
+#endif /* OPTION_HAS_PROGRAM_INVOCATION_NAME */
+#endif /* DEBUG_LOCKS */
 
 static void do_lock  (void)
 {
 #if DEBUG_LOCKS
     if (pthread_mutex_trylock(&mt_sl_mutex) == 0) return;
-    fprintf(stderr, "%s trylock fail in %d\n", strcurtime_msc(), call_gettid());
+    fprintf(stderr, "%s %s[%d] trylock fail in %d\n", strcurtime_msc(), ARGV0_REF, getpid(), call_gettid());
 #endif
     pthread_mutex_lock  (&mt_sl_mutex);
 }
@@ -64,7 +71,7 @@ static void *mt_sl_thread_proc(void *arg __attribute__((unused)))
   static char  a_byte = 0;
 
 #if DEBUG_LOCKS
-    fprintf(stderr, "%s tid=%d\n", __FUNCTION__, call_gettid());
+    fprintf(stderr, "%s %s[%d] %s tid=%d\n", strcurtime_msc(), ARGV0_REF, getpid(), __FUNCTION__, call_gettid());
 #endif
 
     // 1. Lock the mutex
@@ -109,7 +116,7 @@ int  mt_sl_start (void)
 
     // 3. Finally, start a thread for sl_main_loop()
 #if DEBUG_LOCKS
-    fprintf(stderr, "%s tid=%d\n", __FUNCTION__, call_gettid());
+    fprintf(stderr, "%s %s[%d] %s tid=%d\n", strcurtime_msc(), ARGV0_REF, getpid(), __FUNCTION__, call_gettid());
 #endif
     if ((saved_errno = pthread_create(&mt_sl_threadid, NULL, mt_sl_thread_proc, NULL)) != 0)
     {

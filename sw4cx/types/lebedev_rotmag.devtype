@@ -1,17 +1,17 @@
-devtype lebedev_turnmag w10i,r8i,r1t100,r1i {
+devtype lebedev_rotmag w10i,r8i,r1t100,r1i {
 	i_lim		0
 	i_lim_time	1
-	go_bury_max	2
+	go_dump_max	2
 	go_ring_max	3
-	go_bury_100ms	4
+	go_dump_100ms	4
 	go_ring_100ms	5
-	go_bury_n_s	6
+	go_dump_n_s	6
 	go_ring_n_s	7
 	n_s		8
 	stop		9
 
 	cur_direction	10
-	lim_sw_bury	11
+	lim_sw_dump	11
 	lim_sw_ring	12
 	i_motor		13
 	i_exc_time	14
@@ -19,4 +19,7 @@ devtype lebedev_turnmag w10i,r8i,r1t100,r1i {
 	going_dir	16
 	stop_reason	18
 	zzz		19 # Reserved for vdev_state if this driver will become stateful somewhen
+
+	go_dump		go_dump_max
+	go_ring		go_ring_max
 }

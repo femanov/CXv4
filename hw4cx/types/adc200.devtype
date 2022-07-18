@@ -19,6 +19,9 @@ devtype adc200 r1i256000,r2i128000,r7i,w20i,r50i {
 	range<1-2>	24
 	zero<1-2>	26
 
+	j5		28
+	j6		29
+
 	elapsed		30
 	xs_per_point	31
 	xs_divisor	32

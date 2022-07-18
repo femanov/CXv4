@@ -31,6 +31,9 @@ enum
     ADC200_CHAN_ZERO1         = 26,
     ADC200_CHAN_ZERO2         = 27,
 
+    ADC200_CHAN_J5            = 28,
+    ADC200_CHAN_J6            = 29,
+
     /* 30-69: status */
     ADC200_CHAN_ELAPSED       = 30,
     ADC200_CHAN_XS_PER_POINT  = 31,

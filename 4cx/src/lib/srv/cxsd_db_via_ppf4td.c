@@ -13,6 +13,10 @@
   #define MAY_USE_FLOAT 1
 #endif
 
+#if MAY_USE_FLOAT
+  #include <math.h> // For modf()
+#endif
+
 
 static void CxsdDbList(FILE *fp, CxsdDb db)
 {
@@ -74,6 +78,19 @@ static void CxsdDbList(FILE *fp, CxsdDb db)
      fprintf(stderr, "\n"),             \
      -1)
 
+static int  IsAtEOL_IGNHASH(ppf4td_ctx_t *ctx)
+{
+  int  r;
+  int  ch;
+
+    r = ppf4td_is_at_eol(ctx);
+    if (r != 0) return r;
+    r = ppf4td_peekc    (ctx, &ch);
+    if (r < 0)  return r;
+    if (ch == EOF) return -1; /*!!! -2?*/
+    return 0;
+}
+
 static int  IsAtEOL(ppf4td_ctx_t *ctx)
 {
   int  r;
@@ -128,6 +145,29 @@ static int NextCh(const char *argv0, ppf4td_ctx_t *ctx,
         return BARK("unexpected EOF parsing %s; %s",
                     name, ppf4td_strerror(errno));
     if (IsAtEOL(ctx))
+        return BARK("unexpected EOL parsing %s",
+                    name);
+
+    r = ppf4td_nextc(ctx, &ch);
+
+    *ch_p = ch;
+    return 0;
+}
+
+static int NextCh_IGNHASH(const char *argv0, ppf4td_ctx_t *ctx,
+                  const char *name, int *ch_p)
+{
+  int  r;
+  int  ch;
+
+    r = ppf4td_peekc(ctx, &ch);
+    if (r < 0)
+        return BARK("unexpected error parsing %s; %s",
+                    name, ppf4td_strerror(errno));
+    if (r == 0)
+        return BARK("unexpected EOF parsing %s; %s",
+                    name, ppf4td_strerror(errno));
+    if (IsAtEOL_IGNHASH(ctx))
         return BARK("unexpected EOL parsing %s",
                     name);
 
@@ -196,9 +236,10 @@ enum
     SFT_DOUBLE,
     SFT_INT,
     SFT_FLAG,
+    SFT_TIME,
     SFT_RANGE,
     SFT_ANY,
-    SFT_TIME
+    SFT_BINVAL,
 };
 
 typedef struct
@@ -214,8 +255,10 @@ typedef struct
 #define SFD_DOUBLE  (n, sname, field)        {SFT_DOUBLE, n, offsetof(sname, field), -1,                     0}
 #define SFD_DOUBLE_S(n, sname, field, spc_f) {SFT_DOUBLE, n, offsetof(sname, field), offsetof(sname, spc_f), 0}
 #define SFD_FLAG(    n, sname, field, val)   {SFT_FLAG,   n, offsetof(sname, field), -1,                     val}
+#define SFD_TIME(    n, sname, field)        {SFT_TIME,   n, offsetof(sname, field), -1,                     0}
 #define SFD_RANGE(   n, sname, field, dt_f)  {SFT_RANGE,  n, offsetof(sname, field), -1,                     offsetof(sname, dt_f)}
 #define SFD_ANY(     n, sname, field, dt_f)  {SFT_ANY,    n, offsetof(sname, field), -1,                     offsetof(sname, dt_f)}
+#define SFD_BINVAL(  n, sname, field)        {SFT_BINVAL, n, offsetof(sname, field), -1,                     0}
 #define SFD_END()                            {SFT_END,    NULL, 0,                   -1,                     0}
 
 enum
@@ -228,20 +271,19 @@ enum
         PPF4TD_FLAG_SPCTERM | PPF4TD_FLAG_HSHTERM | PPF4TD_FLAG_EOLTERM |
         PPF4TD_FLAG_BRCTERM*0
 };
-#ifndef MAY_USE_PPF4TD_GET_DOUBLE
-  #define MAY_USE_PPF4TD_GET_DOUBLE 1
-#endif
 static inline int isletnum(int c)
 {
     return isalnum(c)  ||  c == '_'  ||  c == '-';
 }
 static int ParseSomeProps(const char *argv0,  ppf4td_ctx_t *ctx, CxsdDb db,
-                          cxdtype_t dtype,
+                          cxdtype_t dtype, int max_nelems,
                           somefielddescr_t *table, void *data_p)
 {
   int             fn;  // >= 0 -- index in the table; <0 => switched to "fieldname:"-keyed specification
   void           *ea;  // Executive address
-  int             idx;
+  int             idx; // Index in the table[]
+
+  int             qc;  // Quote character for SFT_BINVAL: single- or double-quote for text strings, '}' for braced numeric lists
 
   int             r;
   int             ch;
@@ -254,18 +296,25 @@ static int ParseSomeProps(const char *argv0,  ppf4td_ctx_t *ctx, CxsdDb db,
   CxAnyVal_t     *a_p;
   int             subfield;
   const char     *subfield_name;
-#if !MAY_USE_PPF4TD_GET_DOUBLE
-  char           *p;
-  char           *err;
-#endif /* MAY_USE_PPF4TD_GET_DOUBLE */
-#if MAY_USE_PPF4TD_GET_DOUBLE
   int             l_v;
   int64           q_v;
-#else
-  long            l_v;
-  long long       q_v;
-#endif /* MAY_USE_PPF4TD_GET_DOUBLE */
   double          d_v;
+
+  double          time_int;
+  double          time_frac;
+
+  int             nelems;
+  int             binofs;
+  CxAnyVal_t      val;
+  void           *val_p;
+
+  char            hexpfx;    // 'x', 'u' or 'U'; used solely for error reporting
+  char32          c32;
+  char32          m32;
+  int             maxdigits;
+  int             numdigits;
+  int             x;
+  char            hexbuf[8]; // 8=sizeof(char32)*2 (# of hex digits in 0xFFFFFFFF)
 
     fn = 0;
     while (1)
@@ -311,6 +360,25 @@ static int ParseSomeProps(const char *argv0,  ppf4td_ctx_t *ctx, CxsdDb db,
                 keybuf[keylen] = ch;
             }
  END_KEYGET:
+            // "keylen>0" means that no "FIELDNAME:" was specified; in this case we should check if keybuf[] comprises a valid SFT_FLAG name
+            if (keylen > 0)
+            {
+                keybuf[keylen] = '\0';
+                for (idx = 0;  table[idx].name != NULL;  idx++)
+                    if (strcasecmp(table[idx].name, keybuf) == 0  &&
+                        table[idx].type == SFT_FLAG)
+                        break;
+
+                /* Did we find such a field? */
+                if (table[idx].name != NULL)
+                {
+                    fn = -1;    // Switch to keyed mode
+                    keylen = 0; // Consume the key
+                }
+                else
+                    idx = -1; // Drop back to "field not specified" state
+            }
+            // If keylen is still >0, then no key was found and keybuf[] content should be returned to input stream
             if (keylen > 0) ppf4td_ungetchars(ctx, keybuf, keylen);
         }
 
@@ -346,23 +414,36 @@ static int ParseSomeProps(const char *argv0,  ppf4td_ctx_t *ctx, CxsdDb db,
         else if (table[idx].type == SFT_DOUBLE)
         {
 #if MAY_USE_FLOAT
-#if MAY_USE_PPF4TD_GET_DOUBLE
             if (ppf4td_get_double(ctx, ENTITY_PARSE_FLAGS, &d_v) < 0)
                 return BARK("\"%s\" value (float) expected; %s",
                             table[idx].name, ppf4td_strerror(errno));
-#else
-            r = ppf4td_get_string(ctx, ENTITY_PARSE_FLAGS, strbuf, sizeof(strbuf));
-            if (r < 0)
-                return BARK("\"%s\" value (float) expected; %s",
-                            table[idx].name, ppf4td_strerror(errno));
-
-            d_v = strtod(strbuf, &err);
-            if (err == strbuf  ||  *err != '\0')
-                return BARK("error in \"%s\" float specification \"%s\"",
-                            table[idx].name, strbuf);
-#endif /* MAY_USE_PPF4TD_GET_DOUBLE */
 
             *((double *)ea) = d_v;
+#else
+            return BARK("floats are disabled at compile-time");
+#endif
+        }
+        else if (table[idx].type == SFT_FLAG)
+        {
+            *((int *)ea) = table[idx].var_int;
+        }
+        else if (table[idx].type == SFT_TIME)
+        {
+#if MAY_USE_FLOAT
+            if (ppf4td_get_double(ctx, ENTITY_PARSE_FLAGS, &d_v) < 0)
+                return BARK("\"%s\" value (float, time) expected; %s",
+                            table[idx].name, ppf4td_strerror(errno));
+            if (d_v < 0)
+            {
+                time_int  = -1;
+                time_frac =  0;
+            }
+            else
+            {
+                time_frac = modf(d_v, &time_int);
+            }
+            ((cx_time_t *)ea)->sec  = time_int;
+            ((cx_time_t *)ea)->nsec = time_frac * 1000000000;
 #else
             return BARK("floats are disabled at compile-time");
 #endif
@@ -378,20 +459,9 @@ static int ParseSomeProps(const char *argv0,  ppf4td_ctx_t *ctx, CxsdDb db,
 
             a_p = ea;
 
-#if MAY_USE_PPF4TD_GET_DOUBLE
             for (subfield = 0;
                  subfield <= (is_a_range? 1 : 0);
                  subfield++)
-#else
-            r = ppf4td_get_string(ctx, ENTITY_PARSE_FLAGS, strbuf, sizeof(strbuf));
-            if (r < 0)
-                return BARK("\"%s\" value%s expected; %s",
-                            table[idx].name, is_a_range? " (MIN-MAX)" : "", ppf4td_strerror(errno));
-
-            for (subfield = 0, p = strbuf;
-                 subfield <= (is_a_range? 1 : 0);
-                 subfield++)
-#endif /* MAY_USE_PPF4TD_GET_DOUBLE */
             {
                 /* Prepare a name for errors */
                 if      (!is_a_range)     subfield_name = "";
@@ -401,18 +471,11 @@ static int ParseSomeProps(const char *argv0,  ppf4td_ctx_t *ctx, CxsdDb db,
                 /* A '-' range separator */
                 if (subfield > 0)
                 {
-#if MAY_USE_PPF4TD_GET_DOUBLE
                     if (PeekCh(argv0, ctx, table[idx].name, &ch) < 0) return -1;
                     if (ch != '-')
                         return BARK("'-' expected before \"%s\"%s value",
                                     table[idx].name, subfield_name);
                     ppf4td_nextc(ctx, &ch);
-#else
-                    if (*p != '-')
-                        return BARK("'-' expected before \"%s\"%s value",
-                                    table[idx].name, subfield_name);
-                    p++;
-#endif /* MAY_USE_PPF4TD_GET_DOUBLE */
                 }
 
                 /* Get a value */
@@ -420,27 +483,13 @@ static int ParseSomeProps(const char *argv0,  ppf4td_ctx_t *ctx, CxsdDb db,
                 {
 #if MAY_USE_INT64
                     if (sizeof_cxdtype(dtype) == sizeof(int64))
-#if MAY_USE_PPF4TD_GET_DOUBLE
                         r = ppf4td_get_quad(ctx, ENTITY_PARSE_FLAGS, &q_v, 0, NULL);
-#else
-                        q_v = strtoull(p, &err, 0);
-#endif /* MAY_USE_PPF4TD_GET_DOUBLE */
                     else
 #endif /* MAY_USE_INT64 */
-#if MAY_USE_PPF4TD_GET_DOUBLE
                         r = ppf4td_get_int (ctx, ENTITY_PARSE_FLAGS, &l_v, 0, NULL);
-#else
-                        l_v = strtoul (p, &err, 0);
-#endif /* MAY_USE_PPF4TD_GET_DOUBLE */
-#if MAY_USE_PPF4TD_GET_DOUBLE
                     if (r < 0)
                         return BARK("error in \"%s\"%s int specification; %s",
                                     table[idx].name, subfield_name, ppf4td_strerror(errno));
-#else
-                    if (err == p)
-                        return BARK("error in \"%s\"%s int specification \"%s\"",
-                                    table[idx].name, subfield_name, p);
-#endif /* MAY_USE_PPF4TD_GET_DOUBLE */
 
                     if      (dtype == CXDTYPE_INT8)   a_p[subfield].i8  = l_v;
                     else if (dtype == CXDTYPE_UINT8)  a_p[subfield].u8  = l_v;
@@ -459,16 +508,9 @@ static int ParseSomeProps(const char *argv0,  ppf4td_ctx_t *ctx, CxsdDb db,
                 else
                 {
 #if MAY_USE_FLOAT
-#if MAY_USE_PPF4TD_GET_DOUBLE
                     if (ppf4td_get_double(ctx, ENTITY_PARSE_FLAGS, &d_v) < 0)
                         return BARK("error in \"%s\"%s float specification; %s",
                                     table[idx].name, subfield_name, ppf4td_strerror(errno));
-#else
-                    d_v = strtod(p, &err);
-                    if (err == p)
-                        return BARK("error in \"%s\"%s float specification \"%s\"",
-                                    table[idx].name, subfield_name, p);
-#endif /* MAY_USE_PPF4TD_GET_DOUBLE */
 
                     if (dtype == CXDTYPE_SINGLE)
                         a_p[subfield].f32 = d_v;
@@ -478,23 +520,212 @@ static int ParseSomeProps(const char *argv0,  ppf4td_ctx_t *ctx, CxsdDb db,
                     return BARK("floats are disabled at compile-time");
 #endif
                 }
-#if !MAY_USE_PPF4TD_GET_DOUBLE
-
-                /* Advance to next subfield */
-                p = err;
-#endif /* MAY_USE_PPF4TD_GET_DOUBLE */
             }
-
-#if !MAY_USE_PPF4TD_GET_DOUBLE
-            /* Additional check */
-            if (*p != '\0')
-                return BARK("junk after \"%s\" value in \"%s\"",
-                            table[idx].name, strbuf);
-#endif /* MAY_USE_PPF4TD_GET_DOUBLE */
 
             /* Store dtype */
             ea = ((int8 *)data_p) + table[idx].var_int;
             *((cxdtype_t *)ea) = dtype;
+        }
+        else if (table[idx].type == SFT_BINVAL)
+        {
+            if (reprof_cxdtype(dtype) != CXDTYPE_REPR_INT    &&
+                reprof_cxdtype(dtype) != CXDTYPE_REPR_FLOAT  &&
+                reprof_cxdtype(dtype) != CXDTYPE_REPR_TEXT)
+                return BARK("\"%s\" specified for a non-numeric and non-text channel; this isn't supported", table[idx].name);
+
+            if (CxsdDbAddBinStart(db, dtype, 0, NULL, 0) < 0)
+                return BARK("CxsdDbAddBinStart() failure for \"%s\": %s", table[idx].name, strerror(errno));
+
+            if (reprof_cxdtype(dtype) == CXDTYPE_REPR_TEXT)
+            {
+                if      (sizeof_cxdtype(dtype) == 4) m32 = 0xFFFFFFFF;
+                else if (sizeof_cxdtype(dtype) == 2) m32 = 0x0000FFFF;
+                else   /*sizeof_cxdtype(dtype) == 1*/m32 = 0x000000FF;
+
+                // Check if it is a quoted string
+                qc = 0;
+                if (PeekCh(argv0, ctx, table[idx].name, &ch) < 0) return -1;
+                if (ch == '\"'  ||  ch == '\'')
+                {
+                    qc = ch;
+                    ppf4td_nextc(ctx, &ch);
+                }
+
+                for (nelems = 0; ; nelems++)
+                {
+                    // Preliminary check for EOL only if unquoted, otherwise let an error occur if EOL is inside quotes
+                    if (qc == 0)
+                        if (IsAtEOL(ctx)) goto END_PARSE_BINVAL;
+
+                    if (NextCh_IGNHASH(argv0, ctx, table[idx].name, &ch) < 0) return -1; // Note: there is no alternating-if like "(qc==0?NextCh:NextCh_IGNHASH)(...)", because possible '#' in unquoted mode is already catched by IsAtEOL() above
+                    if (ch == qc) goto END_PARSE_BINVAL;
+                    if (qc == 0)
+                        if (isspace(ch))  goto END_PARSE_BINVAL;
+
+                    if ((ch == '\''  &&  qc != '\"')  ||
+                        (ch == '\"'  &&  qc != '\''))
+                        return BARK("unquoted <%c> character in \"%s\"", ch, table[idx].name);
+
+                    if (nelems >= max_nelems)
+                        return BARK("string too long specified for \"%s\" (limit is %d)", table[idx].name, max_nelems);
+
+                    if (ch == '\\')
+                    {
+                        if (NextCh(argv0, ctx, table[idx].name, &ch) < 0) return -1;
+
+                        if      (ch == '\\') c32 = '\\';
+                        else if (ch == '\'') c32 = '\'';
+                        else if (ch == '\"') c32 = '\"';
+                        else if (ch == 'a')  c32 = '\a';
+                        else if (ch == 'b')  c32 = '\b';
+                        else if (ch == 'f')  c32 = '\f';
+                        else if (ch == 'n')  c32 = '\n';
+                        else if (ch == 'r')  c32 = '\r';
+                        else if (ch == 't')  c32 = '\t';
+                        else if (ch == 'v')  c32 = '\v';
+                        else if (ch == 'x'  ||
+                                 ch == 'u'  ||
+                                 ch == 'U')
+                        {
+                            hexpfx = ch;
+                            if      (ch == 'x') maxdigits = 2;
+                            else if (ch == 'u') maxdigits = 4;
+                            else   /*ch == 'U'*/maxdigits = 8;
+
+                            for (numdigits = 0;  numdigits < maxdigits;  numdigits++)
+                            {
+                                // Preliminary check for EOL only if some digits were got, otherwise let an error occur if EOL is right after a backslash+'x'
+                                if (numdigits > 0)
+                                    if (IsAtEOL(ctx)) goto END_PARSE_XDIGITS;
+
+                                if (PeekCh(argv0, ctx, table[idx].name, &ch) < 0) return -1;
+                                if (!isxdigit(ch))
+                                {
+                                    if (numdigits == 0)
+                                        return BARK("no hex-digits after \"\\%c\" in \"%s\" value", hexpfx, table[idx].name);
+                                    goto END_PARSE_XDIGITS;
+                                }
+                                ppf4td_nextc(ctx, &ch);
+                                hexbuf[numdigits] = toupper(ch);
+                            }
+ END_PARSE_XDIGITS:;
+                            for (c32 = 0, x = 0;  x < numdigits;  x++)
+                                c32 = (c32 << 4) | ( (isdigit(hexbuf[x]))? hexbuf[x]-'0' : hexbuf[x]-'A'+10);
+                        }
+                        else
+                            c32 = (unsigned char)ch;
+
+                        // Check size
+                        if ((c32 & m32) != c32)
+                            return BARK("character \\U%08X is out of range (max. \\U%X) in \"%s\"", c32, m32, table[idx].name);
+                    }
+                    else c32 = ch;
+
+                    if      (dtype == CXDTYPE_UCTEXT)  {val.c32 = c32; val_p = &(val.c32); }
+                  /*else if (dtype == CXDTYPE_U16TEXT) {val.c16 = c32; val_p = &(val.c16); }*/
+                    else   /*dtype == CXDTYPE_TEXT*/   {val.c8  = c32; val_p = &(val.c8);  }
+
+                    if (CxsdDbAddBinAddSeg(db, val_p, sizeof_cxdtype(dtype)) < 0)
+                        return BARK("CxsdDbAddBinAddSeg() failure for \"%s\" element %d: %s", table[idx].name, nelems, strerror(errno));
+                }
+            }
+            else
+            {
+                // Check if it is a braced list
+                qc = 0;
+                if (PeekCh(argv0, ctx, table[idx].name, &ch) < 0) return -1;
+                if (ch == '{')
+                {
+                    qc = '}';
+                    ppf4td_nextc(ctx, &ch);
+                }
+
+                for (nelems = 0; ; nelems++)
+                {
+                    if (qc != 0)
+                    {
+                        ppf4td_skip_white(ctx);  // Braced mode allows spaces inside lists
+                        if (PeekCh(argv0, ctx, table[idx].name, &ch) < 0) return -1;
+                        if (ch == qc)
+                        {
+                            ppf4td_nextc(ctx, &ch);
+                            goto END_PARSE_BINVAL;
+                        }
+                    }
+
+                    if (nelems >= max_nelems)
+                        return BARK("too many elements specified for \"%s\" (limit is %d)", table[idx].name, max_nelems);
+
+                    /* Get a value */
+                    if (reprof_cxdtype(dtype) == CXDTYPE_REPR_INT)
+                    {
+#if MAY_USE_INT64
+                        if (sizeof_cxdtype(dtype) == sizeof(int64))
+                            r = ppf4td_get_quad(ctx, ENTITY_PARSE_FLAGS, &q_v, 0, NULL);
+                        else
+#endif /* MAY_USE_INT64 */
+                            r = ppf4td_get_int (ctx, ENTITY_PARSE_FLAGS, &l_v, 0, NULL);
+                        if (r < 0)
+                            return BARK("error in \"%s\" (element %d) int specification; %s",
+                                        table[idx].name, nelems, ppf4td_strerror(errno));
+
+                        if      (dtype == CXDTYPE_INT8)   {val.i8  = l_v; val_p = &(val.i8); }
+                        else if (dtype == CXDTYPE_UINT8)  {val.u8  = l_v; val_p = &(val.u8); }
+                        else if (dtype == CXDTYPE_INT16)  {val.i16 = l_v; val_p = &(val.i16);}
+                        else if (dtype == CXDTYPE_UINT16) {val.u16 = l_v; val_p = &(val.u16);}
+                        else if (dtype == CXDTYPE_INT32)  {val.i32 = l_v; val_p = &(val.i32);}
+                        else if (dtype == CXDTYPE_UINT32) {val.u32 = l_v; val_p = &(val.u32);}
+#if MAY_USE_INT64
+                        else if (dtype == CXDTYPE_INT64)  {val.i64 = q_v; val_p = &(val.i64);}
+                        else if (dtype == CXDTYPE_UINT64) {val.u64 = q_v; val_p = &(val.u64);}
+#endif /* MAY_USE_INT64 */
+                        else
+                            return BARK("\"%s\" is %zd-byte int, which is unsupported size",
+                                        table[idx].name, sizeof_cxdtype(dtype));
+                    }
+                    else /* reprof_cxdtype(dtype) == CXDTYPE_REPR_FLOAT */
+                    {
+#if MAY_USE_FLOAT
+                        if (ppf4td_get_double(ctx, ENTITY_PARSE_FLAGS, &d_v) < 0)
+                            return BARK("error in \"%s\" float specification; %s",
+                                        table[idx].name, ppf4td_strerror(errno));
+
+                        if (dtype == CXDTYPE_SINGLE)      {val.f32 = d_v; val_p = &(val.f32);}
+                        else                              {val.f64 = d_v; val_p = &(val.f64);}
+#else
+                        return BARK("floats are disabled at compile-time");
+#endif
+                    }
+
+                    if (CxsdDbAddBinAddSeg(db, val_p, sizeof_cxdtype(dtype)) < 0)
+                        return BARK("CxsdDbAddBinAddSeg() failure for \"%s\" element %d: %s", table[idx].name, nelems, strerror(errno));
+
+                    if (qc != 0)
+                    {
+                        ppf4td_skip_white(ctx);  // Braced mode allows spaces inside lists
+                        if (PeekCh(argv0, ctx, table[idx].name, &ch) < 0) return -1;
+                        if (ch == qc) goto NEXT_NUMERIC_BINVAL; // Closing-'}' processing is at the beginning of loop body
+                        if (ch != ',')
+                            return BARK("',' expected in \"%s\" braced value after element %d", table[idx].name, nelems);
+                        ppf4td_nextc(ctx, &ch);
+                    }
+                    else
+                    {
+                        if (IsAtEOL(ctx)) goto END_PARSE_BINVAL;
+                        if (PeekCh(argv0, ctx, table[idx].name, &ch) < 0) return -1;
+                        if (ch == ',') ppf4td_nextc(ctx, &ch);
+                        else              goto END_PARSE_BINVAL;
+                    }
+ NEXT_NUMERIC_BINVAL:;
+                }
+            }
+ END_PARSE_BINVAL:;
+
+            binofs = CxsdDbAddBinFinish(db);
+            if (binofs <= 0)
+                return BARK("CxsdDbAddBinFinish() failure for \"%s\": %s", table[idx].name, strerror(errno));
+
+            *((int *)ea) = binofs;
         }
         else
             return BARK("%s(): field \"%s\" is of unsupported type %d", __FUNCTION__, table[idx].name, table[idx].type);
@@ -846,24 +1077,26 @@ static int dev_parser(const char *argv0, ppf4td_ctx_t *ctx, CxsdDb db)
 
 static somefielddescr_t dcpr_fields[] =
 {
-    SFD_DOUBLE_S("r",       CxsdDbDcPrInfo_t, phys_rds[0], phys_rd_specified),
-    SFD_DOUBLE_S("d",       CxsdDbDcPrInfo_t, phys_rds[1], phys_rd_specified),
-    SFD_DBSTR   ("ident",   CxsdDbDcPrInfo_t, ident_ofs),
-    SFD_DBSTR   ("label",   CxsdDbDcPrInfo_t, label_ofs),
-    SFD_DBSTR   ("tip",     CxsdDbDcPrInfo_t, tip_ofs),
-    SFD_DBSTR   ("comment", CxsdDbDcPrInfo_t, comment_ofs),
-    SFD_DBSTR   ("geoinfo", CxsdDbDcPrInfo_t, geoinfo_ofs),
-    SFD_DBSTR   ("rsrvd6",  CxsdDbDcPrInfo_t, rsrvd6_ofs),
-    SFD_DBSTR   ("units",   CxsdDbDcPrInfo_t, units_ofs),
-    SFD_DBSTR   ("dpyfmt",  CxsdDbDcPrInfo_t, dpyfmt_ofs),
-    SFD_RANGE   ("range",   CxsdDbDcPrInfo_t, range,       range_dtype),
-    SFD_ANY     ("quant",   CxsdDbDcPrInfo_t, q,           q_dtype),
+    SFD_DOUBLE_S("r",         CxsdDbDcPrInfo_t, phys_rds[0], phys_rd_specified),
+    SFD_DOUBLE_S("d",         CxsdDbDcPrInfo_t, phys_rds[1], phys_rd_specified),
+    SFD_DBSTR   ("ident",     CxsdDbDcPrInfo_t, ident_ofs),
+    SFD_DBSTR   ("label",     CxsdDbDcPrInfo_t, label_ofs),
+    SFD_DBSTR   ("tip",       CxsdDbDcPrInfo_t, tip_ofs),
+    SFD_DBSTR   ("comment",   CxsdDbDcPrInfo_t, comment_ofs),
+    SFD_DBSTR   ("geoinfo",   CxsdDbDcPrInfo_t, geoinfo_ofs),
+    SFD_DBSTR   ("rsrvd6",    CxsdDbDcPrInfo_t, rsrvd6_ofs),
+    SFD_DBSTR   ("units",     CxsdDbDcPrInfo_t, units_ofs),
+    SFD_DBSTR   ("dpyfmt",    CxsdDbDcPrInfo_t, dpyfmt_ofs),
+    SFD_RANGE   ("range",     CxsdDbDcPrInfo_t, range,       range_dtype),
+    SFD_ANY     ("quant",     CxsdDbDcPrInfo_t, q,           q_dtype),
+    SFD_TIME    ("fresh_age", CxsdDbDcPrInfo_t, fresh_age),
     SFD_FLAG    ("autoupdated_not",     CxsdDbDcPrInfo_t, return_type, IS_AUTOUPDATED_NOT),
     SFD_FLAG    ("autoupdated_yes",     CxsdDbDcPrInfo_t, return_type, IS_AUTOUPDATED_YES),
     SFD_FLAG    ("autoupdated_trusted", CxsdDbDcPrInfo_t, return_type, IS_AUTOUPDATED_TRUSTED),
     SFD_FLAG    ("ignore_upd_cycle",    CxsdDbDcPrInfo_t, return_type, DO_IGNORE_UPD_CYCLE),
-    SFD_DBSTR   ("dbprops", CxsdDbDcPrInfo_t, dbprops_ofs),
-    SFD_DBSTR   ("drvinfo", CxsdDbDcPrInfo_t, drvinfo_ofs),
+    SFD_DBSTR   ("dbprops",   CxsdDbDcPrInfo_t, dbprops_ofs),
+    SFD_DBSTR   ("drvinfo",   CxsdDbDcPrInfo_t, drvinfo_ofs),
+    SFD_BINVAL  ("defval",    CxsdDbDcPrInfo_t, defval_binofs),
     SFD_END()
 };
 static int ParseChanList(const char *argv0, ppf4td_ctx_t *ctx, CxsdDb db,
@@ -894,6 +1127,7 @@ static int ParseChanList(const char *argv0, ppf4td_ctx_t *ctx, CxsdDb db,
   int                changrp_n;
   int                changrp_base;
   cxdtype_t          dtype;
+  int                max_nelems;
 
     /* Get names line-by-line */
     while (1)
@@ -1034,19 +1268,20 @@ static int ParseChanList(const char *argv0, ppf4td_ctx_t *ctx, CxsdDb db,
             dcpr_data.units_ofs   = -1;
             dcpr_data.dpyfmt_ofs  = -1;
 
-            for (changrp_base = 0,          changrp_n = 0, dtype = CXDTYPE_UNKNOWN;
+            for (changrp_base = 0,          changrp_n = 0, dtype = CXDTYPE_UNKNOWN, max_nelems = 0;
                  changrp_n < changrpcount;
                  changrp_base += changroups[changrp_n++].count)
                 if (refval >= changrp_base  /* <- a redundant cond */ &&
                     refval <  changrp_base + changroups[changrp_n].count)
                 {
-                    dtype = changroups[changrp_n++].dtype;
-                    goto DTYPE_FOUND;
+                    dtype      = changroups[changrp_n].dtype;
+                    max_nelems = changroups[changrp_n].max_nelems;
+                    goto CHANGROUP_FOUND;
                 }
- DTYPE_FOUND:;
+ CHANGROUP_FOUND:;
 
             if (ParseSomeProps(argv0, ctx, db,
-                               dtype,
+                               dtype, max_nelems,
                                dcpr_fields, &dcpr_data)) return -1;
             if ((dcpr_id = CxsdDbAddDcPr(db, dcpr_data)) < 0)
                 return BARK("unable to CxsdDbAddDcPr(): %s", strerror(errno));
@@ -1249,7 +1484,7 @@ static int ParseCpointProps(const char *argv0, ppf4td_ctx_t *ctx, CxsdDb db,
                             CxsdDbCpntInfo_t *cpnt_data_p)
 {
     return ParseSomeProps(argv0, ctx, db,
-                          CXDTYPE_UNKNOWN,
+                          CXDTYPE_UNKNOWN, 0,
                           cpnt_fields, cpnt_data_p);
 }
 
