@@ -4,10 +4,14 @@
 #include <string.h>
 #include <errno.h>
 #include <signal.h>
+#include <netdb.h>
 #include <sys/time.h>
 #include <sys/types.h>
 #include <sys/wait.h>
 #include <sys/param.h>
+#include <sys/socket.h>
+#include <netinet/in.h>
+#include <arpa/inet.h>
 
 #include <X11/Intrinsic.h>
 #include <Xm/Xm.h>
@@ -47,8 +51,8 @@ static const char *global_argv0;
 static XhWindow    onewin;
 static Widget      dash;
 
-static Widget      prog_menu, prog_menu_start, prog_menu_stop, prog_menu_restart;
-static Widget      serv_menu, serv_menu_start, serv_menu_stop, serv_menu_restart;
+static Widget      prog_menu, prog_menu_start, prog_menu_stop,                 prog_menu_restart;
+static Widget      serv_menu, serv_menu_start, serv_menu_stop, serv_menu_kill, serv_menu_restart;
 
 static int         prog_menu_client;
 static int         serv_menu_client;
@@ -57,6 +61,7 @@ enum
 {
     CMD_START = 1000,
     CMD_STOP,
+    CMD_KILL,
     CMD_RESTART
 };
 
@@ -410,15 +415,28 @@ static int ChangeServerStatus(int sys, int ns, int on)
   const char   *cfgfile;
   const char   *devlist;
   const char   *pidbase;
+  const char   *sig_n_str;
 
   int           srv;
   srvparams_t   sprms;
   const char   *params;
   int           is_v2cx;
     
+  int           is_ip;
+  in_addr_t       a;
+  struct hostent *hp;
+
     /* Should we do anything at all? */
     curstatus = cda_status_of_srv(sr->ds->cid, ns) != CDA_SERVERSTATUS_DISCONNECTED;
     if (curstatus == on) return 0;
+    // "-1" means "force stop"; as -1 never equals neither 0 nor 1, the condition above will never be true, but we need to treat "-1" as "0" in the main "if" below
+    if (on < 0)
+    {
+        on = 0;
+        sig_n_str = " -9";
+    }
+    else
+        sig_n_str = "";
 
     is_v2cx = 0;
     p = cda_status_srv_scheme(sr->ds->cid, ns);
@@ -429,7 +447,32 @@ static int ChangeServerStatus(int sys, int ns, int on)
     /* Obtain server's host and instance... */
     srvname = cda_status_srv_name(sr->ds->cid, ns);
     if (SplitSrvspec(srvname, host, sizeof(host), &instance) != 0) return 0;
+
+    /* "Normalize" the hostname: */
+    // a. Resolve to a name if is an IP in dot notation (from UDP-zeroconf-resolving)
+    if (host[0]                       != '\0'  &&
+        strcasecmp(host, "localhost") != 0/*     &&
+        strcasecmp(host, "127.0.0.1") != 0*/)
+    {
+        for (is_ip = 1,
+             p = host;  *p != '\0'  &&  is_ip;  p++)
+            if (!isdigit(*p)  &&  *p != '.') is_ip = 0;
+        if (is_ip)
+        {
+            a = inet_addr(host);
+            hp = gethostbyaddr(&a, 4, AF_INET);
+            if (hp != NULL)
+            {
+                strzcpy(host, hp->h_name, sizeof(host));
+                p = strchr(host, '.');
+                if (p != NULL) *p = '\0';
+            }
+        }
+    }
+
+    // b. Lowercase
     for (p = host;  *p != '\0';  p++) *p = tolower(*p);
+
     at_host = cf_host = host;
     
     /* Dig out all parameters concerning this server */
@@ -502,8 +545,8 @@ static int ChangeServerStatus(int sys, int ns, int on)
         else
         {
             snprintf(cmd_buf, sizeof(cmd_buf),
-                     "%s%s%s%s%skill `cat /var/tmp/%s-%d.pid`",
-                     c_at, c_user, c_usr_at, at_host, c_colon, pidbase, instance);
+                     "%s%s%s%s%skill%s `cat /var/tmp/%s-%d.pid`",
+                     c_at, c_user, c_usr_at, at_host, c_colon, sig_n_str, pidbase, instance);
 
             cmd = cmd_buf;
         }
@@ -593,6 +636,10 @@ static void ServMenuCB(Widget     w          __attribute__((unused)),
 
         case CMD_STOP:
             ChangeServerStatus    (sys, ns, 0);
+            break;
+
+        case CMD_KILL:
+            ChangeServerStatus    (sys, ns, -1);
             break;
 
         case CMD_RESTART:
@@ -717,6 +764,13 @@ static void CreateWindow(void)
     XmStringFree(s);
     XtAddCallback(serv_menu_stop, XmNactivateCallback,
                   ServMenuCB, (XtPointer)CMD_STOP);
+
+    serv_menu_kill    = XtVaCreateManagedWidget("", xmPushButtonWidgetClass, serv_menu,
+                                                XmNlabelString, s = XmStringCreateLtoR("kill-9", xh_charset),
+                                                NULL);
+    XmStringFree(s);
+    XtAddCallback(serv_menu_kill, XmNactivateCallback,
+                  ServMenuCB, (XtPointer)CMD_KILL);
 
 #if 0
     serv_menu_restart = XtVaCreateManagedWidget("", xmPushButtonWidgetClass, serv_menu,

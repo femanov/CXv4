@@ -4,6 +4,9 @@
 #include <signal.h>
 #include <errno.h>
 #include <netdb.h>
+#include <sys/socket.h>
+#include <netinet/in.h>
+#include <arpa/inet.h>
 
 #include "misc_macros.h"
 #include "misclib.h"

@@ -1,0 +1,96 @@
+include(`subsys_magx_macros.m4')
+
+sysname skifinjmag
+defserver skifinj:1
+wintitle main "SKIF Injector Belikov+Dovzhenko Test Stand"
+winname  skifinjmag
+winclass SkifInjMag
+
+define(`VIP_LINE',
+       `disp I$1 I$1 text - - %5.0f i$1
+        disp U$1 U$1 text - - %5.0f u$1')
+
+# Note: a copy from devlist-canhw-13.lst, but with "lim" functionality stripped
+define(`LIN124_LINE', `
+    disp  $1_Imes ifelse(`$3', `', substr($1, 1), $3) \
+            text  ""         "" "%6.3f" $1.Imes disprange:0-1100 \
+            tip:"$2"
+    disp  $1_Umes "" text  ""         "" "%6.3f" $1.Umes disprange:0-26
+    knob  $1_IsOn "" onoff "color=green"       r:$1.IsOn layinfo:horz=center
+    knob  $1_U5_7 "" choicebs items:"5\t7" \
+            r:"_all_code; push 0; push 0; push 1; getchan $1.U5_7; case; ret;" \
+            w:"_all_code; qryval; mul 7; putchan $1.U5_7; ret;"
+')
+grouping main SKIFINJMAG_grouping "SKIF Injector Belikov+Dovzhenko" lrtb \
+        content:5 {
+
+    container belikov1 "Belikov 1" grid \
+            coltitles:"Set, mA\tMes.\tU, V\t\t!" \
+            base:belikov1 ncols:5 content:eval(5*8 + 0) {
+        MAGX_MPS208_LINE(ps0,  "0")
+        MAGX_MPS208_LINE(ps1,  "1")
+        MAGX_MPS208_LINE(ps2,  "2")
+        MAGX_MPS208_LINE(ps3,  "3")
+        MAGX_MPS208_LINE(ps4,  "4")
+        MAGX_MPS208_LINE(ps5,  "5")
+        MAGX_MPS208_LINE(ps6,  "6")
+        MAGX_MPS208_LINE(ps7,  "7")
+    } layinfo:newline
+
+    container belikov2 "Belikov 2" grid \
+            coltitles:"Set, mA\tMes.\tU, V\t\t!" \
+            base:belikov2 ncols:5 content:eval(5*8 + 0) {
+        MAGX_MPS208_LINE(ps0,  "0")
+        MAGX_MPS208_LINE(ps1,  "1")
+        MAGX_MPS208_LINE(ps2,  "2")
+        MAGX_MPS208_LINE(ps3,  "3")
+        MAGX_MPS208_LINE(ps4,  "4")
+        MAGX_MPS208_LINE(ps5,  "5")
+        MAGX_MPS208_LINE(ps6,  "6")
+        MAGX_MPS208_LINE(ps7,  "7")
+    }
+
+    container dovzhenko1 "Dovzhenko 1" grid \
+            coltitles:"Set, mA\tMes.\tU, V" \
+            base:dovzhenko1 ncols:3 content:eval(3*8 + 0) {
+        MAGX_COR208_LINE(ps0,  "0")
+        MAGX_COR208_LINE(ps1,  "1")
+        MAGX_COR208_LINE(ps2,  "2")
+        MAGX_COR208_LINE(ps3,  "3")
+        MAGX_COR208_LINE(ps4,  "4")
+        MAGX_COR208_LINE(ps5,  "5")
+        MAGX_COR208_LINE(ps6,  "6")
+        MAGX_COR208_LINE(ps7,  "7")
+    } layinfo:newline
+
+    container dovzhenko2 "Dovzhenko 2" grid \
+            coltitles:"Set, mA\tMes.\tU, V" \
+            base:dovzhenko2 ncols:3 content:eval(3*8 + 0) {
+        MAGX_COR208_LINE(ps0,  "0")
+        MAGX_COR208_LINE(ps1,  "1")
+        MAGX_COR208_LINE(ps2,  "2")
+        MAGX_COR208_LINE(ps3,  "3")
+        MAGX_COR208_LINE(ps4,  "4")
+        MAGX_COR208_LINE(ps5,  "5")
+        MAGX_COR208_LINE(ps6,  "6")
+        MAGX_COR208_LINE(ps7,  "7")
+    }
+
+#    container vip "VIP" grid \
+#            coltitles:"I,uA\tU, V" \
+#            base:vip ncols:2 content:eval(2*4) {
+#        VIP_LINE(0)
+#        VIP_LINE(1)
+#        VIP_LINE(2)
+#        VIP_LINE(3)
+#    } layinfo:newline
+
+    container vip "VIP" grid \
+            coltitles:"I, uA\tU, kV\t+\t5/7\tIl, uA\tUl, kV\tI!\tU!" \
+            ncols:4 content:eval(4*4) {
+        LIN124_LINE(vc0, `')
+        LIN124_LINE(vc1, `')
+        LIN124_LINE(vc2, `')
+        LIN124_LINE(vc3, `')
+    } layinfo:newline
+}

@@ -7,6 +7,7 @@ endif
 # Conditionally add epics,...?
 SUBDIRS+=	epics
 SUBDIRS+=	tango
+SUBDIRS+=	gw
 
 ######################################################################
 PRJDIR=		.

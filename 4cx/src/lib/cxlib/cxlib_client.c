@@ -1,16 +1,19 @@
 #include <unistd.h>
 #include <fcntl.h>
 #include <string.h>
+#include <ctype.h>
 #include <netdb.h>
 #include <errno.h>
 #include <stdarg.h>
 #include <sys/types.h>
 #include <sys/time.h>
+#include <sys/ioctl.h>
 #include <sys/socket.h>
 #include <sys/utsname.h>
 #include <sys/un.h>
 #include <netinet/in.h>
 #include "fix_arpa_inet.h"
+#include <net/if.h>  // "struct ifreq" & Co.
 
 #include "cx_sysdeps.h"
 #include "misc_macros.h"
@@ -583,7 +586,7 @@ int  cx_open  (int            uniq,     void *privptr1,
   int                 s;
   int                 r;
 
-  char                host[256];
+  char                hostname[256];
   int                 srv_n;
   int                 srv_port;
 
@@ -608,7 +611,7 @@ int  cx_open  (int            uniq,     void *privptr1,
   enum {INIT_SENDBUFSIZE = sizeof(CxV4Header) + 1024 /* arbitrary value */};
 
     /* Parse & check spec first */
-    if (GetSrvSpecParts(spec, host, sizeof(host), &srv_n) != 0)
+    if (GetSrvSpecParts(spec, hostname, sizeof(hostname), &srv_n) != 0)
         return -1;
     if (srv_n >= 0)
     {
@@ -684,11 +687,11 @@ int  cx_open  (int            uniq,     void *privptr1,
 
     /* Find out IP of the specified host */
     /* First, is it in dot notation (aaa.bbb.ccc.ddd)? */
-    spechost = inet_addr(host);
+    spechost = inet_addr(hostname);
     /* No, should do a hostname lookup */
     if (spechost == INADDR_NONE)
     {
-        hp = gethostbyname(host);
+        hp = gethostbyname(hostname);
         /* No such host?! */
         if (hp == NULL)
         {
@@ -1149,6 +1152,264 @@ int  cx_srch  (int cd, const char *name,      int  param1,  int  param2)
     return 0;
 }
 
+//--------------------------------------------------------------------
+enum {BCAST_MAX_ADDRS = 100};
+static uint32_t  bcast_list[BCAST_MAX_ADDRS];
+static uint16_t  bcast_port[BCAST_MAX_ADDRS];
+static int       bcast_list_count   = 0;
+static int       bcast_list_present = 0;
+static int       bcast_list_fixed   = 0;
+static uint8    *IFCONF_buf         = NULL;  // Note: this is NOT free()'d because it is valid till exit()
+
+static void set_bcast_list_INADDR_BROADCAST(void)
+{
+    bcast_list[0]      = htonl(INADDR_BROADCAST);
+    bcast_port[0]      = htons(CX_V4_INET_RESOLVER);
+    bcast_list_count   = 1;
+    bcast_list_present = 1;
+}
+
+static int is_a_guru_list_separator(int ch)
+{
+    return ch == ','  ||  ch == ';'  ||  isspace(ch);
+}
+
+/* Note:
+       fill_bcast_list() CAN and probably SHOULD be separated into
+       2 separate functions:
+           1) CX_GURU_LIST parsing;
+           2) SIOCGIFCONF & Co. readout
+       But as it is now is more compact and comprehensible
+ */
+static void fill_bcast_list(v4conn_t *cp)
+{
+  int            r;
+  int            buf_offs;
+
+  uint32_t       loopback_addr = 0;
+
+  struct ifconf  IFCONF;
+  struct ifreq   IFINFO; // Note: this is used for ALL per-interface requests; as "ifr_name" is a separate field, we rely on it being unchanged after calls; plus, data from previous ioctl() is always fetched only BEFORE next ioctl()
+
+  enum {IFCONF_BUF_SIZE = BCAST_MAX_ADDRS * sizeof(struct ifreq)};
+
+  const char    *cx_guru_list;
+  const char    *h_beg;
+  const char    *p;
+  char          *endptr;
+  char           hostname[256];
+  size_t         hostnamelen;
+  uint16_t       port;
+  struct hostent*hp;
+  in_addr_t      spechost;
+
+    /* A. Use $CX_GURU_LIST if specified */
+    cx_guru_list = getenv("CX_GURU_LIST");
+    if (cx_guru_list != NULL)
+    {
+        /* Note: this flag is intentionally set at the beginning,
+           so that even if parsing fails (e.g. due to "host not found"),
+           it wouldn't repeat again. */
+        bcast_list_fixed = 1;
+
+        /* Parse the value, treating ','/';'/whitespace as separators */
+        for (p = cx_guru_list, bcast_list_count = 0;
+                               bcast_list_count < BCAST_MAX_ADDRS;
+             /* No "increment" statement */)
+        {
+            while (*p != '\0'  &&  is_a_guru_list_separator(*p)) p++;
+            if (*p == '\0') goto END_PARSE_CX_GURU_LIST;
+
+            // Consume legal-for-hostname characters,
+            // ...allowing only NON-leading '-' and '.'
+            for (h_beg = p;
+                 isalnum(*p)  ||  (p != h_beg  &&  (*p == '-'  ||  *p == '.'));
+                 p++);
+            hostnamelen = p - h_beg;
+            if (hostnamelen == 0)
+            {
+                cxlib_report(cp, "%s(): garbage in $CX_GURU_LIST at position %zd", __FUNCTION__, p - cx_guru_list);
+                goto END_PARSE_CX_GURU_LIST;
+            }
+            if (hostnamelen > sizeof(hostname) - 1)
+                hostnamelen = sizeof(hostname) - 1;
+            memcpy(hostname, h_beg, hostnamelen); hostname[hostnamelen] = '\0';
+
+            // Is ":PORT" specified?
+            if (*p == ':')
+            {
+                p++;
+                if (*p == '\0')
+                {
+                    cxlib_report(cp, "%s(): unexpected end of $CX_GURU_LIST after ':'", __FUNCTION__);
+                    goto END_PARSE_CX_GURU_LIST;
+                }
+                port = (int)(strtol(p, &endptr, 10));
+                if (endptr == p  ||
+                    (*endptr != '\0'  &&  !is_a_guru_list_separator(*endptr)))
+                {
+                    cxlib_report(cp, "%s(): port number expected in $CX_GURU_LIST after \"%s:\"", __FUNCTION__, hostname);
+                    goto END_PARSE_CX_GURU_LIST;
+                }
+                p = endptr;
+            }
+            else
+                port = CX_V4_INET_RESOLVER;
+
+            // Resolve
+            /* Find out IP of the specified host */
+            /* First, is it in dot notation (aaa.bbb.ccc.ddd)? */
+            spechost = inet_addr(hostname);
+            /* No, should do a hostname lookup */
+            if (spechost == INADDR_NONE)
+            {
+
+#ifndef MAY_USE_GETHOSTBYNAME_FOR_CX_GURU_LIST
+#define MAY_USE_GETHOSTBYNAME_FOR_CX_GURU_LIST 1
+#endif
+#if MAY_USE_GETHOSTBYNAME_FOR_CX_GURU_LIST
+                hp = gethostbyname(hostname);
+                /* No such host?! */
+                if (hp == NULL)
+                {
+                    cxlib_report(cp, "%s(): error parsing $CX_GURU_LIST: gethostbyname(\"%s\"): %s",
+                                 __FUNCTION__, hostname, hstrerror(h_errno));
+                    goto NEXT_CX_GURU_LIST_ITEM;
+                }
+
+                memcpy(&spechost, hp->h_addr, hp->h_length);
+#else
+                cxlib_report(cp, "%s(): hostname-resolving in $CX_GURU_LIST is turned off at compile-time, so can't resolve \"%s\"", __FUNCTION__, hostname);
+                goto NEXT_CX_GURU_LIST_ITEM;
+#endif
+            }
+
+            // Store data
+            bcast_list[bcast_list_count] = spechost;
+            bcast_port[bcast_list_count] = htons(port);
+            bcast_list_count++;
+
+ NEXT_CX_GURU_LIST_ITEM:;
+        }
+
+ END_PARSE_CX_GURU_LIST:;
+        /* Did we get anything? */
+        if (bcast_list_count > 0)
+        {
+            bcast_list_present = 1;
+            return;
+        }
+
+        cxlib_report(cp, "%s(): $CX_GURU_LIST produced empty list, falling back to SIOCGIFCONF", __FUNCTION__);
+    }
+
+    /* B. Obtain list of addresses from the kernel */
+
+    /* Allocate a buffer */
+    if (IFCONF_buf == NULL)
+    {
+        IFCONF_buf = malloc(IFCONF_BUF_SIZE);
+        if (IFCONF_buf == NULL)
+        {
+            cxlib_report(cp, "%s(): malloc(IFCONF_BUF_SIZE) failed: errno=%d; using 255.255.255.255", __FUNCTION__, errno);
+            goto FALLBACK_TO_INADDR_BROADCAST;
+        }
+        bzero(IFCONF_buf, IFCONF_BUF_SIZE);
+    }
+
+    /* Obtain list of interfaces */
+    IFCONF.ifc_len = IFCONF_BUF_SIZE;
+    IFCONF.ifc_req = (void*)IFCONF_buf;
+    r = ioctl(cp->fd, SIOCGIFCONF, &IFCONF);
+    if (r < 0  ||  IFCONF.ifc_len == 0)
+    {
+        cxlib_report(cp, "%s(): ioctl(,SIOCGIFCONF,)=%d errno=%d IFCONF.ifc_len=%d; using 255.255.255.255", __FUNCTION__, r, errno, IFCONF.ifc_len);
+        goto FALLBACK_TO_INADDR_BROADCAST;
+    }
+
+    for (buf_offs = 0,                  bcast_list_count = 0;
+         buf_offs < IFCONF.ifc_len  &&  bcast_list_count < BCAST_MAX_ADDRS;
+         /*!!!*/buf_offs += sizeof(struct ifreq) /*!!! OSX: "IFNAMSIZ + ifreq->ifr_addr.sa_len" */)
+    {
+        IFINFO = *((struct ifreq *)(IFCONF_buf + buf_offs));
+        /* Ignore non-IPv4 interfaces */
+        if (IFINFO.ifr_addr.sa_family != AF_INET) continue;
+
+        /* Get flags and act accordingly */
+        r = ioctl(cp->fd, SIOCGIFFLAGS, &IFINFO);
+        if (r < 0)
+        {
+            cxlib_report(cp, "%s(): \"%s\": ioctl(,SIOCGIFFLAGS,)=%d errno=%d", __FUNCTION__, IFINFO.ifr_name, r, errno);
+            goto NEXT_IFACE;
+        }
+        /* Ignore non-up interfaces*/
+        if ((IFINFO.ifr_flags & IFF_UP) == 0) goto NEXT_IFACE;
+
+        /* Okay, what type of interface it is and which of its addresses to use? */
+        // A broadcast-capable interface: use its broadcast address
+        if      (IFINFO.ifr_flags & IFF_BROADCAST)
+        {
+            r = ioctl(cp->fd, SIOCGIFBRDADDR, &IFINFO);
+            if (r < 0)
+            {
+                cxlib_report(cp, "%s(): \"%s\": ioctl(,SIOCGIFBRDADDR,)=%d errno=%d", __FUNCTION__, IFINFO.ifr_name, r, errno);
+                goto NEXT_IFACE;
+            }
+            bcast_list[bcast_list_count] = ((struct sockaddr_in *)(&(IFINFO.ifr_broadaddr)))->sin_addr.s_addr;
+            bcast_port[bcast_list_count] = htons(CX_V4_INET_RESOLVER);
+            bcast_list_count++;
+        }
+        // A loopback: use its direct address...
+        else if (IFINFO.ifr_flags & IFF_LOOPBACK)
+        {
+            r = ioctl(cp->fd, SIOCGIFADDR,    &IFINFO);
+            if (r < 0)
+            {
+                cxlib_report(cp, "%s(): \"%s\": ioctl(,SIOCGIFADDR,)=%d errno=%d", __FUNCTION__, IFINFO.ifr_name, r, errno);
+                goto NEXT_IFACE;
+            }
+            // Remember this address for future possible case "no other addresses available"
+            loopback_addr = ((struct sockaddr_in *)(&(IFINFO.ifr_addr)))->sin_addr.s_addr;
+        }
+        // Point-to-point: use its "external" address
+        else if (IFINFO.ifr_flags & IFF_POINTOPOINT)
+        {
+            r = ioctl(cp->fd, SIOCGIFDSTADDR, &IFINFO);
+            if (r < 0)
+            {
+                cxlib_report(cp, "%s(): \"%s\": ioctl(,SIOCGIFDSTADDR,)=%d errno=%d", __FUNCTION__, IFINFO.ifr_name, r, errno);
+                goto NEXT_IFACE;
+            }
+            bcast_list[bcast_list_count] = ((struct sockaddr_in *)(&(IFINFO.ifr_dstaddr)))->sin_addr.s_addr;
+            bcast_port[bcast_list_count] = htons(CX_V4_INET_RESOLVER);
+            bcast_list_count++;
+        }
+
+ NEXT_IFACE:;
+    }
+
+    // If no "foreign" addresses available then try to use loopback (useful for networkless standalone hosts, running both server and client)
+    if (bcast_list_count == 0  &&  loopback_addr != 0)
+    {
+        bcast_list[bcast_list_count] = loopback_addr;
+        bcast_port[bcast_list_count] = htons(CX_V4_INET_RESOLVER);
+        bcast_list_count++;
+    }
+
+    if (bcast_list_count > 0)
+    {
+        bcast_list_present = 1;
+        return;
+    }
+
+    cxlib_report(cp, "%s(): empty list of broadcast addresses; using 255.255.255.255", __FUNCTION__);
+    /* Fallback to INADDR_BROADCAST*/
+
+ FALLBACK_TO_INADDR_BROADCAST:
+    set_bcast_list_INADDR_BROADCAST();
+    bcast_list_present = 1;
+}
+//--------------------------------------------------------------------
 /*
  *  SendSrchRequest
  *      Sends a SEARCH request prepared in [cd]->sendbuf to server.
@@ -1165,11 +1426,28 @@ static int SendSrchRequest(v4conn_t *cp)
 {
   int             r;
   struct sockaddr_in  b_addr;
+  int             n;
 
     /* Required additions for connectionless handshake/identification */
     cp->sendbuf->var1 = CXV4_VAR1_ENDIANNESS_SIG;
     cp->sendbuf->var2 = CX_V4_PROTO_VERSION;
 
+#if 1
+    if (!bcast_list_present) fill_bcast_list(cp);
+    for (n = 0;  n < bcast_list_count;  n++)
+    {
+        /* Prepare an address... */
+        b_addr.sin_family      = AF_INET;
+        b_addr.sin_addr.s_addr = bcast_list[n];
+        b_addr.sin_port        = bcast_port[n];
+
+        /* ...and send */
+        r = fdio_send_to(cp->fhandle, cp->sendbuf,
+                         sizeof(CxV4Header) + cp->sendbuf->DataSize,
+                         (struct sockaddr *)&b_addr, sizeof(b_addr));
+        if (r < 0)  return -1;
+    }
+#else
     /* Prepare an address... */
     b_addr.sin_family      = AF_INET;
     b_addr.sin_addr.s_addr = htonl(INADDR_BROADCAST); /*!!! Note: maybe should prepare that address beforehand, to be able to check for any environment specs and even perform gethostbyname(). What about MULTIPLE addresses? */
@@ -1180,6 +1458,7 @@ static int SendSrchRequest(v4conn_t *cp)
                      sizeof(CxV4Header) + cp->sendbuf->DataSize,
                      (struct sockaddr *)&b_addr, sizeof(b_addr));
     if (r < 0)  return -1;
+#endif
 
     return 0;
 }

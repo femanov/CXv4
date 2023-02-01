@@ -10,10 +10,10 @@ EXPORTSDIR=		lib/cda/plugins
 EXPORTSDIR2=		lib
 EXPORTSFILES2=		$(ARLIBS)
 
-SPECIFIC_CFLAGS=	-fPIC
-SPECIFIC_CPPFLAGS=	-std=c++11
-DIR_INCLUDES=		$(TANGO_INCLUDES)
-SPECIFIC_LDFLAGS=	$(TANGO_LIBS)
+LOCAL_CFLAGS=		-fPIC
+LOCAL_CPPFLAGS=		-std=c++11
+LOCAL_INCLUDES=		$(TANGO_INCLUDES)
+LOCAL_LDFLAGS=		$(TANGO_LIBS)
 
 ######################################################################
 PRJDIR=		../..

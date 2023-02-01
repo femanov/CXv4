@@ -390,7 +390,7 @@ void vdev_set_state(vdev_context_t *ctx, int nxt_state)
   vdev_state_dsc_t   *nxts;
 
  NEXT_STEP:
-    if (nxt_state < 0  ||  nxt_state > ctx->state_count)
+    if (nxt_state < 0  ||  nxt_state >= ctx->state_count)
     {
         return;
     }

@@ -10,9 +10,9 @@ EXPORTSDIR=		lib/cda/plugins
 EXPORTSDIR2=		lib
 EXPORTSFILES2=		$(ARLIBS)
 
-SPECIFIC_CFLAGS=	-fPIC
-DIR_INCLUDES=		$(EPICS_INCLUDES)
-SPECIFIC_LDFLAGS=	-L$(EPICS_OS_LIB_DIR) -lca -lCom
+LOCAL_CFLAGS=		-fPIC
+LOCAL_INCLUDES=		$(EPICS_INCLUDES)
+LOCAL_LDFLAGS=		-L$(EPICS_OS_LIB_DIR) -lca -lCom
 
 ######################################################################
 PRJDIR=		../..

@@ -112,19 +112,32 @@ static int GetChanInfo(const char    *name,
 {
   int            kind;
   char           namebuf[1000];
-  const char    *name_p = name;
-  const char    *dot_p;
-  size_t         len;
+  const char    *src_p;
+  char          *dst_p;
+  char          *dot_p;
+  size_t         namelen;
+  char           ch;
 
   cxsd_cpntid_t  cpid;
   cxsd_gchnid_t  gcid;
   int            phys_count;
  
-
     if (name == NULL) return -1;
 
+    // a. Copy name to namebuf, replacing ':'s with '.'s
+    //    and noticing the position of last '.'
+    for (src_p = name, dst_p = namebuf, namelen = 0, dot_p = NULL;
+         *src_p != '\0'  &&             namelen < (sizeof(namebuf) - 1);
+         src_p++,      dst_p++,         namelen++)
+    {
+        ch = *src_p;
+        if (ch == ':') ch = '.';
+        *dst_p = ch;
+        if (ch == '.') dot_p = dst_p;
+    }
+    *dst_p = '\0';
+    // b. Check for special suffixes
     kind = MON_KIND_VAL;
-    dot_p = strrchr(name, '.');
     if (dot_p != NULL  &&  dot_p != name)
     {
         if      (strcasecmp(dot_p + 1, "_raw")      == 0)
@@ -136,22 +149,13 @@ static int GetChanInfo(const char    *name,
         else
             goto LEAVE_NAME_AS_IS;
 
-        // Copy name without "._SPECIAL" into namebuf
-        len = dot_p - name;
-        if (len > sizeof(namebuf) - 1)
-        {
-            // Log this somehow?  No, that can be a sort of a DoS attack
-            return -1;
-        }
-        memcpy(namebuf, name, len); namebuf[len] = '\0';
-        // and switch name-pointer there
-        name_p = namebuf;
+        *dot_p = '\0';
 
  LEAVE_NAME_AS_IS:;
     }
 
         /* Does this name exist? */
-    if ((cpid = CxsdHwResolveChan(name_p, &gcid,
+    if ((cpid = CxsdHwResolveChan(namebuf, &gcid,
                                   &phys_count, rds_buf, rds_buf_cap,
                                   NULL, NULL, NULL, NULL,
                                   NULL, NULL, NULL, NULL)) < 0)
@@ -306,7 +310,7 @@ int  cxsd_fe_epics_pvAttach   (const char *name, int *mid_p)
     chn_p = cxsd_hw_channels + gcid;
     chn_dtype = chn_p->dtype;
 
-fprintf(stderr, "\tgcid=%d cpid=%d\n", gcid, cpid);
+//fprintf(stderr, "\tgcid=%d cpid=%d\n", gcid, cpid);
     /* Isn't it already monitored? */
     mid = ForeachMonSlot(mon_eq_checker, name);
     if (mid >= 0)
@@ -446,7 +450,6 @@ int  cxsd_fe_epics_get_info   (int mid,
     return 0;
 }
 
-#if 1
 static int eng2opr(cxdtype_t src_dtype, int src_nelems,     void *src_data,
                    int phys_count, double *phys_rds,
                    cxdtype_t dst_dtype, int dst_max_nelems, void *dst_data)
@@ -465,7 +468,7 @@ static int eng2opr(cxdtype_t src_dtype, int src_nelems,     void *src_data,
   int              n;
   double          *rdp;
 
-fprintf(stderr, "%s src_dtype=%d src_nelems=%d dst_dtype=%d max_nelems=%d\n", __FUNCTION__, src_dtype, src_nelems, dst_dtype, dst_max_nelems);
+//fprintf(stderr, "%s src_dtype=%d src_nelems=%d dst_dtype=%d max_nelems=%d\n", __FUNCTION__, src_dtype, src_nelems, dst_dtype, dst_max_nelems);
     /* An individual check for CXDTYPE_UNKNOWN, since it can't be converted to anything */
     if (src_dtype == CXDTYPE_UNKNOWN) return -1;
 
@@ -554,7 +557,7 @@ fprintf(stderr, "%s src_dtype=%d src_nelems=%d dst_dtype=%d max_nelems=%d\n", __
             }
             src += ssiz;
 
-fprintf(stderr, "v=%8.3f", v);
+//fprintf(stderr, "v=%8.3f", v);
             // Do conversion
             if (phys_count != 0)
             {
@@ -568,7 +571,7 @@ fprintf(stderr, "v=%8.3f", v);
                     n--;
                 }
             }
-fprintf(stderr, " -> %8.3f\n", v);
+//fprintf(stderr, " -> %8.3f\n", v);
 
             // Store datum, converting from double
             switch (dst_dtype)
@@ -611,7 +614,7 @@ static int opr2eng(cxdtype_t src_dtype, int src_nelems,     void *src_data,
   int              n;
   double          *rdp;
 
-fprintf(stderr, "%s src_dtype=%d src_nelems=%d dst_dtype=%d max_nelems=%d\n", __FUNCTION__, src_dtype, src_nelems, dst_dtype, dst_max_nelems);
+//fprintf(stderr, "%s src_dtype=%d src_nelems=%d dst_dtype=%d max_nelems=%d\n", __FUNCTION__, src_dtype, src_nelems, dst_dtype, dst_max_nelems);
     /* An individual check for CXDTYPE_UNKNOWN, since it can't be converted to anything */
     if (src_dtype == CXDTYPE_UNKNOWN) return -1;
 
@@ -699,7 +702,7 @@ fprintf(stderr, "%s src_dtype=%d src_nelems=%d dst_dtype=%d max_nelems=%d\n", __
             }
             src += ssiz;
 
-fprintf(stderr, "v=%8.3f", v);
+//fprintf(stderr, "v=%8.3f", v);
             // Do conversion
             if (phys_count != 0)
             {
@@ -712,7 +715,7 @@ fprintf(stderr, "v=%8.3f", v);
                     n--;
                 }
             }
-fprintf(stderr, " -> %8.3f\n", v);
+//fprintf(stderr, " -> %8.3f\n", v);
 
             // Store datum, converting from double
             switch (dst_dtype)
@@ -736,10 +739,9 @@ fprintf(stderr, " -> %8.3f\n", v);
 
     return src_nelems;
 }
-#endif
 
 int  cxsd_fe_epics_get_data   (int mid,
-                               cxdtype_t *dtype_p, int *nelems_p, void **data_p,
+                               cxdtype_t *dtype_p, int *nelems_p,       void **data_p,
                                rflags_t *rflags_p, cx_time_t *timestamp_p)
 {
   moninfo_t      *mp    = AccessMonSlot(mid);
@@ -881,7 +883,7 @@ int  cxsd_fe_epics_get_data   (int mid,
 }
 
 int  cxsd_fe_epics_do_write   (int mid, 
-                               cxdtype_t  dtype,   int  nelems,   void  *data)
+                               cxdtype_t  dtype,   int  nelems,   const void  *data)
 {
   moninfo_t      *mp    = AccessMonSlot(mid);
   cxsd_hw_chan_t *chn_p;
@@ -896,7 +898,6 @@ int  cxsd_fe_epics_do_write   (int mid,
 
     chn_p = cxsd_hw_channels + mp->gcid;
 
-#if 1
     if (mp->kind == MON_KIND_VAL  ||
         mp->kind == MON_KIND_RAW)
     {
@@ -930,10 +931,6 @@ int  cxsd_fe_epics_do_write   (int mid,
                           1, &(mp->gcid), &dst_dtype, &eff_nelems, &dst);
     }
     else return -1;
-#else
-    return CxsdHwDoIO(0/*!!!ID!!!*/, DRVA_WRITE,
-                      1, &(mp->gcid), &dtype, &nelems, &data);
-#endif
 }
 
 //////////////////////////////////////////////////////////////////////

@@ -213,7 +213,7 @@ static int  IsAlwdSW_ON_START (void *devptr, int prev_state __attribute__((unuse
   privrec_t *me = devptr;
 
     return (me->cur[SODC_IS_READY].v.i32 != 0  &&        // "READY" bit is on
-            me->uset_val                 <= USET_MIN);   // 3kV minimum
+            me->uset_val                 <= USET_MIN);   // 3kV minimum; note the "<=" for "minimum": that's because values are negative (sign-inverted), so that "3kV minimum" means "the raw value is below -SOMETHING"
 }
 
 static void SwchToSW_ON_START (void *devptr, int prev_state __attribute__((unused)))

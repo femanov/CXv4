@@ -28,7 +28,7 @@ MAKEFILE_PARTS+=	libcda.a_COMPONENTS.mk libcda_d_insrv.a_COMPONENTS.mk
 EXPORTSFILES=		$(ARLIBS)
 EXPORTSDIR=		lib
 
-SPECIFIC_CFLAGS=	-fPIC
+LOCAL_CFLAGS=		-fPIC
 
 TOPDIR=         ../..
 include $(TOPDIR)/TopRules.mk

@@ -133,6 +133,8 @@ typedef struct
 
     char          *name;
     chid           ca_chid;
+    evid           ca_evid;
+    chtype         ca_subs_DBR_type;
 
     cda_hwcnref_t  next;    // Link to next hwr of sid
     cda_hwcnref_t  prev;    // Link to previous hwr of sid
@@ -146,6 +148,8 @@ typedef struct _cda_d_epics_privrec_t_struct
 
     cda_hwcnref_t  frs_hwr;
     cda_hwcnref_t  lst_hwr;
+
+    sl_tid_t       cycle_tid;
 } cda_d_epics_privrec_t;
 
 //////////////////////////////////////////////////////////////////////
@@ -218,6 +222,54 @@ static void DelHwrFromSrv(cda_d_epics_privrec_t *me, cda_hwcnref_t hwr)
 }
 
 //////////////////////////////////////////////////////////////////////
+
+static void NewDataCB    (struct event_handler_args      ARGS)
+{
+  cda_hwcnref_t          hwr = ptr2lint(ARGS.usr);
+  hwrinfo_t             *hi  = AccessHwrSlot(hwr);
+  cda_d_epics_privrec_t *me  = hi->me;
+
+  const void            *value_p;
+  cxdtype_t              dtype;
+  int                    nelems;
+  rflags_t               rflags;
+  epicsTimeStamp         epics_stamp;
+  cx_time_t              timestamp;
+
+    if (ARGS.status != ECA_NORMAL  ||  ARGS.dbr == NULL) return;
+    if (DBR2cxdtype(ARGS.type, &dtype) != DBR_class_TIME) return;
+
+    nelems = ARGS.count;
+    rflags = alarm2rflags(((struct dbr_time_string *)(ARGS.dbr))->status);
+    epics_stamp =         ((struct dbr_time_string *)(ARGS.dbr))->stamp;
+    timestamp.sec  = epics_stamp.secPastEpoch + POSIX_TIME_AT_EPICS_EPOCH;
+    timestamp.nsec = epics_stamp.nsec;
+
+    switch (ARGS.type)
+    {
+        case DBR_TIME_STRING: value_p = &(((const struct dbr_time_string *)(ARGS.dbr))->value); 
+                              nelems = sizeof(((const struct dbr_time_string *)(ARGS.dbr))->value) - 1;
+//fprintf(stderr, "\tnelems=%d count=%d\n", nelems, ARGS.count);
+                              while (nelems > 0  &&  ((char*)(value_p))[nelems-1] == '\0') nelems--;
+                              for (nelems = 0;
+                                   nelems < sizeof(((const struct dbr_time_string *)(ARGS.dbr))->value)
+                                   &&  ((char*)(value_p))[nelems] != '\0';
+                                   nelems++);
+                              break;
+        case DBR_TIME_SHORT:
+        /* ==DBR_TIME_INT */  value_p = &(((const struct dbr_time_short  *)(ARGS.dbr))->value); break;
+        case DBR_TIME_FLOAT:  value_p = &(((const struct dbr_time_float  *)(ARGS.dbr))->value); break;
+        case DBR_TIME_ENUM:   value_p = &(((const struct dbr_time_enum   *)(ARGS.dbr))->value); break;
+        case DBR_TIME_CHAR:   value_p = &(((const struct dbr_time_char   *)(ARGS.dbr))->value); break;
+        case DBR_TIME_LONG:   value_p = &(((const struct dbr_time_long   *)(ARGS.dbr))->value); break;
+        case DBR_TIME_DOUBLE: value_p = &(((const struct dbr_time_double *)(ARGS.dbr))->value); break;
+        default: return;
+    }
+
+    cda_dat_p_update_dataset(me->sid, 1, &(hi->dataref),
+                             &value_p, &dtype, &nelems,
+                             &rflags, &timestamp, CDA_DAT_P_IS_UPDATE);
+}
 
 static void GetPropsCB   (struct event_handler_args      ARGS)
 {
@@ -303,70 +355,73 @@ static void StateChangeCB(struct connection_handler_args ARGS)
   int                    c_s = (ARGS.op == CA_OP_CONN_UP)? CDA_RSLVSTAT_FOUND
                                                          : CDA_RSLVSTAT_NOTFOUND;
 
-  int                    stat;
+  unsigned long          srv_nelems;
+  unsigned               srv_is_rw;
+  short                  srv_dbf_type;
+  chtype                 srv_DBR_type;
+  cxdtype_t              srv_dtype;
 
   chtype                 DBR_type;
+  int                    stat;
 
 ////fprintf(stderr, "%s: op=%d c_s=%d\n", __FUNCTION__, ARGS.op, c_s);
     if (c_s == CDA_RSLVSTAT_FOUND)
     {
-        DBR_type = cxdtype2DBR(hi->dtype, DBR_class_CTRL);
+        srv_nelems   = ca_element_count(hi->ca_chid);
+        srv_is_rw    = ca_write_access (hi->ca_chid);
+        srv_dbf_type = ca_field_type   (hi->ca_chid);
+        srv_DBR_type = dbf_type_to_DBR(srv_dbf_type);
+        if (srv_dbf_type == DBF_STRING) srv_nelems = sizeof(dbr_string_t); // Handle difference in "string" concepts between EPICS and CX: EPICS strings are "scalars" of size 40
+        if (srv_DBR_type < 0  ||
+            DBR2cxdtype(srv_DBR_type, &srv_dtype) < 0)
+        {
+            cda_dat_p_report(me->sid, "%s::%s(): strange \"%s\" ca_field_type()=%d",
+                             __FILE__, __FUNCTION__, hi->name, srv_dbf_type);
+            goto SKIP_TYPE_MANIPULATIONS;
+        }
+fprintf(stderr, "SRV: srv_dbf_type=%d srv_nelems=%ld srv_is_rw=%d\n", srv_dbf_type, srv_nelems, srv_is_rw);
+        cda_dat_p_set_hwinfo(hi->dataref,
+                             srv_is_rw, srv_dtype, srv_nelems,
+                             0/*hwid*/);
 
-        if (DBR_type != DBR_CTRL_STRING) /* dbr_ctrl_string is not implemented because is senseless */
+        if (hi->dtype == CXDTYPE_UNKNOWN)
+            DBR_type = srv_DBR_type;
+        else
+            DBR_type = cxdtype2DBR(hi->dtype, DBR_class_CTRL);
+
+        if (DBR_type != DBR_CTRL_STRING) /* dbr_ctrl_string is not implemented because is senseless; maybe we should request smth. else, for conformity with everything else? But there's NO DBR_xxx_STRING with a "units" component... */
             stat = ca_array_get_callback(DBR_type, 1, hi->ca_chid,
                                          GetPropsCB, lint2ptr(hwr));
+
+        // Check if existing subscription is of the same type and if not, then re-subscribe
+        if (hi->dtype == CXDTYPE_UNKNOWN  &&
+            hi->ca_subs_DBR_type != srv_DBR_type)
+        {
+            // Delete existing subscription
+            if (hi->ca_evid != NULL)
+            {
+                ca_clear_subscription(hi->ca_evid);
+                hi->ca_evid          = NULL;
+                hi->ca_subs_DBR_type = -1;
+            }
+            // ...and create a new one
+            stat = ca_create_subscription(DBR_type, 0/*max_nelems*/, hi->ca_chid,
+                                          DBE_VALUE | DBE_ALARM,
+                                          NewDataCB, lint2ptr(hwr),
+                                          &(hi->ca_evid));
+            if (stat != ECA_NORMAL)
+            {
+                cda_dat_p_report(me->sid, "%s::%s(): ca_create_subscription(\"%s\") failed: %s",
+                                 __FILE__, __FUNCTION__, hi->name, ca_message(stat));
+                hi->ca_evid          = NULL;
+            }
+            else
+                hi->ca_subs_DBR_type = DBR_type;
+        }
     }
+ SKIP_TYPE_MANIPULATIONS:;
     cda_dat_p_report_rslvstat(hi->dataref, c_s);
     cda_dat_p_set_ready      (hi->dataref, c_s == CDA_RSLVSTAT_FOUND);
-}
-
-static void NewDataCB    (struct event_handler_args      ARGS)
-{
-  cda_hwcnref_t          hwr = ptr2lint(ARGS.usr);
-  hwrinfo_t             *hi  = AccessHwrSlot(hwr);
-  cda_d_epics_privrec_t *me  = hi->me;
-  
-
-  const void            *value_p;
-  cxdtype_t              dtype;
-  int                    nelems;
-  rflags_t               rflags;
-  epicsTimeStamp         epics_stamp;
-  cx_time_t              timestamp;
-
-    if (ARGS.status != ECA_NORMAL  ||  ARGS.dbr == NULL) return;
-    if (DBR2cxdtype(ARGS.type, &dtype) != DBR_class_TIME) return;
-
-    nelems = ARGS.count;
-    rflags = alarm2rflags(((struct dbr_time_string *)(ARGS.dbr))->status);
-    epics_stamp =         ((struct dbr_time_string *)(ARGS.dbr))->stamp;
-    timestamp.sec  = epics_stamp.secPastEpoch + POSIX_TIME_AT_EPICS_EPOCH;
-    timestamp.nsec = epics_stamp.nsec;
-
-    switch (ARGS.type)
-    {
-        case DBR_TIME_STRING: value_p = &(((const struct dbr_time_string *)(ARGS.dbr))->value); 
-                              nelems = sizeof(((const struct dbr_time_string *)(ARGS.dbr))->value) - 1;
-//fprintf(stderr, "\tnelems=%d count=%d\n", nelems, ARGS.count);
-                              while (nelems > 0  &&  ((char*)(value_p))[nelems-1] == '\0') nelems--;
-                              for (nelems = 0;
-                                   nelems < sizeof(((const struct dbr_time_string *)(ARGS.dbr))->value)
-                                   &&  ((char*)(value_p))[nelems] != '\0';
-                                   nelems++);
-                              break;
-        case DBR_TIME_SHORT:
-        /* ==DBR_TIME_INT */  value_p = &(((const struct dbr_time_short  *)(ARGS.dbr))->value); break;
-        case DBR_TIME_FLOAT:  value_p = &(((const struct dbr_time_float  *)(ARGS.dbr))->value); break;
-        case DBR_TIME_ENUM:   value_p = &(((const struct dbr_time_enum   *)(ARGS.dbr))->value); break;
-        case DBR_TIME_CHAR:   value_p = &(((const struct dbr_time_char   *)(ARGS.dbr))->value); break;
-        case DBR_TIME_LONG:   value_p = &(((const struct dbr_time_long   *)(ARGS.dbr))->value); break;
-        case DBR_TIME_DOUBLE: value_p = &(((const struct dbr_time_double *)(ARGS.dbr))->value); break;
-        default: return;
-    }
-
-    cda_dat_p_update_dataset(me->sid, 1, &(hi->dataref),
-                             &value_p, &dtype, &nelems,
-                             &rflags, &timestamp, CDA_DAT_P_IS_UPDATE);
 }
 
 static int  cda_d_epics_new_chan(cda_dataref_t ref, const char *name,
@@ -382,7 +437,9 @@ static int  cda_d_epics_new_chan(cda_dataref_t ref, const char *name,
 
   chtype                 DBR_type;
 
-    if ((DBR_type = cxdtype2DBR(dtype, DBR_class_TIME)) < 0)
+fprintf(stderr, "%s(\"%s\")\n", __FUNCTION__, name);
+    if (dtype != CXDTYPE_UNKNOWN  &&
+        (DBR_type = cxdtype2DBR(dtype, DBR_class_TIME)) < 0)
     {
         errno = EINVAL;
         return CDA_DAT_P_ERROR;
@@ -419,16 +476,29 @@ static int  cda_d_epics_new_chan(cda_dataref_t ref, const char *name,
         return CDA_DAT_P_ERROR;
     }
 
-    stat = ca_create_subscription(DBR_type, max_nelems, hi->ca_chid,
-                                  DBE_VALUE | DBE_ALARM,
-                                  NewDataCB, lint2ptr(hwr),
-                                  NULL);
-    if (stat != ECA_NORMAL)
+    if (dtype != CXDTYPE_UNKNOWN)
     {
-        cda_dat_p_report(me->sid, "ca_create_subscription(\"%s\") failed: %s",
-                         name, ca_message(stat));
-        RlsHwrSlot(hwr);
-        return CDA_DAT_P_ERROR;
+        /* Note:
+               despite gcc's "warning: 'DBR_type' may be used uninitialized in this function",
+               it IS initialized, because initialization above is conditioned by
+               the same "dtype != CXDTYPE_UNKNOWN" expression. */
+        stat = ca_create_subscription(DBR_type, max_nelems, hi->ca_chid,
+                                      DBE_VALUE | DBE_ALARM,
+                                      NewDataCB, lint2ptr(hwr),
+                                      &(hi->ca_evid));
+        if (stat != ECA_NORMAL)
+        {
+            cda_dat_p_report(me->sid, "ca_create_subscription(\"%s\") failed: %s",
+                             name, ca_message(stat));
+            RlsHwrSlot(hwr);
+            return CDA_DAT_P_ERROR;
+        }
+        hi->ca_subs_DBR_type = DBR_type;
+    }
+    else
+    {
+        hi->ca_evid          = NULL;
+        hi->ca_subs_DBR_type = -1;
     }
 
     return CDA_DAT_P_NOTREADY;
@@ -443,6 +513,8 @@ static int  cda_d_epics_snd_data(void *pdt_privptr, cda_hwcnref_t hwr,
   int                    stat;
 
   chtype                 DBR_type;
+
+  dbr_string_t           local_string_buf;
 
     /* A safety net */
     if (hwr < HWR_MIN_VAL  ||  hwr >= hwrs_list_allocd  ||
@@ -459,6 +531,24 @@ static int  cda_d_epics_snd_data(void *pdt_privptr, cda_hwcnref_t hwr,
         return CDA_PROCESS_ERR;
 ////fprintf(stderr, "%s: dtype=%d DBR_type=%d nelems=%d\n", __FUNCTION__, dtype, DBR_type, nelems);
 
+    /* Must handle STRINGs separately, because
+       1. they are "scalars"
+       2. their size MUST be exactly 40 bytes (bigger vectors are OK but are silently truncated) */
+    if (DBR_type == DBR_STRING)
+    {
+        // If less than 40 bytes -- copy into local buffer
+        if (nelems < sizeof(local_string_buf))
+        {
+            if (nelems != 0) memcpy(local_string_buf, value, nelems);
+            /* Note: no reason for "nelems < sizeof(local_string_buf)" guard,
+               since such check is already performed above */
+            bzero(local_string_buf + nelems, sizeof(local_string_buf) - nelems);
+            value = local_string_buf;
+        }
+        // Force scalar
+        nelems = 1;
+    }
+
     stat = ca_array_put(DBR_type, nelems, hi->ca_chid, value);
     if (stat != ECA_NORMAL)
     {
@@ -469,11 +559,27 @@ static int  cda_d_epics_snd_data(void *pdt_privptr, cda_hwcnref_t hwr,
     /*!!! do we need something like ca_pend_io(0.0) or ca_poll() here? */
     //ca_pend_io(0.1+5);
     //ca_poll();
+    ca_flush_io();
 
     return CDA_PROCESS_DONE;
 }
 
 //////////////////////////////////////////////////////////////////////
+
+enum {CYCLE_PERIOD_USECS = 1 * 1000000}; // 1s
+
+static void CycleProc(int uniq, void *unsdptr,
+                      sl_tid_t tid, void *privptr)
+{
+  cda_d_epics_privrec_t *me = privptr;
+
+    me->cycle_tid = -1;
+
+    cda_dat_p_update_server_cycle(me->sid);
+
+    me->cycle_tid = sl_enq_tout_after(cda_dat_p_suniq_of_sid(me->sid), NULL,
+                                      CYCLE_PERIOD_USECS, CycleProc, me);
+}
 
 static int  cda_d_epics_new_srv (cda_srvconn_t  sid, void *pdt_privptr,
                                  int            uniq,
@@ -488,6 +594,8 @@ static int  cda_d_epics_new_srv (cda_srvconn_t  sid, void *pdt_privptr,
     me->sid = sid;
     me->frs_hwr = -1;
     me->lst_hwr = -1;
+    me->cycle_tid = sl_enq_tout_after(cda_dat_p_suniq_of_sid(me->sid), NULL,
+                                      CYCLE_PERIOD_USECS, CycleProc, me);
 
     return CDA_DAT_P_OPERATING;
 }
@@ -495,6 +603,8 @@ static int  cda_d_epics_new_srv (cda_srvconn_t  sid, void *pdt_privptr,
 static int  cda_d_epics_del_srv (cda_srvconn_t  sid, void *pdt_privptr)
 {
   cda_d_epics_privrec_t *me = pdt_privptr;
+
+    sl_deq_tout(me->cycle_tid);  me->cycle_tid = -1;
 
     return CDA_DAT_P_DEL_SRV_SUCCESS;  
 }
@@ -549,7 +659,7 @@ static void cda_d_epics_term_m(void)
 CDA_DEFINE_DAT_PLUGIN(epics, "EPICS (Channel Access) data-access plugin",
                       cda_d_epics_init_m, cda_d_epics_term_m,
                       sizeof(cda_d_epics_privrec_t),
-                      CDA_DAT_P_FLAG_NONE,
+                      CDA_DAT_P_FLAG_CHAN_TYPE_CHANGE_SUPPORTED,
                       '.', ':', '@',
                       cda_d_epics_new_chan, NULL,
                       NULL,

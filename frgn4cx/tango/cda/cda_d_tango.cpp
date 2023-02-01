@@ -71,16 +71,6 @@ enum
 
 typedef int dpx_id_t;
 
-#if USE_PUSH_MODEL
-typedef struct
-{
-    int32 a;
-    int32 hwr;
-    int32 c;
-    int32 d;
-} event_info_t;
-#endif
-
 typedef struct
 {
     int            in_use;
@@ -96,10 +86,24 @@ typedef struct
     int            subscr_event_id;
     cda_d_tango_EventCallBack *cb;
 
+    /*!!! Should remove next/prev & Co. when USE_PUSH_MODEL in effect */
     cda_hwcnref_t  next;    // Link to next hwr of sid
     cda_hwcnref_t  prev;    // Link to previous hwr of sid
 
     struct _cda_d_tango_privrec_t_struct *me; // Backreference to a containing server
+
+    // Copied from cxsd_fe_epics.c::moninfo_t; should better keep in sync
+    void          *current_val;      // Pointer to current-value-buffer (if !=NULL)...
+    int            current_nelems;   // ...and # of units in it
+    CxAnyVal_t     valbuf;           // Buffer for small-sized values; current_val=NULL in such cases
+    cxdtype_t      current_dtype;    // Current data type
+    rflags_t       current_rflags;
+    cx_time_t      current_timestamp;
+
+#if USE_PUSH_MODEL 
+    pthread_mutex_t val_mutex;
+    int             val_mutex_inited;
+#endif /* USE_PUSH_MODEL */
 } hwrinfo_t;
 
 typedef struct
@@ -132,7 +136,7 @@ typedef struct _cda_d_tango_privrec_t_struct
     int            event_pipe[2];
     sl_fdh_t       event_rfdh;
 #else
-#endif
+#endif /* USE_PUSH_MODEL */
 } cda_d_tango_privrec_t;
 
 //////////////////////////////////////////////////////////////////////
@@ -261,9 +265,16 @@ static void RlsHwrSlot(cda_hwcnref_t hwr)
     }
     if (hi->cb != NULL)
     {
-        delete hi->cb;
-        hi->cb = NULL;
+        delete hi->cb; hi->cb = NULL;
     }
+
+    safe_free(hi->current_val); hi->current_val = NULL;
+
+#if USE_PUSH_MODEL
+    if (hi->val_mutex_inited)
+        pthread_mutex_destroy(&(hi->val_mutex));
+    hi->val_mutex_inited = 0;
+#endif /* USE_PUSH_MODEL */
 
     hi->in_use = 0;
 }
@@ -302,6 +313,84 @@ static void DelHwrFromSrv(cda_d_tango_privrec_t *me, cda_hwcnref_t hwr)
 
 //////////////////////////////////////////////////////////////////////
 
+static int  store_current_value (hwrinfo_t *hi, Tango::DeviceAttribute *attr_value)
+{
+  void          *value_p;
+
+  int            data_type;
+  cxdtype_t      dtype;
+
+    value_p = hi->current_val;
+    if (value_p == NULL) value_p = &(hi->valbuf);
+
+    data_type = attr_value->get_type();
+
+    /*!!! A very BIG FAT note:
+          we are trying to read value of a type DIFFERENT
+          from what was used for current_val allocation,
+          which potentially can result in buffer overflow.
+          Currently, for SCALARS, it is safe, because reading
+          is performed into valbuf, which is of type CxAnyVal_t,
+          which, by design, is able to hold a value of ANY type.
+          But for VECTORS (and STRINGS) this wouldn't work. */
+
+#if DO_CATCH
+    try
+    {
+#endif
+        switch (hi->dtype)
+        {
+            case Tango::DEV_SHORT:  *(attr_value) >> *(( int16*)value_p);   dtype = CXDTYPE_INT16;  break;
+            case Tango::DEV_USHORT: *(attr_value) >> *((uint16*)value_p);   dtype = CXDTYPE_UINT16; break;
+            case Tango::DEV_LONG:   *(attr_value) >> *(( int32*)value_p);   dtype = CXDTYPE_INT32;  break;
+            case Tango::DEV_ULONG:  *(attr_value) >> *((uint32*)value_p);   dtype = CXDTYPE_UINT32; break;
+            /* Note: since "'long long int' is not an enumeration type",
+                     we can NOT use 64-bit ints */
+            //case Tango::DEV_LONG64:  *(attr_value) >> *(( int64*)value_p);  dtype = CXDTYPE_INT64;  break;
+            //case Tango::DEV_ULONG64: *(attr_value) >> *((uint64*)value_p);  dtype = CXDTYPE_UINT64; break;
+            case Tango::DEV_FLOAT:  *(attr_value) >> *((float32*)value_p);  dtype = CXDTYPE_SINGLE; break;
+            case Tango::DEV_DOUBLE: *(attr_value) >> *((float64*)value_p);  dtype = CXDTYPE_DOUBLE; break;
+            // case Tango::DEV_UCHAR:   ???
+            // case Tango::DEV_STRING:  ???
+            // case Tango::DEV_BOOLEAN: convert to int32?
+            // case Tango::DEV_STATE:   convert to int32?
+            // case Tango::DEV_ENUM:    convert to int32?
+            // case Tango::DEV_INT:     what type is it???
+            default: return -1;
+        }
+        hi->current_dtype  = dtype;
+        hi->current_nelems = 1;
+        hi->current_rflags = 0;
+
+        return 0;
+#if DO_CATCH
+    }
+    catch (CORBA::Exception &e)
+    {
+        if (cda_d_tango_debug)
+            report_exception("push_event: reading via >>", e);
+    }
+    catch (...)
+    {
+        if (cda_d_tango_debug)
+            fprintf(stderr, "%s: reading via >> raised an exception\n", __FUNCTION__);
+    }
+#endif
+
+    return -1;
+}
+
+static void return_current_value(hwrinfo_t *hi)
+{
+  void *value_p;
+
+    value_p = hi->current_val;
+    if (value_p == NULL) value_p = &(hi->valbuf);
+    cda_dat_p_update_dataset(hi->me->sid, 1, &(hi->dataref),
+                             &value_p, &(hi->current_dtype), &(hi->current_nelems),
+                             &(hi->current_rflags), NULL/*&(hi->current_timestamp)*/, CDA_DAT_P_IS_UPDATE);
+}
+
 #if USE_PUSH_MODEL
 static void event2pipe_proc(int uniq, void *privptr1,
                             sl_fdh_t fdh, int fd, int mask, void *privptr2)
@@ -310,16 +399,24 @@ static void event2pipe_proc(int uniq, void *privptr1,
 
   int                    repcount;
   int                    r;
-  event_info_t           info;
+  cda_hwcnref_t          hwr;
+  hwrinfo_t             *hi;
 
     for (repcount = 100;  repcount > 0;  repcount--)
     {
-        r = read(fd, &info, sizeof(info));
-        if (r != sizeof(info))
+        r = read(fd, &hwr, sizeof(hwr));
+        if (r != sizeof(hwr))
         {
-            /*!!!*/
-            return;
+            hi = AccessHwrSlot(hwr);
+            if (hwr < 0  ||  hwr >= hwrs_list_allocd  ||
+                hi->in_use == 0) goto NEXT_REPCOUNT;
+
+            pthread_mutex_lock  (&(hi->val_mutex));
+            return_current_value(hi);
+            pthread_mutex_unlock(&(hi->val_mutex));
         }
+
+ NEXT_REPCOUNT:;
     }
 }
 #endif /* USE_PUSH_MODEL */
@@ -432,7 +529,7 @@ static int create_hwr_subscription(cda_hwcnref_t hwr)
                                                        Tango::CHANGE_EVENT,
                                                        Tango::ALL_EVENTS,
                                                        1);
-#endif
+#endif /* USE_PUSH_MODEL */
 #if DO_CATCH
     }
     catch (CORBA::Exception &e)
@@ -482,6 +579,8 @@ static int  cda_d_tango_new_chan(cda_dataref_t ref, const char *name,
   char                  *dev_name = NULL;
   dpx_id_t               dpx;
   dpxinfo_t             *di;
+
+  size_t                 csize;                // Channel data size
 
   int                    saved_errno;
 
@@ -649,6 +748,29 @@ fprintf(stderr, "\tdup_name=<%s> sl3+1=<%s>\n", dup_name, sl3+1);
     hi->chn_name = sl3 + 1;
     hi->subscr_event_id = -1;
 
+    // Allocate a buffer for data if needed
+    csize = sizeof_cxdtype(dtype) * max_nelems;
+    if (csize > sizeof(hi->valbuf))
+    {
+        if ((hi->current_val = malloc(csize)) == NULL)
+        {
+            saved_errno = errno;
+            RlsHwrSlot(hwr);
+            errno = saved_errno;
+            return CDA_DAT_P_ERROR;
+        }
+    }
+
+#if USE_PUSH_MODEL
+    if ((saved_errno = pthread_mutex_init(&(hi->val_mutex), NULL)) != 0)
+    {
+        RlsHwrSlot(hwr);
+        errno = saved_errno;
+        return CDA_DAT_P_ERROR;
+    }
+    hi->val_mutex_inited = 1;
+#endif /* USE_PUSH_MODEL */
+
     hi->chtype   = chtype;
     hi->dpx      = dpx;
     hi->cb       = new cda_d_tango_EventCallBack(hwr);
@@ -752,7 +874,7 @@ static int  cda_d_tango_snd_data(void *pdt_privptr, cda_hwcnref_t hwr,
     {
         delete da; da = NULL;
         if (cda_d_tango_debug)
-            report_exception("snd: new Tango::DeviceAttribute()", e);
+            report_exception("snd: write_attribute()", e);
         errno = EIO;
         return CDA_PROCESS_ERR;
     }
@@ -811,7 +933,7 @@ static int  cda_d_tango_new_srv (cda_srvconn_t  sid, void *pdt_privptr,
         return CDA_DAT_P_ERROR;
     }
 #else
-#endif
+#endif /* USE_PUSH_MODEL */
 
     return CDA_DAT_P_OPERATING;
 
@@ -836,7 +958,7 @@ static int  cda_d_tango_del_srv (cda_srvconn_t  sid, void *pdt_privptr)
         close(me->event_pipe[PIPE_WR_SIDE]); me->event_pipe[PIPE_WR_SIDE] = -1;
     }
 #else
-#endif
+#endif /* USE_PUSH_MODEL */
     return CDA_DAT_P_DEL_SRV_SUCCESS;  
 }
 
@@ -979,18 +1101,16 @@ void cda_d_tango_EventCallBack::push_event(Tango::EventData *myevent)
 {
   hwrinfo_t     *hi = AccessHwrSlot(hwr);
 #if USE_PUSH_MODEL
-  event_info_t   info;
+  int            r;
 
-    info.hwr = hwr;
-    write(hi->me->event_pipe[PIPE_WR_SIDE], &info, sizeof(info));
+    // Store data
+    pthread_mutex_lock  (&(hi->val_mutex));
+    r = store_current_value (hi, myevent->attr_value);
+    pthread_mutex_unlock(&(hi->val_mutex));
+
+    // Send a notification
+    if (r == 0) write(hi->me->event_pipe[PIPE_WR_SIDE], &hwr, sizeof(hwr));
 #else
-  cda_d_tango_privrec_t *me = hi->me;
-
-  CxAnyVal_t     val;
-  void          *value_p = &val;
-  int            nelems;
-  rflags_t       rflags;
-
 //fprintf(stderr, "%s: dev=%p attr_value=%p ", __FUNCTION__, myevent->device, myevent->attr_value); cerr << "attr_name=" << myevent->attr_name << " event=" << myevent->event; fprintf(stderr, " err=%d\n\t", myevent->err); cout<<myevent->errors[0].desc<<"\n"; //for (int err = 0;  err < myevent->errors.size();  err++) ;
     if (myevent->err)
     {
@@ -1002,41 +1122,8 @@ void cda_d_tango_EventCallBack::push_event(Tango::EventData *myevent)
         }
         return;
     }
-#if DO_CATCH
-    try
-    {
-#endif
-        switch (hi->dtype)
-        {
-            case CXDTYPE_INT16:  *(myevent->attr_value) >> val.i16;  break;
-            case CXDTYPE_UINT16: *(myevent->attr_value) >> val.u16;  break;
-            case CXDTYPE_INT32:  *(myevent->attr_value) >> val.i32;  break;
-            case CXDTYPE_UINT32: *(myevent->attr_value) >> val.u32;  break;
-            /* Note: since "'long long int' is not an enumeration type",
-                     we can NOT use 64-bit ints */
-            //case CXDTYPE_INT64:  *(myevent->attr_value) >> val.i64;  break;
-            //case CXDTYPE_UINT64: *(myevent->attr_value) >> val.u64;  break;
-            case CXDTYPE_SINGLE: *(myevent->attr_value) >> val.f32;  break;
-            case CXDTYPE_DOUBLE: *(myevent->attr_value) >> val.f64;  break;
-            default: return;
-        }
-        nelems = 1;
-        rflags = 0;
-        cda_dat_p_update_dataset(me->sid, 1, &(hi->dataref),
-                                 &value_p, &(hi->dtype), &nelems,
-                                 &rflags, NULL, CDA_DAT_P_IS_UPDATE);
-#if DO_CATCH
-    }
-    catch (CORBA::Exception &e)
-    {
-        if (cda_d_tango_debug)
-            report_exception("push_event: reading via >>", e);
-    }
-    catch (...)
-    {
-        if (cda_d_tango_debug)
-            fprintf(stderr, "%s: reading via >> raised an exception\n", __FUNCTION__);
-    }
-#endif
+
+    if (store_current_value (hi, myevent->attr_value) == 0)
+        return_current_value(hi);
 #endif /* USE_PUSH_MODEL */
 }

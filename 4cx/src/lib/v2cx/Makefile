@@ -48,7 +48,7 @@ libv2Cdr.a_COMPONENTS=		$(V2CDR_LIB_CS:.c=.o)
 
 UNCFILES=			v2all_COMPONENTS.mk
 
-SPECIFIC_CFLAGS=	-fPIC
+LOCAL_CFLAGS=		-fPIC
 
 TOPDIR=         ../..
 include $(TOPDIR)/TopRules.mk

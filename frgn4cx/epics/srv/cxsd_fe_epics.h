@@ -37,10 +37,10 @@ int  cxsd_fe_epics_get_info   (int mid,
                                cxdtype_t *dtype_p, int *max_nelems_p, int *is_rw_p);
 
 int  cxsd_fe_epics_get_data   (int mid,
-                               cxdtype_t *dtype_p, int *nelems_p, void **data_p,
+                               cxdtype_t *dtype_p, int *nelems_p,       void **data_p,
                                rflags_t *rflags_p, cx_time_t *timestamp_p);
 int  cxsd_fe_epics_do_write   (int mid, 
-                               cxdtype_t  dtype,   int  nelems,   void  *data);
+                               cxdtype_t  dtype,   int  nelems,   const void  *data);
 
 
 #ifdef __cplusplus

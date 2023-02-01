@@ -57,6 +57,10 @@ typedef struct {
     struct timeval      time_exc_start;
 
     int                 target;
+
+    int32               cur_dirn_cache;
+    int32               lim_dump_cache;
+    int32               lim_ring_cache;
 } privrec_t;
 
 static inline void SndCVal(privrec_t *me, int sodc, int32 val)
@@ -160,26 +164,42 @@ static void lebedev_rotmag_sodc_cb(int devid, void *devptr,
                                    int sodc, int32 val)
 {
   privrec_t      *me = (privrec_t *)devptr;
-  int             lim_ring;
-  int             lim_dump;
+  int32           cur_dirn;
+  int32           lim_ring;
+  int32           lim_dump;
   struct timeval  now;
   struct timeval  delta;
   struct timeval  limit;
 
     if      (sodc == C_INPREG8)
     {
-        ReturnInt32DatumTimed(devid, LEBEDEV_ROTMAG_CHAN_CUR_DIRECTION,
-                              (val >> 6) & 0x3,
-                              me->cur[sodc].flgs, me->cur[sodc].ts);
-        /* Note: we return INVERTED values (val=0: lim_sw is ON) */
+        /* 1. Calc new values */
+        cur_dirn = (val >> 6) & 0x3;
+        /* Note: we use INVERTED values of input bits (val=0: lim_sw is ON) */
         lim_dump = (val & (1 << 6)) == 0;
         lim_ring = (val & (1 << 7)) == 0;
-        ReturnInt32DatumTimed(devid, LEBEDEV_ROTMAG_CHAN_LIM_SW_DUMP,
-                              lim_dump,
-                              me->cur[sodc].flgs, me->cur[sodc].ts);
-        ReturnInt32DatumTimed(devid, LEBEDEV_ROTMAG_CHAN_LIM_SW_RING,
-                              lim_ring,
-                              me->cur[sodc].flgs, me->cur[sodc].ts);
+        /* 2. Return values ONLY if changed */
+        if (me->cur_dirn_cache != cur_dirn)
+        {
+            me->cur_dirn_cache  = cur_dirn;
+            ReturnInt32DatumTimed(devid, LEBEDEV_ROTMAG_CHAN_CUR_DIRECTION,
+                                  cur_dirn,
+                                  me->cur[sodc].flgs, me->cur[sodc].ts);
+        }
+        if (me->lim_dump_cache != lim_dump)
+        {
+            me->lim_dump_cache  = lim_dump;
+            ReturnInt32DatumTimed(devid, LEBEDEV_ROTMAG_CHAN_LIM_SW_DUMP,
+                                  lim_dump,
+                                  me->cur[sodc].flgs, me->cur[sodc].ts);
+        }
+        if (me->lim_ring_cache != lim_ring)
+        {
+            me->lim_ring_cache  = lim_ring;
+            ReturnInt32DatumTimed(devid, LEBEDEV_ROTMAG_CHAN_LIM_SW_RING,
+                                  lim_ring,
+                                  me->cur[sodc].flgs, me->cur[sodc].ts);
+        }
 
         if ((lim_dump  &&  me->target < 0)  ||
             (lim_ring  &&  me->target > 0))
@@ -228,6 +248,10 @@ static int lebedev_rotmag_init_d(int devid, void *devptr,
 
     me->n_time     = 1.0 * CHAN_TIME_R;
 
+    me->cur_dirn_cache = -1;
+    me->lim_dump_cache = -1;
+    me->lim_ring_cache = -1;
+
     SetChanRDs(devid, LEBEDEV_ROTMAG_CHAN_I_LIM,        1, UV2I,        0); /*!!! Should tube/tunnel source channel's */
     SetChanRDs(devid, LEBEDEV_ROTMAG_CHAN_I_MOTOR,      1, UV2I,        0); /*!!! Should tube/tunnel source channel's */
     SetChanRDs(devid, LEBEDEV_ROTMAG_CHAN_I_LIM_TIME,   1, CHAN_TIME_R, 0);
@@ -236,11 +260,11 @@ static int lebedev_rotmag_init_d(int devid, void *devptr,
     SetChanRDs(devid, LEBEDEV_ROTMAG_CHAN_GO_TIME_LEFT, 1, CHAN_TIME_R, 0);
 
     SetChanReturnType(devid, LEBEDEV_ROTMAG_CHAN_CUR_DIRECTION, 1,
-                      IS_AUTOUPDATED_YES);
+                      IS_AUTOUPDATED_TRUSTED);
     SetChanReturnType(devid, LEBEDEV_ROTMAG_CHAN_LIM_SW_base,   2,
-                      IS_AUTOUPDATED_YES);
-//    SetChanReturnType(devid, LEBEDEV_ROTMAG_CHAN_GOING_DIR,     1,
-//                      IS_AUTOUPDATED_TRUSTED);
+                      IS_AUTOUPDATED_TRUSTED);
+    SetChanReturnType(devid, LEBEDEV_ROTMAG_CHAN_GOING_DIR,     1,
+                      IS_AUTOUPDATED_TRUSTED);
 
     ReturnInt32Datum(devid, LEBEDEV_ROTMAG_CHAN_GOING_DIR, 0, 0);
 

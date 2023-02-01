@@ -2,6 +2,8 @@
 //#include <unistd.h>
 //#include <stdlib.h>
 
+#include "timeval_utils.h"
+
 #include "cxsd_driver.h"
 #include "cankoz_lyr.h"
 
@@ -533,10 +535,11 @@ static void PerformTimeoutActions(privrec_t *me, int do_return)
         me->tid = -1;
     }
     AbortMeasurements(me);
-    if (do_return)
+    if (do_return >  0)
         ReturnMeasurements (me, CXRF_IO_TIMEOUT);
-
-    RequestMeasurements(me);
+    if (do_return >= 0)
+        RequestMeasurements(me);
+    // -1, <0 -- do NOTHING
 }
 
 static void tout_p(int devid, void *devptr __attribute__((unused)),
@@ -689,7 +692,9 @@ static void canipp_ff(int devid, void *devptr, int is_a_reset)
     /* Note: unfortunately, data will remain "OFFLINE", because _rst() is called BEFORE triggering  */
     if (is_a_reset)
     {
-        PerformTimeoutActions(me, 1);
+//DoDriverLog(devid, 0, "PRE: read_state=%d", me->read_state);
+        PerformTimeoutActions(me, -1);
+//DoDriverLog(devid, 0, "PST: read_state=%d", me->read_state);
     }
 
     RequestScan(me);
@@ -746,7 +751,10 @@ static void canipp_in(int devid, void *devptr,
                     me->unit_CREG  [unit] = code;
                 }
                 rflags = (me->unit_online [unit]? 0 : CXRF_CAMAC_NO_Q);
-DoDriverLog(devid, 0, "unit=%-2d %c:%-2d M=%d P=%d CREG=%d", unit, me->unit_kind[unit]==UNIT_KIND_REPKOV?'r':'c', me->unit_nwires[unit], me->unit_M[unit], me->unit_P[unit], me->unit_CREG[unit]);
+                DoDriverLog(devid, 0,
+                            "Scan: %2d%c %c:%-2d M=%d P=%d CREG=%d",
+                            unit, me->unit_online[unit]?'+':' ',
+                            me->unit_kind[unit]==UNIT_KIND_REPKOV?'r':'c', me->unit_nwires[unit], me->unit_M[unit], me->unit_P[unit], me->unit_CREG[unit]);
 
                 ReturnInt32Datum(devid,
                                  CANIPP_CHAN_M_n_base      + unit,

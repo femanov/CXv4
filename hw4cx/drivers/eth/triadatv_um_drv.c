@@ -280,7 +280,8 @@ static void ScheduleReconnect(int devid, privrec_t *me, const char *reason)
 {
     /* Perform cleanup and notify server of our problem */
     CleanupFDIO(devid, me);
-    SetDevState(devid, DEVSTATE_NOTREADY, CXRF_REM_C_PROBL, reason);
+    if (!(me->is_reconnecting))
+        SetDevState(devid, DEVSTATE_NOTREADY, CXRF_REM_C_PROBL, reason);
 
     /* And do schedule reconnect */
     me->is_ready        = 0;

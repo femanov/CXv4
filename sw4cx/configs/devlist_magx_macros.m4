@@ -27,6 +27,7 @@ define(`MAGX_OLD_V1000_DEV', `
     MAGX_OLD_V1000_DEV_LINE($1, $2, 7, $24, $25, $26)
 ')
 
+# 1:a40_name 2:c16_name 3:N(0-15) 4:prefix 5:line_name
 define(`MAGX_COR4016_DEV_LINE', `
     cpoint $4.$5.Iset $2.out$3             r:0.00054000 #!!!FLOAT: 5.4/10./1000 # 5.4V<->3A? 1000 - A->mA
     cpoint $4.$5.Iset_rate $2.out_rate$3   r:0.00054000
@@ -54,12 +55,13 @@ define(`MAGX_COR4016_DEV', `
     MAGX_COR4016_DEV_LINE($1, $2, 15, $3, $19)
 ')
 
+# 1:device_name 2:N(0-7) 3:prefix 4:line_name
 define(`MAGX_COR208_DEV_LINE', `
-    cpoint $3.$4.Iset $1.out$2             r:0.00054000 #!!!FLOAT: 5.4/10./1000 # 5.4V<->3A? 1000 - A->mA
-    cpoint $3.$4.Iset_rate $1.out_rate$2   r:0.00054000
-    cpoint $3.$4.Iset_cur  $1.out_cur$2    r:0.00054000
-    cpoint $3.$4.Imes $1.adc`'eval($2*2+0) r:0.00054000 #!!!FLOAT: ^^^
-    cpoint $3.$4.Umes $1.adc`'eval($2*2+1) r:0.27027027 #!!!FLOAT: 1/3.7
+    cpoint $3.$4.Iset      $1.out$2             r:0.00054000 #!!!FLOAT: 5.4/10./1000 # 5.4V<->3A? 1000 - A->mA
+    cpoint $3.$4.Iset_rate $1.out_rate$2        r:0.00054000
+    cpoint $3.$4.Iset_cur  $1.out_cur$2         r:0.00054000
+    cpoint $3.$4.Imes      $1.adc`'eval($2*2+0) r:0.00054000 #!!!FLOAT: ^^^
+    cpoint $3.$4.Umes      $1.adc`'eval($2*2+1) r:0.27027027 #!!!FLOAT: 1/3.7
 ')
 # 1:device_name 2:prefix 3-10:line names
 define(`MAGX_COR208_DEV', `
@@ -73,12 +75,13 @@ define(`MAGX_COR208_DEV', `
     MAGX_COR208_DEV_LINE($1, 7, $2, $10)
 ')
 
+# 1:device_name 2:N(0-7) 3:prefix 4:line_name
 define(`MAGX_COR208E_DEV_LINE', `
-    cpoint $3.$4.Iset $1.out$2             r:0.00333333 #!!!FLOAT: 10.0/3.0/1000 # 10V<->3A  1000 - A->mA
-    cpoint $3.$4.Iset_rate $1.out_rate$2   r:0.00333333
-    cpoint $3.$4.Iset_cur  $1.out_cur$2    r:0.00333333
-    cpoint $3.$4.Imes $1.adc`'eval($2*2+0) r:0.00333333 #!!!FLOAT: ^^^
-    cpoint $3.$4.Umes $1.adc`'eval($2*2+1) r:0.25       #!!!FLOAT: 1/4.0
+    cpoint $3.$4.Iset      $1.out$2             r:0.00333333 #!!!FLOAT: 10.0/3.0/1000 # 10V<->3A  1000 - A->mA
+    cpoint $3.$4.Iset_rate $1.out_rate$2        r:0.00333333
+    cpoint $3.$4.Iset_cur  $1.out_cur$2         r:0.00333333
+    cpoint $3.$4.Imes      $1.adc`'eval($2*2+0) r:0.00333333 #!!!FLOAT: ^^^
+    cpoint $3.$4.Umes      $1.adc`'eval($2*2+1) r:0.25       #!!!FLOAT: 1/4.0
 ')
 # 1:device_name 2:prefix 3-10:line names
 define(`MAGX_COR208E_DEV', `
@@ -190,3 +193,27 @@ define(`MAGX_MPS25_CEAC124_DEV', `
     cpoint $1.Umes      $1.Umes      0.1
     MAGX_WALKER_SUBDEV($1, 0.4)
 ')
+
+# Note: MAGX_MPS208E_DEV* are copied from MAGX_COR208E_DEV*
+# 1:device_name 2:N(0-7) 3:prefix 4:line_name
+define(`MAGX_MPS208E_DEV_LINE', `
+    cpoint $3.$4.Iset      $1.out$2             r:0.00166666 #!!!FLOAT: 10.0/6.0/1000 # 10V<->6A  1000 - A->mA
+    cpoint $3.$4.Iset_rate $1.out_rate$2        r:0.00166666
+    cpoint $3.$4.Iset_cur  $1.out_cur$2         r:0.00166666
+    cpoint $3.$4.Imes      $1.adc`'eval($2*2+0) r:0.00166666 #!!!FLOAT: ^^^
+    cpoint $3.$4.Umes      $1.adc`'eval($2*2+1) r:0.1        #!!!FLOAT: ? 10.0/100.0 # 10V@ADC<->100V@MPS ?
+    cpoint $3.$4.swch      $1.outrb$2
+    cpoint $3.$4.ilk       $1.inprb$2
+')
+# 1:device_name 2:prefix 3-10:line names
+define(`MAGX_MPS208E_DEV', `
+    MAGX_MPS208E_DEV_LINE($1, 0, $2, $3)
+    MAGX_MPS208E_DEV_LINE($1, 1, $2, $4)
+    MAGX_MPS208E_DEV_LINE($1, 2, $2, $5)
+    MAGX_MPS208E_DEV_LINE($1, 3, $2, $6)
+    MAGX_MPS208E_DEV_LINE($1, 4, $2, $7)
+    MAGX_MPS208E_DEV_LINE($1, 5, $2, $8)
+    MAGX_MPS208E_DEV_LINE($1, 6, $2, $9)
+    MAGX_MPS208E_DEV_LINE($1, 7, $2, $10)
+')
+

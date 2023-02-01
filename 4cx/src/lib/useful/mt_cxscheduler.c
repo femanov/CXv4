@@ -45,8 +45,8 @@ static int call_gettid(void)
 
 static void do_lock  (void)
 {
-#if DEBUG_LOCKS
     if (pthread_mutex_trylock(&mt_sl_mutex) == 0) return;
+#if DEBUG_LOCKS
     fprintf(stderr, "%s %s[%d] trylock fail in %d\n", strcurtime_msc(), ARGV0_REF, getpid(), call_gettid());
 #endif
     pthread_mutex_lock  (&mt_sl_mutex);

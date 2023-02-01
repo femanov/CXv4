@@ -2936,7 +2936,7 @@ void ReturnDataSet    (int devid,
             /* Note "usize", NOT "current_usize"! */
             bzero(dst, chn_p->max_nelems * chn_p->usize);
         }
-#else
+#else /* Artefact from times when data conversion wasn't implemented yet */
         /*!!!DATACONV*/
         if (dtypes[x] != chn_p->dtype)
         {

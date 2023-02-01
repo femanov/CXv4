@@ -1,10 +1,11 @@
 vepp4_CLIENTS=	
 vepp5_CLIENTS=	
+skif_CLIENTS=	skifinjmag
 weld_CLIENTS=	baachi verona weldcc xweldcc lhebwcc
 liu_CLIENTS=	liu
 common_CLIENTS=	ist_cdac20 v1k_cdac20 v3h_a40d16 mps20_ceac124 \
 		gid25x4
-CLIENTS=	rfsyn_eng v5rfsyn v5ie v5kls v5cnv \
+CLIENTS=	rfsyn_eng v5rfsyn v5ie v5kls v5kls_ionpumps v5cnv \
 		linmag linvac linthermcan linslbpms linipp lin485s linrf_smc \
 		ringmag ringcor23 ringcor45 ringrf ringcurmon \
 		subharmonic lincamsel ringcamsel rotmag \
@@ -21,7 +22,8 @@ CLIENTS=	rfsyn_eng v5rfsyn v5ie v5kls v5cnv \
 		gid25x4 v4gid25s v4k500mag v4k500 \
 		vepp34info vepp5info \
 		v5ringcurmon4v4 \
-		baachi verona weldcc xweldcc lhebwcc
+		baachi verona weldcc xweldcc lhebwcc \
+		skifinjmag
 #CLIENTS=	$(sort $(foreach P, $(PARTS), $($(P)_CLIENTS)) )
 AUX_SCREEN_FILES=	subsys_magx_macros.m4 gid25_subsys_macros.m4
 

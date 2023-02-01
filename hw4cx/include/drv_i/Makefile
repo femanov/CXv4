@@ -4,6 +4,7 @@ TYPES_LIST=	cac208 ceac124 cdac20 candac16 canadc40 \
 		senkov_vip senkov_ebc weld02 \
 		tvac320 panov_ubs \
 		smc8 \
+		gin25 \
 		\
 		c0601 c0609 c0612 c0642 \
 		g0401 g0601 g0603 gzi11 \

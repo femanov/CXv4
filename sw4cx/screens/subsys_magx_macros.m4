@@ -474,3 +474,16 @@ define(`MAGX_COR20_CEAC124_LINE',
     }
         ')
 
+# 1:id&r 2:label
+define(`MAGX_MPS208_LINE',
+       `knob/groupable $1_Iset $2 text nounits - %5.0f $1.Iset \
+                alwdrange:-9000-+9000 step:100
+        disp           $1_Imes "" text -       - %5.0f $1.Imes \
+                normrange:0-5 yelwrange:0-7 \
+                c:MAGX_C100($1`'.Iset, $1`'.Imes) colz:important
+        disp           $1_Umes "" text -       - %6.2f $1.Umes \
+                yelwrange:-1-+24'
+        knob           $1_swch "" choicebs           r:$1.swch \
+                items:"#TOff\b\blit=red\tOn\b\blit=green"
+        disp           $1_ilk  "" led  "color=red"   r:$1.ilk
+)

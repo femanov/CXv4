@@ -2,6 +2,7 @@
 
 include(`caniva.devtype')
 include(`ceac124.devtype')
+include(`cdac20.devtype')
 
 include(`canhw_CAN_LINES_LIST.m4')
 
@@ -129,3 +130,8 @@ LIN124_DEV(chanvc9,  v5T2,    v5T3,    v5T4,    v5T5)
 LIN124_DEV(chanvc10, v6T6,    v6T7,    v6T8,    v6T9)
 LIN124_DEV(chanvc11, v6T10,   v6T11,   v6T12,   v6T13)
 LIN124_DEV(chanvc12, vR120,   vR121,   vR122,   vR123)
+
+#---------------------------------------------------------------------
+
+dev kls1_ionpump_adc cdac20@sktcankoz ~ L_IONPMP,63 beg=0 end=0 fast adc_timecode=4
+cpoint kls1.ionpump.current kls1_ionpump_adc.adc0 r:-0.01 units:uA   # 10mV<->1uA, i.e. 0.01V<->1uA; invert the sign (hence '-')

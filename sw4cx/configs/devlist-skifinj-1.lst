@@ -1,0 +1,51 @@
+include(`cac208.devtype')
+include(`ceac124.devtype')
+include(`devlist_magx_macros.m4')
+
+######################################################################
+######################################################################
+
+dev c208e_b1    cac208@sktcankoz   ~ 0,51     spd=-1666666 # 0x33=0xCC>>2
+dev c208e_b2    cac208@sktcankoz   ~ 0,63     spd=-1666666 # 
+dev c208e_d1    cac208@sktcankoz   ~ 0,53     spd=-1666666
+dev c208e_d2    cac208@sktcankoz   ~ 0,15     spd=-1666666
+
+MAGX_MPS208E_DEV(c208e_b1, belikov1,
+                 ps0,ps1,ps2,ps3,ps4,ps5,ps6,ps7)
+MAGX_MPS208E_DEV(c208e_b2, belikov2,
+                 ps0,ps1,ps2,ps3,ps4,ps5,ps6,ps7)
+MAGX_COR208E_DEV(c208e_d1, dovzhenko1,
+                 ps0,ps1,ps2,ps3,ps4,ps5,ps6,ps7)
+MAGX_COR208E_DEV(c208e_d2, dovzhenko2,
+                 ps0,ps1,ps2,ps3,ps4,ps5,ps6,ps7)
+
+######################################################################
+
+dev vip124 ceac124@sktcankoz ~ 1,63
+
+#cpoint vip.i0	vip124.adc0 0.001
+#cpoint vip.u0	vip124.adc1 0.001
+#cpoint vip.i1	vip124.adc2 0.001
+#cpoint vip.u1	vip124.adc3 0.001
+#cpoint vip.i2	vip124.adc4 0.001
+#cpoint vip.u2	vip124.adc5 0.001
+#cpoint vip.i3	vip124.adc6 0.001
+#cpoint vip.u3	vip124.adc7 0.001
+
+define(`LIN124_DEV_LINE', `
+    cpoint $2.Imes $1.adc`'eval(($3)*2+0) r:0.001 # 1mA<->V
+    cpoint $2.Umes $1.adc`'eval(($3)*2+1)         # 1kV<->1V
+    cpoint $2.U5_7 $1.out$3                       # Just volts
+    cpoint $2.IsOn $1.outrb$3
+    #cpoint $2.Ilim a_$1.ilim$3
+    #cpoint $2.Ulim a_$1.ulim$3
+')
+# 1:ceac124_name 2-5:row names
+define(`LIN124_DEV', `
+    LIN124_DEV_LINE($1, $2, 0)
+    LIN124_DEV_LINE($1, $3, 1)
+    LIN124_DEV_LINE($1, $4, 2)
+    LIN124_DEV_LINE($1, $5, 3)
+')
+
+LIN124_DEV(vip124,vc0,vc1,vc2,vc3)

@@ -4,7 +4,7 @@ libvdev.a_COMPONENTS=	vdev.o
 EXPORTSFILES=		$(ARLIBS)
 EXPORTSDIR=		lib
 
-SPECIFIC_CFLAGS=	-fPIC
+LOCAL_CFLAGS=		-fPIC
 
 ######################################################################
 TOPDIR=	        ../..

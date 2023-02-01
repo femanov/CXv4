@@ -10,13 +10,13 @@ weld_CLNHOSTS=	tower ep1-berezin2 xweld
 liu_SRVHOSTS=	rack0 rack1 wolf
 liu_CLNHOSTS=	
 
-skif_SRVHOSTS=	dwarf
+skif_SRVHOSTS=	dwarf skifinj
 skif_CLNHOSTS=	dwarf
 
 SRVHOSTS=	cxhw canhw foxy v2k-k500-1 vepp4-pult6 can2 \
 		bike tower romeo ep1-berezin2 xweld \
 		rack0 rack1 \
-		dwarf
+		dwarf skifinj
 CLNHOSTS=	linac3 worker1 camilla2 io io2 vepp4-pult6 PULT VEPP4 \
 		tower ep1-berezin2 xweld \
 		dwarf
@@ -39,6 +39,7 @@ xweld_SERVERS=		50
 rack0_SERVERS=		24 26
 rack1_SERVERS=		23
 dwarf_SERVERS=		59
+skifinj_SERVERS=	1
 
 DEVLISTS=	$(foreach H, $(SRVHOSTS), \
 		  $(foreach N, $($(H)_SERVERS), devlist-$H-$N.lst))

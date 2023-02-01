@@ -14,7 +14,7 @@ MAKEFILE_PARTS+=	libcx_async.a_COMPONENTS.mk libcx_sync.a_COMPONENTS.mk
 EXPORTSFILES=		$(ARLIBS)
 EXPORTSDIR=		lib
 
-SPECIFIC_CFLAGS=	-fPIC
+LOCAL_CFLAGS=		-fPIC
 
 TOPDIR=         ../..
 include $(TOPDIR)/TopRules.mk

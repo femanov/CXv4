@@ -1,0 +1,15 @@
+sysname v5kls_ionpumps
+defserver canhw:13
+wintitle main "Klystrons Ion Pumps current measurements"
+winname  main v5kls_ionpumps
+winclass main V5KLS_IonPumps
+winopts  main resizable,compact,nostatusline,hist_period=0.2,hist_len=eval(86400*5)
+
+grouping main v5kls_ionpumps_grouping "V5KLS_IonPumps" canvas "nodecor" param1:1 content:2 {
+    container params Params grid notitle,nocoltitles,noshadow content:1 {
+        disp kls1_ionpump_current  "Kls1 Pump Current"       text "" uA   %7.1f r:kls1.ionpump.current disprange:0-+10
+    }
+    noop      plot "Plot" histplot \
+            "width=700,height=400,add=params.kls1_ionpump_current" \
+            layinfo:"left=0,right=0,top=0,bottom=0"
+}
