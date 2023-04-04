@@ -135,6 +135,29 @@ static char *make_time_str(MotifKnobs_histplot_t *hp, int age, int with_msc)
     return buf;
 }
 
+static void ShowCurTime(MotifKnobs_histplot_t *hp)
+{
+  char            buf[100];
+  struct timeval  timenow;
+  struct tm      *st;
+
+    if (hp->view_only  || 0/* if displaying absolute times instead of ages */)
+        buf[0] = '\0';
+    else
+    {
+        gettimeofday(&timenow, NULL);
+        st = localtime(&(timenow.tv_sec));
+        if (hp->cyclesize_us < 1000000) // Display milliseconds if frequency is >1Hz
+            sprintf(buf, "%02d:%02d:%02d.%03d",
+                    st->tm_hour, st->tm_min, st->tm_sec, (int)(timenow.tv_usec / 1000));
+        else
+            sprintf(buf, "%02d:%02d:%02d",
+                    st->tm_hour, st->tm_min, st->tm_sec);
+    }
+
+    XmTextSetString(hp->time_dpy, buf);
+}
+
 //////////////////////////////////////////////////////////////////////
 
 enum
@@ -1001,7 +1024,7 @@ static void set_x_index(MotifKnobs_histplot_t *hp, int idx)
     /* 1. Blank if state changes from "on" to "off" */
     if (idx < 0  &&  hp->x_index >= 0)
     {
-        XmTextSetString(hp->time_dpy, "");
+        ShowCurTime(hp);
     }
     /* 2. Display time if required */
     if (idx >= 0)
@@ -1088,7 +1111,11 @@ static int CalcPlotParams(MotifKnobs_histplot_t *hp)
 
 static void DisplayPlot(MotifKnobs_histplot_t *hp)
 {
-    if (hp->x_index < 0) UpdateAllPlotRows(hp);
+    if (hp->x_index < 0)
+    {
+        UpdateAllPlotRows(hp);
+        ShowCurTime      (hp);
+    }
 
     CalcPlotParams(hp);
     
@@ -1225,8 +1252,13 @@ static void PlotRmCB(Widget     w,
 static void XScaleKCB(DataKnob k, double v, void *privptr)
 {
   MotifKnobs_histplot_t *hp  = privptr;
+  int                    rqd_x_scale;
 
-    hp->x_scale = x_scale_factors[(int)(round(v))];
+    rqd_x_scale = x_scale_factors[(int)(round(v))];
+    if (rqd_x_scale == hp->x_scale) return;
+
+    hp->x_scale = rqd_x_scale;
+    SetHorzOffset(hp, 0); XtVaSetValues(hp->horzbar, XmNvalue, 0, NULL); // Set scrollbar to the beginning
     CalcPlotParams(hp);
     DrawGraph(hp, True);
     DrawAxis (hp, True);

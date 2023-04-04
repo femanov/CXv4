@@ -1,0 +1,48 @@
+     define(`forloop',
+            `pushdef(`$1', `$2')_forloop(`$1', `$2', `$3', `$4')popdef(`$1')')
+     define(`_forloop',
+            `$4`'ifelse($1, `$3', ,
+                   `define(`$1', incr($1))_forloop(`$1', `$2', `$3', `$4')')')
+     define(`fordown',
+            `pushdef(`$1', `$2')_fordown(`$1', `$2', `$3', `$4')popdef(`$1')')
+     define(`_fordown',
+            `$4`'ifelse($1, `$3', ,
+                   `define(`$1', decr($1))_fordown(`$1', `$2', `$3', `$4')')')
+#---------------------------------------------------------------------
+
+# 1:line_N 2:bit_N
+define(`GIN25_ERR_LINE', `
+    disp errc$1b$2 "" led  "shape=circle,color=red" r:errc$1b$2
+')
+
+# 1:line_N
+define(`GIN25_LINE', `
+    knob Uset$1  "" text "" "" %9.0f r:Uset$1
+    disp Umes$1  "" text "" "" %9.0f r:Umes$1
+    disp stat$1  "" led  "shape=circle,color=green" r:status$1
+    knob/ign_otherop charge$1 "" choicebs nolabel items:"#TOff\b\blit=red\tOn\b\blit=green" \
+                                      r:charge_ctl$1
+    forloop(`N', 0, 7, `GIN25_ERR_LINE($1, N)')
+    button rst$1 "R"  button r:rst_err$1
+')
+
+grouping main GIN25 "GIN25" \
+         lrtb "" content:1 {
+    container "" "CGVI8" grid "noshadow"  \
+              coltitles:"Uset\tUmes\t?\t \t0\bShort-circuit\t1\bOverload\t2\bCharge timeout\t3\b24V low\t4\b500V low\t5\bOverheat\t6\t7\t " \
+              rowtitles:"1\t2\t3" \
+              ncols:13 nattl:3 content:eval(3+13*3) {
+        disp   hw_ver    HW    text   "withlabel" dpyfmt:"%-2.0f" r:hw_ver
+        disp   sw_ver    SW    text   "withlabel" dpyfmt:"%-2.0f" r:sw_ver
+        knob   time_code "T"   text   "withlabel" dpyfmt:"%1.0f"  r:timecode
+
+        GIN25_LINE(1)
+        GIN25_LINE(2)
+        GIN25_LINE(3)
+    }
+}
+
+wintitle main "GIN25"
+winname  main gin25
+winclass main GIN25
+winopts  main ""

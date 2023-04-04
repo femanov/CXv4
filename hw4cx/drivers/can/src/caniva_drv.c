@@ -96,10 +96,11 @@ static void caniva_term_d(int devid, void *devptr __attribute__((unused)))
 {
   privrec_t *me    = (privrec_t *) devptr;
 
-    me->lvmt->q_enqueue_v(me->handle, SQ_ALWAYS,
-                          SQ_TRIES_DIR, 0,
-                          NULL, NULL,
-                          0, 4, DESC_WRITEDEVSTAT, 0, 0, 0);
+    if (me->handle >= 0)
+        me->lvmt->q_enqueue_v(me->handle, SQ_ALWAYS,
+                              SQ_TRIES_DIR, 0,
+                              NULL, NULL,
+                              0, 4, DESC_WRITEDEVSTAT, 0, 0, 0);
 }
 
 static void caniva_ff(int   devid    __attribute__((unused)),

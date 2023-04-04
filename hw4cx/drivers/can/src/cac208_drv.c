@@ -237,6 +237,7 @@ enum
     DSRF_RESET_CHANS = 1 << 0,
     DSRF_RETCONFIGS  = 1 << 1,
     DSRF_CUR2OUT     = 1 << 2,
+    DSRF_TMODE_NONE  = 1 << 3,
 };
 
 static int8 SUPPORTED_chans[KOZDEV_CONFIG_CHAN_count] =
@@ -317,6 +318,7 @@ static void SendMULTICHAN(privrec_t *me)
                         0, dlc, data);
 }
 
+static void SetTmode(privrec_t *me, int mode, const char *message);
 static void DoSoftReset(privrec_t *me, int flags)
 {
   int    x;
@@ -339,6 +341,9 @@ static void DoSoftReset(privrec_t *me, int flags)
         for (x = 0;  x < countof(me->out);  x++)
             ReturnInt32Datum(me->devid, KOZDEV_CHAN_OUT_n_base + x,
                              me->out[x].cur, 0);
+
+    if (flags & DSRF_TMODE_NONE)
+        SetTmode(me, KOZDEV_TMODE_NONE, NULL);
 }
 
 static void SendWrRq(privrec_t *me, int l, int32 val)
@@ -415,8 +420,7 @@ static int  cac208_init_d(int devid, void *devptr,
     if (me->handle < 0) return me->handle;
     me->lvmt->has_regs(me->handle, KOZDEV_CHAN_REGS_base);
 
-    DoSoftReset(me, DSRF_RESET_CHANS);
-    SetTmode   (me, KOZDEV_TMODE_NONE, NULL);
+    DoSoftReset(me, DSRF_RESET_CHANS | DSRF_TMODE_NONE);
 
     sl_enq_tout_after(devid, devptr, ALIVE_USECS,     cac208_alv, NULL);
     sl_enq_tout_after(devid, devptr, HEARTBEAT_USECS, cac208_hbt, NULL);
@@ -450,10 +454,11 @@ static void cac208_term_d(int devid, void *devptr)
   privrec_t *me = devptr;
 
     DoDriverLog(devid, 0 | DRIVERLOG_C_ENTRYPOINT, "%s()", __FUNCTION__);
-    me->lvmt->q_enqueue_v(me->handle, SQ_ALWAYS,
-                          SQ_TRIES_DIR, 0,
-                          NULL, NULL,
-                          0, 1, DESC_STOP);
+    if (me->handle >= 0)
+        me->lvmt->q_enqueue_v(me->handle, SQ_ALWAYS,
+                              SQ_TRIES_DIR, 0,
+                              NULL, NULL,
+                              0, 1, DESC_STOP);
 }
 
 static void cac208_ff (int devid, void *devptr, int is_a_reset)
@@ -475,7 +480,7 @@ static void cac208_ff (int devid, void *devptr, int is_a_reset)
     if (is_a_reset)
     {
         for (l = 0;  l < countof(me->out);  l++) me->out[l].rcv = 0;
-        DoSoftReset(me, 0);
+        DoSoftReset(me, DSRF_TMODE_NONE);
     }
 }
 
@@ -691,7 +696,7 @@ static void cac208_rw_p(int devid, void *devptr,
         {
             if (val == CX_VALUE_COMMAND)
             {
-                DoSoftReset(me, DSRF_RESET_CHANS | DSRF_RETCONFIGS | DSRF_CUR2OUT);
+                DoSoftReset(me, DSRF_RESET_CHANS | DSRF_RETCONFIGS | DSRF_CUR2OUT | DSRF_TMODE_NONE);
                 SendMULTICHAN(me);
             }
             ReturnCtlCh(me, chn);

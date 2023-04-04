@@ -1,0 +1,23 @@
+define(`TIME24K4_LINE', `
+    knob mask$1 ""  onoff "color=black" r:mask$1
+    disp time$1 ""  text  - - %8.0f     r:time$1
+')
+
+grouping main TIME24K4 "Frolov's TIME24K4" \
+        grid "nodecor" ncols:2 content:eval(2+2+2*4) {
+    noop
+    selector clk_mode "" choicebs r:clk_mode items:"Int\tExt"
+    disp     l        "" led "" r:99
+    button   r        Read button r:49
+    TIME24K4_LINE(1)
+    TIME24K4_LINE(2)
+    TIME24K4_LINE(3)
+    TIME24K4_LINE(4)
+#    selector in  "Input" choicebs r:in_sel  items:"-\t1\t2\t3\t4"
+#    selector out "->"    choicebs r:out_sel items:"none\tOut1\tOutIn\tOut1+OutIn"
+}
+
+wintitle main "Frolov's TIME24K4 diagnostic app"
+winname  main frolov_time24k4
+winclass main Frolov_Time24k4
+winopts  main ""

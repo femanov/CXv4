@@ -248,10 +248,11 @@ static void canadc40_term_d(int devid, void *devptr)
   privrec_t *me = devptr;
 
     DoDriverLog(devid, 0 | DRIVERLOG_C_ENTRYPOINT, "%s()", __FUNCTION__);
-    me->lvmt->q_enqueue_v(me->handle, SQ_ALWAYS,
-                          SQ_TRIES_DIR, 0,
-                          NULL, NULL,
-                          0, 1, DESC_STOP);
+    if (me->handle >= 0)
+        me->lvmt->q_enqueue_v(me->handle, SQ_ALWAYS,
+                              SQ_TRIES_DIR, 0,
+                              NULL, NULL,
+                              0, 1, DESC_STOP);
 }
 
 static void canadc40_ff (int devid, void *devptr, int is_a_reset)

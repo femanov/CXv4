@@ -33,7 +33,7 @@ int ppf4td_pipe_open (ppf4td_ctx_t *ctx, char *const cmdline[])
 
     if (pipe(fds) != 0) return -1;
 
-    me = malloc(sizeof(me));
+    me = malloc(sizeof(*me));
     if (me == NULL) return -1;
 
     r = fork();

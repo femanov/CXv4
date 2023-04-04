@@ -1,0 +1,5 @@
+include(`frolov_d16.devtype')
+include(`frolov_time24k4.devtype')
+
+dev d16 frolov_d16/remdrv      ~ 14  b:ppc-syn-test
+dev t24 frolov_time24k4/remdrv ~ 11  b:ppc-syn-test

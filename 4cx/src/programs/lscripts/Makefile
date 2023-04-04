@@ -1,18 +1,21 @@
 ######################################################################
 #                                                                    #
-#  programs/Makefile                                                 #
-#      Rules for making CX programs/ subtree                         #
+#  programs/lscripts/Makefile                                        #
+#      Rules for making launch-scripts                               #
 #                                                                    #
 ######################################################################
 
-CSUBDIRS=	server drivers utils lscripts
-XSUBDIRS=	tests xmclients runner pults
-ifneq "$(NOX)" ""
-  XSUBDIRS=	
-endif
-SUBDIRS=	$(CSUBDIRS) $(XSUBDIRS)
+SH_UTILS=	run-cx-server start-all-servers stop-all-servers
+UNCFILES=	$(SH_UTILS)
 
-TOPDIR=		..
+SUBDIRS=
+TOPDIR=		../..
 include $(TOPDIR)/TopRules.mk
+
+$(SH_UTILS):	%: %.sh
+		cp -p $< $@  &&  chmod +x $@
+
+EXPORTSFILES=	$(SH_UTILS)
+EXPORTSDIR=	bin
 
 # #### END OF Makefile ###############################################

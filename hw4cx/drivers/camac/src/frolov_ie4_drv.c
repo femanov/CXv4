@@ -121,13 +121,42 @@ static void LAM_CB(int devid, void *devptr)
 {
   frolov_ie4_privrec_t *me = (frolov_ie4_privrec_t*)devptr;
   int                   c;
+#if 1
+  int                   status;
 
+  int                   chan_addrs [2];
+  cxdtype_t             chan_dtypes[2];
+  int                   chan_nelems[2];
+  int32                 chan_vals  [2];
+  void                 *chan_vals_p[2];
+  rflags_t              chan_rflags[2];
+
+    // Drop LAM
+    DO_NAF(CAMAC_REF, me->N, 0, 10, &c);
+    // Read BUM state
+    status = DO_NAF(CAMAC_REF, me->N, A_RS, 1, &c);
+
+    // Update BUM_GOING and LAM_SIG in a *single* operation
+    // (thus saving an extra syscall and reducing time between those channels' updates)
+    chan_addrs [0] = FROLOV_IE4_CHAN_BUM_GOING; chan_addrs [1] = FROLOV_IE4_CHAN_LAM_SIG;
+    chan_dtypes[0] =                            chan_dtypes[1] = CXDTYPE_INT32;
+    chan_nelems[0] =                            chan_nelems[1] = 1;
+    chan_vals  [0] = (c & (1 << 6)) == 0;       chan_vals  [1] = 0;
+    chan_vals_p[0] = chan_vals + 0;             chan_vals_p[1] = chan_vals + 1;
+    chan_rflags[0] = x2rflags(status);          chan_rflags[1] = 0;
+
+    ReturnDataSet(me->devid,
+                  2,
+                  chan_addrs, chan_dtypes, chan_nelems,
+                  chan_vals_p, chan_rflags, NULL);
+#else
     // Drop LAM
     DO_NAF(CAMAC_REF, me->N, 0, 10, &c);
     // Immediately update BUM status
     ReturnOne(me, FROLOV_IE4_CHAN_BUM_GOING);
     // And signal LAM upwards
     ReturnInt32Datum(devid, FROLOV_IE4_CHAN_LAM_SIG, 0, 0);
+#endif
 }
 
 static int frolov_ie4_init_d(int devid, void *devptr,
@@ -197,6 +226,9 @@ static void frolov_ie4_rw_p(int devid, void *devptr,
   int                   c;
   int32                 value;
   rflags_t              rflags;
+
+  int                   status;
+  int                   junk;
 
   int                   c_rf;
   int                   c_rs;
@@ -510,6 +542,19 @@ static void frolov_ie4_rw_p(int devid, void *devptr,
                  FROLOV_IE4_CHAN_DIAG_n_base + FROLOV_IE4_CHAN_DIAG_n_count - 1:
                 /* Just ignore this request: are returned upon DO_DIAG */
                 goto NEXT_CHANNEL;
+
+            case FROLOV_IE4_CHAN_FORCE_LAM:
+                if (action == DRVA_WRITE  &&  value == CX_VALUE_COMMAND)
+                    LAM_CB(devid, devptr);
+                rflags = 0;
+                value  = 0;
+                break;
+
+            case FROLOV_IE4_CHAN_LAM_VIA_Q:
+                status = DO_NAF(CAMAC_REF, me->N, 0, 8, &junk);
+                rflags = x2rflags(status);
+                value  = (status & CAMAC_Q)   != 0;
+                break;
 
             default:
                 value  = 0;

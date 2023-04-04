@@ -1,0 +1,5 @@
+include(`gin25.devtype')
+
+include(`canhw_CAN_LINES_LIST.m4')
+
+dev g25 gin25@sktcankoz ~ L_TMP_IE,8

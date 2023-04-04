@@ -224,7 +224,7 @@ static int  CreateMatrixVect(DataKnob k, CxWidget parent)
   int                    x0;
   int                    y0;
   int                    n;
-  int                    n_w;
+  CxWidget               n_w;
   char                   buf[10];
   XmString               s;
   int                    columns = GetTextColumns(k->u.v.dpyfmt, NULL) + 1;
@@ -328,6 +328,7 @@ static int  CreateMatrixVect(DataKnob k, CxWidget parent)
             XmStringFree(s);
             XhGridSetChildPosition (n_w, 0, y0 + n);
             XhGridSetChildAlignment(n_w, +1, 0);
+//fprintf(stderr, "n=%5d n_w=%p\n", n, (void*)n_w);
         }
 
         me->cells[n] = MotifKnobs_MakeTextWidget(CNCRTZE(grid), k->is_rw, columns);

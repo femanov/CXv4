@@ -29,7 +29,7 @@ grouping main VERONA_grouping "Beam welding control center" \
             grid "nocoltitles,norowtitles" 4 base:vip content:4 {
         container ctl "Управление" grid nohline,nofold,noshadow,nocoltitles,norowtitles content:8 {
             container - "Settings" grid notitle,noshadow,nocoltitles content:2 {
-                knob u_high "Высокое" text - kV %4.1f set_dac_uout alwdrange:0-60
+                knob u_high "Высокое" text - kV %4.1f set_dac_uout alwdrange:0-90
                 knob k_corr "K корр." text - -  %4.0f set_dac_corr alwdrange:0-255
             }
             disp pwr "3ф-сеть подана" led r:mode_power_on

@@ -868,8 +868,8 @@ int     CxsdDbResolveName(CxsdDb      db,
                           int        *chann_p)
 {
   int               parent_clvl_id;
-  char             *p;
-  char             *dot_p;
+  const char       *p;
+  const char       *dot_p;
   size_t            len;
   int               last;
   int               r;
@@ -925,7 +925,7 @@ int     CxsdDbResolveName(CxsdDb      db,
         }
         len = dot_p - p;
         /* Skip consecutive '.'s, if any */
-        while (dot_p[1] == '.') dot_p++;
+        if (!last) while (dot_p[1] == '.') dot_p++;
 
         r = CxsdDbClvlFindItem(db, parent_clvl_id, p, len, &item_data);
 ////fprintf(stderr, "rslv<%.*s>, last=%d: lvlid=%d r=%d, type=%d\n", len, p, last, parent_clvl_id, r, r<0?-9:item_data.type);

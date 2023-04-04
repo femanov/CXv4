@@ -25,7 +25,8 @@ CLIENTS=	rfsyn_eng v5rfsyn v5ie v5kls v5kls_ionpumps v5cnv \
 		baachi verona weldcc xweldcc lhebwcc \
 		skifinjmag
 #CLIENTS=	$(sort $(foreach P, $(PARTS), $($(P)_CLIENTS)) )
-AUX_SCREEN_FILES=	subsys_magx_macros.m4 gid25_subsys_macros.m4
+AUX_SCREEN_FILES=	subsys_magx_macros.m4 \
+			gid25_subsys_macros.m4 subsys_kshd485_macros.m4
 
 EXPORTSFILES3=	weld_mes_up_mv2mka.lst
 EXPORTSDIR3=	settings/common

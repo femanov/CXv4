@@ -1,0 +1,9 @@
+
+dev src noop    w1d -
+dev val noop    w1d -
+dev ena noop    w1d -
+dev cpy formula r1d - \
+    r="_all_code; \
+       getchan ena.0; cmp_if_lt 1; goto RET; \
+       getchan src.0; allow_w; putchan val.0; \
+       label RET; ret 0;"

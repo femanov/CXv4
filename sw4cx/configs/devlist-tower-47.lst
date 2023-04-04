@@ -13,7 +13,7 @@ include(`weldproc.devtype')
 
 # 192.168.8.205   ppc-weldsyn.Vepp5.private.net   ppc-weldsyn
 
-dev vip    senkov_vip@sktcankoz  ~ 0,10 
+dev vip    senkov_vip@sktcankoz  ~ 0,10 max_u=90
 dev gun    weld02@sktcankoz      ~ 0,12 
 dev vac    ceac124@sktcankoz     ~ 0,13 beg=0 end=1
 dev mag1_a ceac124@sktcankoz     ~ 0,14

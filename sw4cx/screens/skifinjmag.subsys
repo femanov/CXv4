@@ -1,4 +1,5 @@
 include(`subsys_magx_macros.m4')
+include(`subsys_kshd485_macros.m4')
 
 sysname skifinjmag
 defserver skifinj:1
@@ -22,7 +23,7 @@ define(`LIN124_LINE', `
             w:"_all_code; qryval; mul 7; putchan $1.U5_7; ret;"
 ')
 grouping main SKIFINJMAG_grouping "SKIF Injector Belikov+Dovzhenko" lrtb \
-        content:5 {
+        content:6 {
 
     container belikov1 "Belikov 1" grid \
             coltitles:"Set, mA\tMes.\tU, V\t\t!" \
@@ -74,6 +75,18 @@ grouping main SKIFINJMAG_grouping "SKIF Injector Belikov+Dovzhenko" lrtb \
         MAGX_COR208_LINE(ps5,  "5")
         MAGX_COR208_LINE(ps6,  "6")
         MAGX_COR208_LINE(ps7,  "7")
+    }
+
+    grouping main LIN485s_grouping "Lumin. 485s" grid nocoltitles 4 content:eval(4*9) {
+        KSHD485_LINE(k1)
+        KSHD485_LINE(k2)
+        KSHD485_LINE(k3)
+        KSHD485_LINE(k4)
+        KSHD485_LINE(k5)
+        KSHD485_LINE(k6)
+        KSHD485_LINE(k7)
+        KSHD485_LINE(k8)
+        KSHD485_LINE(k9)
     }
 
 #    container vip "VIP" grid \

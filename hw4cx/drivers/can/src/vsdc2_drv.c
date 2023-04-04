@@ -309,10 +309,11 @@ static void vsdc2_term_d(int devid, void *devptr)
 
     DoDriverLog(devid, 0 | DRIVERLOG_C_ENTRYPOINT, "%s()", __FUNCTION__);
 #if 0 /*!!! Send "STOP"? */
-    me->lvmt->q_enqueue_v(me->handle, SQ_ALWAYS,
-                          SQ_TRIES_DIR, 0,
-                          NULL, NULL,
-                          0, 1, DESC_STOP);
+    if (me->handle >= 0)
+        me->lvmt->q_enqueue_v(me->handle, SQ_ALWAYS,
+                              SQ_TRIES_DIR, 0,
+                              NULL, NULL,
+                              0, 1, DESC_STOP);
 #endif
 }
 

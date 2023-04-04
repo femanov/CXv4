@@ -1,6 +1,7 @@
 include(`cac208.devtype')
 include(`ceac124.devtype')
 include(`devlist_magx_macros.m4')
+include(`kshd485.devtype')
 
 ######################################################################
 ######################################################################
@@ -49,3 +50,15 @@ define(`LIN124_DEV', `
 ')
 
 LIN124_DEV(vip124,vc0,vc1,vc2,vc3)
+
+######################################################################
+
+#dev k1 kshd485@mxupiv485 ~ 0,1
+#dev k2 kshd485@mxupiv485 ~ 0,2
+#dev k3 kshd485@mxupiv485 ~ 0,3
+#dev k4 kshd485@mxupiv485 ~ 0,4
+#dev k5 kshd485@mxupiv485 ~ 0,5
+#dev k6 kshd485@mxupiv485 ~ 0,6
+#dev k7 kshd485@mxupiv485 ~ 0,7
+#dev k8 kshd485@mxupiv485 ~ 0,8
+#dev k9 kshd485@mxupiv485 ~ 0,9

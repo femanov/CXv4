@@ -1,0 +1,14 @@
+devtype frolov_time24k4 w50i,r40i,r4+b2048,r6i {
+        mask<1-4>	0
+
+	clk_mode	10
+
+	time<1-4>	50
+
+	stat<1-4>	90
+	# Following channels are for onei32l oscillogram presentation and are forced to 2048,0,255 respectively
+	numpts		94
+	cur_numpts	numpts
+	rangemin	95
+	rangemax	96
+}

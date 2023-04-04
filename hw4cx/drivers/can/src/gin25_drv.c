@@ -30,9 +30,17 @@ enum
 enum
 {
     MIN_TIMECODE = 0,
-    MAX_TIMECODE = 7,
+    MAX_TIMECODE = 99,
     DEF_TIMECODE = 4,
 };
+
+enum
+{
+    ALIVE_SECONDS   = 60,
+    ALIVE_USECS     = ALIVE_SECONDS * 1000000,
+};
+
+//////////////////////////////////////////////////////////////////////
 
 typedef struct
 {
@@ -42,6 +50,9 @@ typedef struct
 
     int              rd_rcvd;
 
+    uint8            err_reg[GIN25_NUM_LINES];
+
+    int              DEV_LINES;
     int              timecode;
 
     int              hw_ver;
@@ -50,7 +61,8 @@ typedef struct
 
 static psp_paramdescr_t gin25_params[] =
 {
-    PSP_P_INT ("timecode", privrec_t, timecode, DEF_TIMECODE,              MIN_TIMECODE, MAX_TIMECODE),
+    PSP_P_INT ("lines",    privrec_t, DEV_LINES, 1,            1,            3),
+    PSP_P_INT ("timecode", privrec_t, timecode,  DEF_TIMECODE, MIN_TIMECODE, MAX_TIMECODE),
     PSP_P_END()
 };
 
@@ -60,12 +72,54 @@ static void SendPERIODIC(privrec_t *me)
 {
   int  nl;
 
-    for (nl = 0;  nl < GIN25_NUM_LINES;  nl++)
+    for (nl = 0;  nl < me->DEV_LINES;  nl++)
         me->lvmt->q_enqueue_v(me->handle, SQ_ALWAYS,
                               SQ_TRIES_ONS, 0,
                               NULL, NULL,
                               0, 3,
                               DESC_REQ_U_MES_n_base + nl, me->timecode, MODE_MES_PERIODIC);
+}
+
+static void ReturnErrorBits(privrec_t *me, int nl, uint8 mask)
+{
+  int        err_addrs [1 + GIN25_CHAN_ERRBx_pl_count];
+  cxdtype_t  err_dtypes[1 + GIN25_CHAN_ERRBx_pl_count];
+  int        err_nelems[1 + GIN25_CHAN_ERRBx_pl_count];
+  int32      err_vals  [1 + GIN25_CHAN_ERRBx_pl_count];
+  void      *err_vals_p[1 + GIN25_CHAN_ERRBx_pl_count];
+  rflags_t   err_rflags[1 + GIN25_CHAN_ERRBx_pl_count];
+
+  int        n;
+#define SET_RET_INFO(chan_n, val)      \
+    do                                 \
+    {                                  \
+        err_addrs [n] = chan_n;        \
+        err_dtypes[n] = CXDTYPE_INT32; \
+        err_nelems[n] = 1;             \
+        err_vals  [n] = (val);         \
+        err_vals_p[n] = err_vals + n;  \
+        err_rflags[n] = 0;             \
+        n++;                           \
+    }                                  \
+    while (0)
+
+  int        x;
+
+    me->err_reg[nl] = mask;
+
+    n = 0;
+
+    SET_RET_INFO(GIN25_CHAN_ERR8B_n_base + nl, mask);
+
+    for (x = 0;  x < GIN25_CHAN_ERRBx_pl_count;  x++)
+        SET_RET_INFO(GIN25_CHAN_ERRBx_n_base + 
+                     GIN25_CHAN_ERRBx_pl_count * nl + x, 
+                     (mask & (1 << x)) != 0);
+
+    ReturnDataSet(me->devid,
+                  n,
+                  err_addrs, err_dtypes, err_nelems,
+                  err_vals_p, err_rflags, NULL);
 }
 
 //////////////////////////////////////////////////////////////////////
@@ -99,10 +153,10 @@ static int  gin25_init_d(int devid, void *devptr,
 
     sl_enq_tout_after(devid, devptr, ALIVE_USECS, gin25_alv, NULL);
 
-    //!!! SetChanRDs, SetChanReturnType
-    SetChanReturnType(devid, GIN25_CHAN_U_MES_n_base, GIN25_NUM_LINES, IS_AUTOUPDATED_YES);
-    SetChanReturnType(devid, GIN25_CHAN_HW_VER,       1,               IS_AUTOUPDATED_TRUSTED);
-    SetChanReturnType(devid, GIN25_CHAN_SW_VER,       1,               IS_AUTOUPDATED_TRUSTED);
+    SetChanReturnType(devid, GIN25_CHAN_U_MES_n_base, GIN25_NUM_LINES,        IS_AUTOUPDATED_YES);
+    SetChanReturnType(devid, GIN25_CHAN_HW_VER,       1,                      IS_AUTOUPDATED_TRUSTED);
+    SetChanReturnType(devid, GIN25_CHAN_SW_VER,       1,                      IS_AUTOUPDATED_TRUSTED);
+    SetChanReturnType(devid, GIN25_CHAN_ERROR_first,  GIN25_CHAN_ERROR_count, IS_AUTOUPDATED_TRUSTED);
 
     return DEVSTATE_OPERATING;
 }
@@ -151,7 +205,7 @@ static void gin25_in (int devid, void *devptr,
             if (dlc < 4) return;
             me->rd_rcvd = 1;
             nl  = desc - DESC_REQ_U_MES_n_base;
-            val = data[1] | (data[2] >> 8) | (data[3] >> 16);
+            val = (uint32)(data[1]) | ((uint32)(data[2]) << 8) | ((uint32)(data[3]) << 16);
             ReturnInt32Datum(devid, GIN25_CHAN_U_MES_n_base + nl, val, 0);
             break;
 
@@ -159,7 +213,7 @@ static void gin25_in (int devid, void *devptr,
         case DESC_GET_U_SET_n_base ... DESC_GET_U_SET_n_base + GIN25_NUM_LINES-1:
             if (dlc < 4) return;
             me->lvmt->q_erase_and_send_next_v(me->handle, -1, desc);
-            nl  = desc & 0x0F; /*!!! a dirty hack... */
+            nl  = (desc & 0x0F) - 1; /*!!! a dirty hack...; Note: no reason to check resulting nl for [0..2] because of "case" ranges above */
             val = data[1] | (data[2] << 8) | (data[3] << 16);
             ReturnInt32Datum(devid, GIN25_CHAN_U_SET_n_base + nl, val, 0);
             break;
@@ -177,14 +231,13 @@ static void gin25_in (int devid, void *devptr,
             nl = desc - DESC_GET_STATUS_n_base;
             ReturnInt32Datum(devid, GIN25_CHAN_CHARGE_CTL_n_base + nl, data[1], 0);
             ReturnInt32Datum(devid, GIN25_CHAN_STATUS_n_base     + nl, data[2], 0);
-            ReturnErrorBits(me, nl, data[3]);
+            ReturnErrorBits (me,                                   nl, data[3]);
             break;
 
         case DESC_RST_ERR_n_base ... DESC_RST_ERR_n_base + GIN25_NUM_LINES-1:
             if (dlc < 2) return;
             me->lvmt->q_erase_and_send_next_v(me->handle, -1, desc);
             nl = desc - DESC_RST_ERR_n_base;
-//            me->err_reg[nl] = data[1];
             ReturnErrorBits(me, nl, data[1]);
             break;
 
@@ -222,14 +275,14 @@ static void gin25_rw_p(int devid, void *devptr,
             val = 0xFFFFFFFF; // That's just to make GCC happy
 
         if      (chn >= GIN25_CHAN_U_SET_n_base  &&
-                 chn <  GIN25_CHAN_U_SET_n_base + GIN25_NUM_LINES)
+                 chn <  GIN25_CHAN_U_SET_n_base + me->DEV_LINES)
         {
             nl = chn - GIN25_CHAN_U_SET_n_base;
             if (action == DRVA_WRITE)
                 me->lvmt->q_enq_v(me->handle, SQ_IF_NONEORFIRST, 4,
-                                  DESC_GET_U_SET_n_base + nl,
-                                  ( val        & 0xFF) |
-                                  ((val >> 8)  & 0xFF) |
+                                  DESC_SET_U_SET_n_base + nl,
+                                  ( val        & 0xFF),
+                                  ((val >> 8)  & 0xFF),
                                   ((val >> 16) & 0xFF));
             else
                 me->lvmt->q_enq_v(me->handle, SQ_IF_NONEORFIRST, 1,
@@ -237,7 +290,7 @@ static void gin25_rw_p(int devid, void *devptr,
                                   
         }
         else if (chn >= GIN25_CHAN_CHARGE_CTL_n_base  &&
-                 chn <  GIN25_CHAN_CHARGE_CTL_n_base + GIN25_NUM_LINES)
+                 chn <  GIN25_CHAN_CHARGE_CTL_n_base + me->DEV_LINES)
         {
             nl = chn - GIN25_CHAN_CHARGE_CTL_n_base;
             if (action == DRVA_WRITE)
@@ -249,7 +302,7 @@ static void gin25_rw_p(int devid, void *devptr,
                                   DESC_GET_STATUS_n_base + nl);
         }
         else if (chn >= GIN25_CHAN_RST_ERR_n_base  &&
-                 chn <  GIN25_CHAN_RST_ERR_n_base + GIN25_NUM_LINES)
+                 chn <  GIN25_CHAN_RST_ERR_n_base + me->DEV_LINES)
         {
             nl = chn - GIN25_CHAN_RST_ERR_n_base;
             if (action == DRVA_WRITE  &&  val == CX_VALUE_COMMAND)
@@ -259,7 +312,7 @@ static void gin25_rw_p(int devid, void *devptr,
             ReturnInt32Datum(devid, chn, 0, 0);
         }
         else if (chn >= GIN25_CHAN_STATUS_n_base  &&
-                 chn <  GIN25_CHAN_STATUS_n_base + GIN25_NUM_LINES)
+                 chn <  GIN25_CHAN_STATUS_n_base + me->DEV_LINES)
         {
             nl = chn - GIN25_CHAN_STATUS_n_base;
             me->lvmt->q_enq_v(me->handle, SQ_IF_NONEORFIRST, 1,
@@ -276,6 +329,14 @@ static void gin25_rw_p(int devid, void *devptr,
             }
             ReturnInt32Datum(devid, chn, me->timecode, 0);
         }
+        else if (chn >= GIN25_CHAN_U_MES_n_base  &&
+                 chn <  GIN25_CHAN_U_MES_n_base + me->DEV_LINES)
+        {/* Those are returned upon measurement */}
+        else if (chn == GIN25_CHAN_HW_VER  ||  chn == GIN25_CHAN_SW_VER)
+        {/* Do-nothing -- returned from _ff() */}
+        else if (chn >= GIN25_CHAN_ERROR_first  &&
+                 chn <  GIN25_CHAN_ERROR_first + GIN25_CHAN_ERROR_count)
+        {/* Do-nothing -- returned from _in() upon DESC_GET_STATUS_* */}
         else
             ReturnInt32Datum(devid, chn, 0, CXRF_UNSUPPORTED);
 

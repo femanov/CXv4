@@ -15,6 +15,8 @@ devtype frolov_ie4 w40i,w10d,r50i {
         bum_start	31
         bum_stop	32
 
+	force_lam	33
+
         do_diag         39
 
 	v<0-3>		40
@@ -32,4 +34,6 @@ devtype frolov_ie4 w40i,w10d,r50i {
         diag_RKp	73
         diag_RKd	74
         diag_Rs		75
+
+	lam_via_q	99
 }

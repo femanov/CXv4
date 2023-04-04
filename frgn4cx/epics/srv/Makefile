@@ -1,9 +1,11 @@
-ARLIBS=			libcxsd_fe_epics.a
-SOLIBS=			cxsd_fe_epics.so
+ARLIBS=			libcxsd_fe_epics.a  libcxsd_fe_zpics.a
+SOLIBS=			cxsd_fe_epics.so    cxsd_fe_zpics.so
 MONO_C_FILES=		test_libcas
 
 libcxsd_fe_epics.a_COMPONENTS=	cxsd_fe_epics.o cxsd_fe_epics_meat.o
 cxsd_fe_epics.so_COMPONENTS=	cxsd_fe_epics.o cxsd_fe_epics_meat.o
+libcxsd_fe_zpics.a_COMPONENTS=	cxsd_fe_zpics.o cxsd_fe_epics_cas.o cxsd_sfi.o
+cxsd_fe_zpics.so_COMPONENTS=	cxsd_fe_zpics.o cxsd_fe_epics_cas.o cxsd_sfi.o
 
 EXPORTSFILES=		$(SOLIBS)
 EXPORTSDIR=		lib/server/frontends

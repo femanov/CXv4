@@ -1011,7 +1011,7 @@ static int  cda_d_cx_new_srv (cda_srvconn_t  sid, void *pdt_privptr,
 
     me->srvtype = srvtype;
 
-    /* Type-dependent cations */
+    /* Type-dependent actions */
     if (srvtype == SRVTYPE_RESOLVER)
     {
         me->cd = cx_seeker(uniq, NULL,

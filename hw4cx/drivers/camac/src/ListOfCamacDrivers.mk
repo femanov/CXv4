@@ -10,6 +10,7 @@ CAMACDRIVERS=   c0601 c0609 c0612 c0642 \
 		frolov_d16 frolov_ie4 \
 		frolov_bfp frolov_bfp2 frolov_bfp16 frolov_bl700 frolov_spd \
 		frolov_k4x1 frolov_k4x1_2x2x1 \
+		frolov_time24k4 \
 		sukh_comm24 \
 		\
 		adc200 adc502 adc333 adc4 c061621 f4226

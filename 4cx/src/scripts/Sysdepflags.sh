@@ -19,7 +19,7 @@
 #      $OS becomes one of:
 #          "LINUX", "BSDI", "FREEBSD", "OPENBSD",
 #          "IRIX", "OSF", "UNIXWARE", "SUNOS", "SOLARIS",
-#          "CYGWIN", "INTERIX',
+#          "CYGWIN", "INTERIX', "DARWIN"
 #          or "UNKNOWN"
 #
 #  Reserved OS names:
@@ -34,7 +34,7 @@ if   (echo $UNAME | grep -i "linux"   >/dev/null)
 then
     OS="LINUX"
 # Cygwin should be as at top as possible, to minimize number of exec()s ;-)
-elif (echo $UNAME | grep -i "cygwin" >/dev/null)
+elif (echo $UNAME | grep -i "cygwin"  >/dev/null)
 then
     OS="CYGWIN"
 elif (echo $UNAME | grep -i "interix" >/dev/null)
@@ -50,7 +50,7 @@ then
 elif (echo $UNAME | grep -i "freebsd" >/dev/null)
 then
     OS="FREEBSD"
-elif (echo $UNAME | grep -i "darwin" >/dev/null)
+elif (echo $UNAME | grep -i "darwin"  >/dev/null)
 then
     OS="DARWIN"
 elif (echo $UNAME | grep -i "irix"    >/dev/null)
@@ -78,7 +78,7 @@ fi
 #
 #  Result:
 #      $CPU becomes one of:
-#          "X86", "X86_64", "SPARC", "MIPS", "ALPHA" or "UNKNOWN"
+#          "X86", "X86_64", "SPARC", "MIPS", "ALPHA", "E2K or "UNKNOWN"
 #
 #  Reserved CPU names:
 #      "PPC", "ARM", "M68K", "M88K", "VAX"
@@ -106,6 +106,7 @@ then
 elif (echo $PLATFORM | grep -i "sparc"   >/dev/null)
 then
     CPU="SPARC"
+# Isn't ideal because early SUNs are M68k-based, but those are antique anyway
 elif (echo $PLATFORM | grep -i "sun"     >/dev/null)
 then
     CPU="SPARC"
@@ -115,6 +116,12 @@ then
 elif (echo $PLATFORM | grep -i "alpha"   >/dev/null)
 then
     CPU="ALPHA"
+elif (echo $PLATFORM | grep -i "e2k"     >/dev/null)
+then
+    CPU="E2K"
+elif (echo $PLATFORM | grep -i "aarch64"     >/dev/null)
+then
+    CPU="AARCH64"
 fi
 
 

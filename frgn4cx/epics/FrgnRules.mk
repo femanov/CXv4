@@ -4,6 +4,8 @@ EPICS_OS_INCLUDE_DIR=		$(EPICS_INCLUDE_DIR)/os/Linux
 EPICS_COMPILER_INCLUDE_DIR=	$(EPICS_INCLUDE_DIR)/compiler/gcc
 
 #!!! Damn!!! Stupid EPICSoids -- one has to EXPLICITLY point to specific OS-ARCH dir, instead of something like "this platform"
+tolower_OS:=			$(shell echo $(OS)  | tr '[:lower:]' '[:upper:]')
+tolower_CPU:=			$(shell echo $(CPU) | tr '[:lower:]' '[:upper:]')
 EPICS_OS_LIB_DIR=		$(EPICS_BASE_DIR)/lib/linux-x86_64
 
 EPICS_INCLUDES=			-I$(EPICS_INCLUDE_DIR) \

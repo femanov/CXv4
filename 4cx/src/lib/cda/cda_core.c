@@ -1311,7 +1311,7 @@ int            cda_del_dataref_evproc(cda_dataref_t         ref,
     if (ri->in_use == REF_TYPE_FLA)
     {
         if (ri->fla_vmt             != NULL  &&
-            ri->fla_vmt->add_evproc != NULL)
+            ri->fla_vmt->del_evproc != NULL)
             return ri->fla_vmt->del_evproc(ri->fla_privptr,
                                            evmask, evproc, privptr2);
         else

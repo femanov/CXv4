@@ -687,8 +687,8 @@ static int  cankoz_add   (int devid, void *devptr,
         if (lp->fd < 0)
         {
             DoDriverLog(my_lyrid, 0 | DRIVERLOG_ERRNO,
-                        "%s: can_hal_open_and_setup_line(): %s",
-                        __FUNCTION__, err);
+                        "%s: can_hal_open_and_setup_line(line=%d): %s",
+                        __FUNCTION__, line, err);
             sq_fini(&(dp->q));
             return -CXRF_DRV_PROBL;
         }

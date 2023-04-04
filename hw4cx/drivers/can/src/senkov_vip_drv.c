@@ -18,7 +18,7 @@ enum
     DESC_WRITECTL = CANKOZ_DESC_WRITEOUTREG,
 };
 
-static int max_dac_values[SENKOV_VIP_SET_n_count] =
+static const int default_max_dac_values[SENKOV_VIP_SET_n_count] =
 {
     0,
     700,
@@ -41,10 +41,14 @@ typedef struct
     int              devid;
     int              handle;
 
+    int              max_dac_values[SENKOV_VIP_SET_n_count];
+    int              max_u; // Is used for auxinfo parsing only, value is copied into max_dac_values[SENKOV_VIP_SET_n_DAC_UOUT]
 } privrec_t;
 
 static psp_paramdescr_t senkov_vip_params[] =
 {
+    PSP_P_INT("max_u", privrec_t, max_u, -1, 1, 120),
+
     PSP_P_END()
 };
 
@@ -62,6 +66,11 @@ static int senkov_vip_init_d(int devid, void *devptr,
   privrec_t *me    = (privrec_t *) devptr;
     
     DoDriverLog(devid, 0 | DRIVERLOG_C_ENTRYPOINT, "ENTRY %s(%s)", __FUNCTION__, auxinfo);
+
+    /* Handle params-config, what should be better done via just parsing, but that's impossible because of required "*10" */
+    memcpy(me->max_dac_values, default_max_dac_values, sizeof(default_max_dac_values));
+    if (me->max_u > 0)
+        me->max_dac_values[SENKOV_VIP_SET_n_DAC_UOUT] = me->max_u * 10;
 
     /* Initialize interface */
     me->lvmt   = GetLayerVMT(devid);
@@ -231,8 +240,8 @@ static void senkov_vip_rw_p(int devid, void *devptr,
             if (action == DRVA_WRITE)
             {
                 code = val;
-                if (code < 0)                    code = 0;
-                if (code > max_dac_values[attr]) code = max_dac_values[attr];
+                if (code < 0)                        code = 0;
+                if (code > me->max_dac_values[attr]) code = me->max_dac_values[attr];
 
                 me->lvmt->q_enqueue_v(me->handle, SQ_ALWAYS,
                                       SQ_TRIES_DIR, 0,

@@ -5,7 +5,7 @@
 #                                                                    #
 ######################################################################
 
-SH_UTILS=	cstart run-cx-server start-all-servers stop-all-servers
+SH_UTILS=	cstart
 UNCFILES=	$(SH_UTILS)
 EXES=		cx-starter
 cx-starter_COMPONENTS=	cx-starter.o \

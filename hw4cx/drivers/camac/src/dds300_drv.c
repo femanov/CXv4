@@ -92,6 +92,8 @@ static int dds300_init_d(int devid, void *devptr,
     return DEVSTATE_OPERATING;
 }
 
+#define DEBUG_DATA_IO 1
+
 static rflags_t dds300_rd_data(int N, int ra, uint8 *data, int data_len)
 {
   rflags_t  rflags = 0;
@@ -101,7 +103,13 @@ static rflags_t dds300_rd_data(int N, int ra, uint8 *data, int data_len)
     {
         c = ra << 8;
         rflags |= x2rflags(DO_NAF(CAMAC_REF, N, A_REGADR, 16, &c));
+#if DEBUG_DATA_IO
+        DoDriverLog(1, DRIVERLOG_C_DATACONV, "w NAF(%d,%d,%2d,%d) rflags=%d c=0x%x", N, A_REGADR, 16, c, rflags, c);
+#endif
         rflags |= x2rflags(DO_NAF(CAMAC_REF, N, A_DATA,   0,  &c));
+#if DEBUG_DATA_IO
+        DoDriverLog(1, DRIVERLOG_C_DATACONV, "r NAF(%d,%d,%2d,%d) rflags=%d c=0x%x", N, A_DATA,   0,  c, rflags, c);
+#endif
         *data = c;
     }
     return rflags;
@@ -116,6 +124,9 @@ static rflags_t dds300_wr_data(int N, int ra, uint8 *data, int data_len)
     {
         c = (ra << 8) | *data;
         rflags |= x2rflags(DO_NAF(CAMAC_REF, N, A_DATA, 16, &c));
+#if DEBUG_DATA_IO
+        DoDriverLog(1, DRIVERLOG_C_DATACONV, "w NAF(%d,%d,%2d,%d) rflags=%d c=0x%x", N, A_DATA, 16, c, rflags, c);
+#endif
     }
   
     return rflags;
@@ -270,16 +281,19 @@ static void dds300_rw_p(int devid, void *devptr,
                     if (value < 0) value = 0;
                     FTW = value * fquant + 0.5;
                     rflags |= dds300_wr_int64(me->N, ra, FTW, AD9854_R_FTW_BYTES);
-                    DDS300_UPDATE();
                     DoDriverLog(devid, 0 | DRIVERLOG_C_DATACONV,
-                                "write(%d:%02x): value=%d FTW=%016llx",
-                                chn, ra, value, FTW);
+                                "write(%d:%02x): %c value=%d FTW=%016llx rflags=%d",
+                                chn, ra, (rflags&CXRF_CAMAC_NO_X)?'-':'X', value, FTW, rflags);
+                    DDS300_UPDATE();
+#if DEBUG_DATA_IO
+                    DoDriverLog(devid, 0 | DRIVERLOG_C_DATACONV, "UPDATE rflags=%d", rflags);
+#endif
                 }
                 rflags |= dds300_rd_int64(me->N, ra, &FTW, AD9854_R_FTW_BYTES);
                 value = FTW / fquant + 0.5;
-                DoDriverLog(devid, 0 | DRIVERLOG_C_DATACONV,
-                            " read(%d:%02x): value=%d FTW=%016llx fq=%e",
-                            chn, ra, value, FTW, fquant);
+                DoDriverLog    (devid, 0 | DRIVERLOG_C_DATACONV,
+                                " read(%d:%02x): %c value=%d FTW=%016llx fq=%e rflags=%d",
+                                chn, ra, (rflags&CXRF_CAMAC_NO_X)?'-':'X', value, FTW, fquant, rflags);
                 break;
                 
             case DDS300_CHAN_REF_SEL:
