@@ -565,7 +565,7 @@ static void ProcessInData(cda_d_vcas_privrec_t *me,
 
   void          *value_p;
   int            nelems;
-  rflags_t       rflags;
+  rflags_t       rflags=0;
   cx_time_t      timestamp;
   cx_time_t     *timestamp_p;
   struct tm      brk_time;
