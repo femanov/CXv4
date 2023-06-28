@@ -1,3 +1,5 @@
 #!/bin/sh
 
-sudo ln -snf /bin/sh bash
+# change /bin/sh simlink from dash to bash
+
+sudo ln -snf bash /bin/sh
